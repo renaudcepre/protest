@@ -4,7 +4,12 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "colorlog>=6.9.0",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.26.0",
+    "pyyaml>=6.0.2",
+]
 
 
 [tool.ruff]
@@ -43,3 +48,12 @@ select = [
 
 [tool.mypy]
 strict = true
+
+[tool.pytest.ini_options]
+pythonpath = "."
+testpaths = ["tests"]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "[%(levelname)7s] %(name)20s - %(message)s"
