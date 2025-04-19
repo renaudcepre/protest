@@ -56,6 +56,8 @@ async def async_db_pool(config: Annotated[dict[str, Any], Use(config)]) -> Async
 logger.debug("Creating User Management suite")
 user_suite = ProTestSuite(name="User Management")
 
+test_session.include_suite(user_suite)
+
 
 # ====== USER SUITE FIXTURES ======
 
@@ -255,7 +257,7 @@ def test_with_async_db(
 
 # Include all suites in the session
 logger.debug("Including all suites in the test session")
-test_session.include_suite(user_suite)
+
 test_session.include_suite(api_suite)
 test_session.include_suite(data_suite)
 
