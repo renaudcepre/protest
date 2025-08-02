@@ -44,16 +44,15 @@ select = [
     "S101", #  Use of `assert` detected
     "PLR2004", # Magic value used in comparison
 ]
-"usage_exemples/**" = [
-    "S101", #  Use of `assert` detected 
-    "PLR2004", # Magic value used in comparison
-]
+
 
 [tool.mypy]
 strict = true
+exclude = [
+    "usage_examples",
+]
 
 [tool.pytest.ini_options]
-pythonpath = "."
 testpaths = ["tests"]
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "function"
