@@ -39,10 +39,13 @@ select = [
     "RUF", # Ruff-specific rules
 ]
 
-
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = [
     "S101", #  Use of `assert` detected
+    "PLR2004", # Magic value used in comparison
+]
+"usage_exemples/**" = [
+    "S101", #  Use of `assert` detected 
     "PLR2004", # Magic value used in comparison
 ]
 
