@@ -17,6 +17,10 @@ class AlreadyRegisteredError(ProTestError):
     """Raised when attempting to register a function that is already registered."""
 
 
+class UnregisteredDependencyError(ProTestError):
+    """Raised when a fixture depends on an unregistered function."""
+
+
 class Resolver:
     """Manages fixture registration, dependency analysis, and resolution."""
 
@@ -64,7 +68,10 @@ class Resolver:
             dep_func = self._extract_dependency_from_parameter(param)
             if dep_func:
                 if dep_func not in self._registry:
-                    self.register(dep_func, Scope.FUNCTION)
+                    raise UnregisteredDependencyError(
+                        f"Fixture '{fixture.func.__name__}' depends on unregistered function '{dep_func.__name__}'. "
+                f"Register '{dep_func.__name__}' first."
+                    )
 
                 self._validate_scope(fixture, dep_func)
                 dependencies[param_name] = dep_func

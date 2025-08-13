@@ -22,6 +22,3 @@ class Use:
 
     def __init__(self, dependency: Callable[..., Any]):
         self.dependency = dependency
-
-    def __str__(self) -> str:
-        return f"Use({self.dependency.__name__})"
