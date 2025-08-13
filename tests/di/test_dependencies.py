@@ -1,10 +1,9 @@
 # A collection of simple functions to be used as dependencies in tests.
 
 from collections import defaultdict
-from typing import Dict
 
 # Counter to track how many times a function is called.
-call_counts: Dict[str, int] = defaultdict(int)
+call_counts: dict[str, int] = defaultdict(int)
 
 
 def reset_call_counts() -> None:
@@ -12,6 +11,7 @@ def reset_call_counts() -> None:
 
 
 # --- Simple Dependencies ---
+
 
 def dependency_d() -> str:
     call_counts["d"] += 1
@@ -35,6 +35,7 @@ def dependency_a(b: str | None = None, c: str | None = None) -> str:
 
 # --- Scoped Dependencies ---
 
+
 def session_dependency() -> str:
     call_counts["session"] += 1
     return "session_data"
@@ -46,6 +47,7 @@ def function_dependency() -> str:
 
 
 # --- Invalid Scope Dependencies ---
+
 
 def session_needs_function(f: str | None = None) -> str:
     return f"session_using_{f}"

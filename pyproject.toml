@@ -30,7 +30,6 @@ select = [
     "D212", # Multi-line docstring summary should start at the first line
 
     "N", # pep8-naming
-    "S", # flake8-bandit
     "C4", # flake8-comprehensions
     "PIE", # flake8-pie
     "T20", # flake8-print
@@ -41,7 +40,6 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = [
-    "S101", #  Use of `assert` detected
     "PLR2004", # Magic value used in comparison
 ]
 
@@ -59,3 +57,8 @@ asyncio_default_fixture_loop_scope = "function"
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "[%(levelname)7s] %(name)20s - %(message)s"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.17.1",
+]

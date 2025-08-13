@@ -6,14 +6,14 @@ from typing import Annotated, Any, get_args, get_origin
 from protest.core.fixture import Fixture
 from protest.core.scope import Scope
 from protest.di.markers import Use
-from protest.exceptions import ProTestException
+from protest.exceptions import ProTestError
 
 
-class ScopeMismatchError(ProTestException):
+class ScopeMismatchError(ProTestError):
     """Raised when a dependency has an incompatible scope."""
 
 
-class AlreadyRegisteredError(ProTestException):
+class AlreadyRegisteredError(ProTestError):
     """Raised when attempting to register a function that is already registered."""
 
 
