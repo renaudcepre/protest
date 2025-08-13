@@ -12,7 +12,13 @@ from protest.exceptions import ProTestError
 class ScopeMismatchError(ProTestError):
     """Raised when a dependency has an incompatible scope."""
 
-    def __init__(self, requester_name: str, requester_scope: str, dependency_name: str, dependency_scope: str):
+    def __init__(
+        self,
+        requester_name: str,
+        requester_scope: str,
+        dependency_name: str,
+        dependency_scope: str,
+    ):
         self.requester_name = requester_name
         self.requester_scope = requester_scope
         self.dependency_name = dependency_name
@@ -35,7 +41,8 @@ class UnregisteredDependencyError(ProTestError):
 
     def __init__(self, fixture_name: str, dependency_name: str):
         super().__init__(
-            f"Fixture '{fixture_name}' depends on unregistered function '{dependency_name}'. "
+            f"Fixture '{fixture_name}' depends on unregistered "
+            f"function '{dependency_name}'. "
             f"Register '{dependency_name}' first."
         )
 
@@ -87,7 +94,9 @@ class Resolver:
             dep_func = self._extract_dependency_from_parameter(param)
             if dep_func:
                 if dep_func not in self._registry:
-                    raise UnregisteredDependencyError(fixture.func.__name__, dep_func.__name__)
+                    raise UnregisteredDependencyError(
+                        fixture.func.__name__, dep_func.__name__
+                    )
 
                 self._validate_scope(fixture, dep_func)
                 dependencies[param_name] = dep_func
@@ -95,7 +104,9 @@ class Resolver:
         if dependencies:
             self._dependencies[fixture.func] = dependencies
 
-    def _validate_scope(self, requester: Fixture, dependency_func: Callable[..., Any]) -> None:
+    def _validate_scope(
+        self, requester: Fixture, dependency_func: Callable[..., Any]
+    ) -> None:
         """Ensures a dependency has a wider or equal scope than its requester."""
         dependency_fixture = self._registry[dependency_func]
         if dependency_fixture.scope.value > requester.scope.value:
@@ -107,7 +118,9 @@ class Resolver:
             )
 
     @staticmethod
-    def _extract_dependency_from_parameter(param: inspect.Parameter) -> Callable[..., Any] | None:
+    def _extract_dependency_from_parameter(
+        param: inspect.Parameter,
+    ) -> Callable[..., Any] | None:
         if get_origin(param.annotation) is Annotated:
             for metadata in get_args(param.annotation)[1:]:
                 if isinstance(metadata, Use):

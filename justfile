@@ -5,8 +5,8 @@
 
 # Run all linting and formatting
 @lintfix:
-    ruff check --fix .
     ruff format .
+    ruff check --fix .
     mypy --strict .
 
 # Run tests with verbose output

@@ -14,7 +14,7 @@ dependencies = [
 
 [tool.ruff]
 output-format = "concise"
-line-length = 120
+line-length = 88
 
 [tool.ruff.lint]
 select = [

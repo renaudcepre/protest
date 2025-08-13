@@ -5,8 +5,18 @@ import pytest
 
 from protest.core.scope import Scope
 from protest.di.markers import Use
-from protest.di.resolver import AlreadyRegisteredError, Resolver, ScopeMismatchError, UnregisteredDependencyError
-from tests.di.test_dependencies import call_counts, function_dependency, reset_call_counts, session_dependency
+from protest.di.resolver import (
+    AlreadyRegisteredError,
+    Resolver,
+    ScopeMismatchError,
+    UnregisteredDependencyError,
+)
+from tests.di.test_dependencies import (
+    call_counts,
+    function_dependency,
+    reset_call_counts,
+    session_dependency,
+)
 
 
 @pytest.fixture
@@ -71,7 +81,9 @@ def test_session_dependency_is_available_in_function_scope(resolver: Resolver) -
 def test_session_scope_cannot_depend_on_function_scope(resolver: Resolver) -> None:
     resolver.register(function_dependency, Scope.FUNCTION)
 
-    def invalid_session_fixture(function_data: Annotated[str, Use(function_dependency)]) -> str:
+    def invalid_session_fixture(
+        function_data: Annotated[str, Use(function_dependency)],
+    ) -> str:
         return f"session_using_{function_data}"
 
     # This will fail fast, during registration/analysis
@@ -90,7 +102,9 @@ def test_cannot_register_same_function_twice(resolver: Resolver) -> None:
     resolver.register(my_fixture, Scope.FUNCTION)
 
     # Second registration should fail
-    with pytest.raises(AlreadyRegisteredError, match=r"Function 'my_fixture' is already registered\."):
+    with pytest.raises(
+        AlreadyRegisteredError, match=r"Function 'my_fixture' is already registered\."
+    ):
         resolver.register(my_fixture, Scope.SESSION)
 
 
@@ -101,7 +115,9 @@ def test_fails_on_unregistered_dependency(resolver: Resolver) -> None:
     def unregistered_dependency() -> str:
         return "unregistered_data"
 
-    def fixture_with_unregistered_dep(dep: Annotated[str, Use(unregistered_dependency)]) -> str:
+    def fixture_with_unregistered_dep(
+        dep: Annotated[str, Use(unregistered_dependency)],
+    ) -> str:
         return f"fixture({dep})"
 
     with pytest.raises(UnregisteredDependencyError, match=r"unregistered function"):
@@ -109,7 +125,9 @@ def test_fails_on_unregistered_dependency(resolver: Resolver) -> None:
 
 
 def test_extract_dependency_returns_none_for_regular_params() -> None:
-    regular_param = Parameter("regular_param", Parameter.POSITIONAL_OR_KEYWORD, annotation=str)
+    regular_param = Parameter(
+        "regular_param", Parameter.POSITIONAL_OR_KEYWORD, annotation=str
+    )
 
     result = Resolver._extract_dependency_from_parameter(regular_param)
 
