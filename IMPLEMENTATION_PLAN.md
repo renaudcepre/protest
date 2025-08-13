@@ -18,8 +18,8 @@ building the framework.
 
 - [ ] Implement `ProTestSession` class
 - [ ] Implement `ProTestSuite` class
-- [ ] Create `Scope` enum (SESSION, SUITE, FUNCTION)
-- [ ] Implement `Use` marker for injection
+- [X] Create `Scope` enum (SESSION, SUITE, FUNCTION)
+- [X] Implement `Use` marker for injection
 - [ ] Define data structures for tests/fixtures storage
 
 #### 1.2 Dependency Injection System (3-4 days)
