@@ -1,7 +1,8 @@
 from end_to_end import e2e_suite
-from protest import ProTestSession
 from protest_cases import protest_suite
 from unit import unit_suite
+
+from protest import ProTestSession
 
 session = ProTestSession()
 
