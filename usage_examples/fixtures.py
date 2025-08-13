@@ -22,7 +22,9 @@ def app_config() -> dict:
 
 
 @session.fixture(scope=Scope.SESSION)
-async def database_pool(config: Annotated[dict, Use(app_config)]) -> AsyncGenerator[str, None]:
+async def database_pool(
+    config: Annotated[dict, Use(app_config)],
+) -> AsyncGenerator[str, None]:
     """Database connection pool shared across all suites."""
     await asyncio.sleep(0.1)
     pool_id = f"db_pool_{hash(config['database_url']) % 1000}"
@@ -31,7 +33,9 @@ async def database_pool(config: Annotated[dict, Use(app_config)]) -> AsyncGenera
 
 
 @session.fixture(scope=Scope.FUNCTION)
-async def db_transaction(pool: Annotated[str, Use(database_pool)]) -> AsyncGenerator[str, None]:
+async def db_transaction(
+    pool: Annotated[str, Use(database_pool)],
+) -> AsyncGenerator[str, None]:
     """Database transaction with automatic rollback."""
     await asyncio.sleep(0.02)
     tx_id = f"tx_{hash(pool) % 100}"
@@ -40,7 +44,9 @@ async def db_transaction(pool: Annotated[str, Use(database_pool)]) -> AsyncGener
 
 
 @session.fixture(scope=Scope.SESSION)
-async def redis_client(config: Annotated[dict, Use(app_config)]) -> AsyncGenerator[str, None]:
+async def redis_client(
+    config: Annotated[dict, Use(app_config)],
+) -> AsyncGenerator[str, None]:
     """Redis client shared across all suites."""
     await asyncio.sleep(0.05)
     client_id = f"redis_{hash(config['redis_url']) % 1000}"
@@ -49,7 +55,9 @@ async def redis_client(config: Annotated[dict, Use(app_config)]) -> AsyncGenerat
 
 
 @session.fixture(scope=Scope.FUNCTION)
-async def http_client(config: Annotated[dict, Use(app_config)]) -> AsyncGenerator[dict, None, None]:
+async def http_client(
+    config: Annotated[dict, Use(app_config)],
+) -> AsyncGenerator[dict, None, None]:
     """Basic HTTP client shared across multiple suites:
     - api_integration/ uses it directly
     - performance/ uses it directly
