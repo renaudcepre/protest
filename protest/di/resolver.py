@@ -1,6 +1,7 @@
 import inspect
+from collections.abc import Callable
 from inspect import signature
-from typing import Any, Callable, Dict, Annotated, get_origin, get_args
+from typing import Annotated, Any, get_args, get_origin
 
 from protest.core.fixture import Fixture
 from protest.core.scope import Scope
@@ -10,22 +11,23 @@ from protest.exceptions import ProTestException
 
 class ScopeMismatchError(ProTestException):
     """Raised when a dependency has an incompatible scope."""
-    pass
+
+
+class AlreadyRegisteredError(ProTestException):
+    """Raised when attempting to register a function that is already registered."""
 
 
 class Resolver:
     """Manages fixture registration, dependency analysis, and resolution."""
 
     def __init__(self) -> None:
-        self._registry: Dict[Callable[..., Any], Fixture] = {}
-        self._dependencies: Dict[Callable[..., Any], Dict[str, Callable[..., Any]]] = {}
+        self._registry: dict[Callable[..., Any], Fixture] = {}
+        self._dependencies: dict[Callable[..., Any], dict[str, Callable[..., Any]]] = {}
 
     def register(self, func: Callable[..., Any], scope: Scope) -> None:
         """Analyzes a function's dependencies and registers it as a Fixture."""
         if func in self._registry:
-            if scope.value < self._registry[func].scope.value:
-                self._registry[func].scope = scope
-            return
+            raise AlreadyRegisteredError(f"Function '{func.__name__}' is already registered.")
 
         fixture = Fixture(func, scope)
         self._analyze_and_store_dependencies(fixture)
@@ -63,10 +65,10 @@ class Resolver:
             if dep_func:
                 if dep_func not in self._registry:
                     self.register(dep_func, Scope.FUNCTION)
-                
+
                 self._validate_scope(fixture, dep_func)
                 dependencies[param_name] = dep_func
-        
+
         if dependencies:
             self._dependencies[fixture.func] = dependencies
 

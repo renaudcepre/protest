@@ -1,7 +1,7 @@
 import pytest
 from typing import Annotated
 
-from protest.di.resolver import Resolver, ScopeMismatchError
+from protest.di.resolver import Resolver, ScopeMismatchError, AlreadyRegisteredError
 from protest.di.markers import Use
 from protest.core.scope import Scope
 from tests.di.test_dependencies import (
@@ -65,3 +65,16 @@ def test_session_scope_cannot_depend_on_function_scope(resolver):
     # This will fail fast, during registration/analysis
     with pytest.raises(ScopeMismatchError):
         resolver.register(invalid_session_fixture, Scope.SESSION)
+
+# --- Already Registered Error Test ---
+
+def test_cannot_register_same_function_twice(resolver):
+    def my_fixture() -> str:
+        return "test"
+    
+    # First registration should work
+    resolver.register(my_fixture, Scope.FUNCTION)
+    
+    # Second registration should fail
+    with pytest.raises(AlreadyRegisteredError, match=r"Function 'my_fixture' is already registered\."):
+        resolver.register(my_fixture, Scope.SESSION)
