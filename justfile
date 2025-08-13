@@ -15,7 +15,7 @@
 
 # Run tests with coverage
 @test-cov *options="":
-    uv run pytest -vv --cov=protest --cov-report=html {{ options }}
+    uv run pytest -vv --cov=protest --cov-report=term {{ options }}
 
 # Run tests with coverage and open browser
 @test-cov-open *options="":

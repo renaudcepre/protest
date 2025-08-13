@@ -112,6 +112,4 @@ class Resolver:
             for metadata in get_args(param.annotation)[1:]:
                 if isinstance(metadata, Use):
                     return metadata.dependency
-        elif isinstance(param.default, Use):
-            return param.default.dependency
         return None
