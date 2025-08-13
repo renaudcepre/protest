@@ -18,8 +18,8 @@ def resolver() -> Resolver:
 
 def test_session_scope_is_cached(resolver: Resolver) -> None:
     resolver.register(session_dependency, Scope.SESSION)
-    def target(s: Annotated[str, Use(session_dependency)]) -> str:
-        return s
+    def target(session_data: Annotated[str, Use(session_dependency)]) -> str:
+        return session_data
     resolver.register(target, Scope.SESSION)
 
     resolver.resolve(target)
@@ -29,8 +29,8 @@ def test_session_scope_is_cached(resolver: Resolver) -> None:
 
 def test_function_scope_is_not_cached_across_runs(resolver: Resolver) -> None:
     resolver.register(function_dependency, Scope.FUNCTION)
-    def target(f: Annotated[str, Use(function_dependency)]) -> str:
-        return f
+    def target(function_data: Annotated[str, Use(function_dependency)]) -> str:
+        return function_data
     resolver.register(target, Scope.FUNCTION)
 
     resolver.resolve(target)
@@ -43,8 +43,8 @@ def test_function_scope_is_not_cached_across_runs(resolver: Resolver) -> None:
 
 def test_session_dependency_is_available_in_function_scope(resolver: Resolver) -> None:
     resolver.register(session_dependency, Scope.SESSION)
-    def target(s: Annotated[str, Use(session_dependency)]) -> str:
-        return s
+    def target(session_data: Annotated[str, Use(session_dependency)]) -> str:
+        return session_data
     resolver.register(target, Scope.FUNCTION)
 
     resolver.resolve(target)
@@ -58,8 +58,8 @@ def test_session_dependency_is_available_in_function_scope(resolver: Resolver) -
 def test_session_scope_cannot_depend_on_function_scope(resolver: Resolver) -> None:
     resolver.register(function_dependency, Scope.FUNCTION)
 
-    def invalid_session_fixture(f: Annotated[str, Use(function_dependency)]) -> str:
-        return f"session_using_{f}"
+    def invalid_session_fixture(function_data: Annotated[str, Use(function_dependency)]) -> str:
+        return f"session_using_{function_data}"
 
     # This will fail fast, during registration/analysis
     with pytest.raises(ScopeMismatchError):
