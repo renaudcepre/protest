@@ -1,3 +1,4 @@
+from inspect import Parameter
 from typing import Annotated
 
 import pytest
@@ -105,3 +106,11 @@ def test_fails_on_unregistered_dependency(resolver: Resolver) -> None:
 
     with pytest.raises(UnregisteredDependencyError, match=r"unregistered function"):
         resolver.register(fixture_with_unregistered_dep, Scope.SESSION)
+
+
+def test_extract_dependency_returns_none_for_regular_params() -> None:
+    regular_param = Parameter("regular_param", Parameter.POSITIONAL_OR_KEYWORD, annotation=str)
+
+    result = Resolver._extract_dependency_from_parameter(regular_param)
+
+    assert result is None

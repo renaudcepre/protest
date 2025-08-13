@@ -12,3 +12,4 @@ wheels/
 .cursor
 .idea
 /.coverage
+/.claude/
