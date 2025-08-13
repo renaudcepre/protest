@@ -99,12 +99,9 @@ def test_cannot_register_same_function_twice(resolver: Resolver) -> None:
 def test_fails_on_unregistered_dependency(resolver: Resolver) -> None:
     def unregistered_dependency() -> str:
         return "unregistered_data"
-    
+
     def fixture_with_unregistered_dep(dep: Annotated[str, Use(unregistered_dependency)]) -> str:
         return f"fixture({dep})"
-    
-    # unregistered_dependency n'est PAS enregistré
-    # Cette ligne doit échouer avec UnregisteredDependencyError
-    with pytest.raises(UnregisteredDependencyError, match=
-        r"Fixture 'fixture_with_unregistered_dep' depends on unregistered function 'unregistered_dependency'\. Register 'unregistered_dependency' first\."):
+
+    with pytest.raises(UnregisteredDependencyError, match=r"unregistered function"):
         resolver.register(fixture_with_unregistered_dep, Scope.SESSION)

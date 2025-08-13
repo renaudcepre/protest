@@ -12,13 +12,32 @@ from protest.exceptions import ProTestError
 class ScopeMismatchError(ProTestError):
     """Raised when a dependency has an incompatible scope."""
 
+    def __init__(self, requester_name: str, requester_scope: str, dependency_name: str, dependency_scope: str):
+        self.requester_name = requester_name
+        self.requester_scope = requester_scope
+        self.dependency_name = dependency_name
+        self.dependency_scope = dependency_scope
+        super().__init__(
+            f"Fixture '{requester_name}' with scope {requester_scope} "
+            f"cannot depend on '{dependency_name}' with scope {dependency_scope}."
+        )
+
 
 class AlreadyRegisteredError(ProTestError):
     """Raised when attempting to register a function that is already registered."""
 
+    def __init__(self, function_name: str):
+        super().__init__(f"Function '{function_name}' is already registered.")
+
 
 class UnregisteredDependencyError(ProTestError):
     """Raised when a fixture depends on an unregistered function."""
+
+    def __init__(self, fixture_name: str, dependency_name: str):
+        super().__init__(
+            f"Fixture '{fixture_name}' depends on unregistered function '{dependency_name}'. "
+            f"Register '{dependency_name}' first."
+        )
 
 
 class Resolver:
@@ -31,7 +50,7 @@ class Resolver:
     def register(self, func: Callable[..., Any], scope: Scope) -> None:
         """Analyzes a function's dependencies and registers it as a Fixture."""
         if func in self._registry:
-            raise AlreadyRegisteredError(f"Function '{func.__name__}' is already registered.")
+            raise AlreadyRegisteredError(func.__name__)
 
         fixture = Fixture(func, scope)
         self._analyze_and_store_dependencies(fixture)
@@ -68,10 +87,7 @@ class Resolver:
             dep_func = self._extract_dependency_from_parameter(param)
             if dep_func:
                 if dep_func not in self._registry:
-                    raise UnregisteredDependencyError(
-                        f"Fixture '{fixture.func.__name__}' depends on unregistered function '{dep_func.__name__}'. "
-                f"Register '{dep_func.__name__}' first."
-                    )
+                    raise UnregisteredDependencyError(fixture.func.__name__, dep_func.__name__)
 
                 self._validate_scope(fixture, dep_func)
                 dependencies[param_name] = dep_func
@@ -84,8 +100,10 @@ class Resolver:
         dependency_fixture = self._registry[dependency_func]
         if dependency_fixture.scope.value > requester.scope.value:
             raise ScopeMismatchError(
-                f"Fixture '{requester.func.__name__}' with scope {requester.scope.name} "
-                f"cannot depend on '{dependency_fixture.func.__name__}' with scope {dependency_fixture.scope.name}."
+                requester.func.__name__,
+                requester.scope.name,
+                dependency_fixture.func.__name__,
+                dependency_fixture.scope.name,
             )
 
     @staticmethod
