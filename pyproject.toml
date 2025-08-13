@@ -61,4 +61,5 @@ log_cli_format = "[%(levelname)7s] %(name)20s - %(message)s"
 [dependency-groups]
 dev = [
     "mypy>=1.17.1",
+    "pytest-cov>=6.0.0",
 ]

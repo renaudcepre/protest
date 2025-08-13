@@ -4,7 +4,7 @@ import pytest
 
 from protest.core.scope import Scope
 from protest.di.markers import Use
-from protest.di.resolver import AlreadyRegisteredError, Resolver, ScopeMismatchError
+from protest.di.resolver import AlreadyRegisteredError, Resolver, ScopeMismatchError, UnregisteredDependencyError
 from tests.di.test_dependencies import call_counts, function_dependency, reset_call_counts, session_dependency
 
 
@@ -14,12 +14,16 @@ def resolver() -> Resolver:
     reset_call_counts()
     return Resolver()
 
+
 # --- Scoping and Caching Tests ---
+
 
 def test_session_scope_is_cached(resolver: Resolver) -> None:
     resolver.register(session_dependency, Scope.SESSION)
+
     def target(session_data: Annotated[str, Use(session_dependency)]) -> str:
         return session_data
+
     resolver.register(target, Scope.SESSION)
 
     resolver.resolve(target)
@@ -27,10 +31,13 @@ def test_session_scope_is_cached(resolver: Resolver) -> None:
 
     assert call_counts["session"] == 1
 
+
 def test_function_scope_is_not_cached_across_runs(resolver: Resolver) -> None:
     resolver.register(function_dependency, Scope.FUNCTION)
+
     def target(function_data: Annotated[str, Use(function_dependency)]) -> str:
         return function_data
+
     resolver.register(target, Scope.FUNCTION)
 
     resolver.resolve(target)
@@ -41,10 +48,13 @@ def test_function_scope_is_not_cached_across_runs(resolver: Resolver) -> None:
     resolver.resolve(target)
     assert call_counts["function"] == 2
 
+
 def test_session_dependency_is_available_in_function_scope(resolver: Resolver) -> None:
     resolver.register(session_dependency, Scope.SESSION)
+
     def target(session_data: Annotated[str, Use(session_dependency)]) -> str:
         return session_data
+
     resolver.register(target, Scope.FUNCTION)
 
     resolver.resolve(target)
@@ -53,7 +63,9 @@ def test_session_dependency_is_available_in_function_scope(resolver: Resolver) -
 
     assert call_counts["session"] == 1
 
+
 # --- Invalid Scope Dependency Test ---
+
 
 def test_session_scope_cannot_depend_on_function_scope(resolver: Resolver) -> None:
     resolver.register(function_dependency, Scope.FUNCTION)
@@ -65,7 +77,9 @@ def test_session_scope_cannot_depend_on_function_scope(resolver: Resolver) -> No
     with pytest.raises(ScopeMismatchError):
         resolver.register(invalid_session_fixture, Scope.SESSION)
 
+
 # --- Already Registered Error Test ---
+
 
 def test_cannot_register_same_function_twice(resolver: Resolver) -> None:
     def my_fixture() -> str:
@@ -77,3 +91,20 @@ def test_cannot_register_same_function_twice(resolver: Resolver) -> None:
     # Second registration should fail
     with pytest.raises(AlreadyRegisteredError, match=r"Function 'my_fixture' is already registered\."):
         resolver.register(my_fixture, Scope.SESSION)
+
+
+# --- Unregistered Dependency Error Test ---
+
+
+def test_fails_on_unregistered_dependency(resolver: Resolver) -> None:
+    def unregistered_dependency() -> str:
+        return "unregistered_data"
+    
+    def fixture_with_unregistered_dep(dep: Annotated[str, Use(unregistered_dependency)]) -> str:
+        return f"fixture({dep})"
+    
+    # unregistered_dependency n'est PAS enregistré
+    # Cette ligne doit échouer avec UnregisteredDependencyError
+    with pytest.raises(UnregisteredDependencyError, match=
+        r"Fixture 'fixture_with_unregistered_dep' depends on unregistered function 'unregistered_dependency'\. Register 'unregistered_dependency' first\."):
+        resolver.register(fixture_with_unregistered_dep, Scope.SESSION)
