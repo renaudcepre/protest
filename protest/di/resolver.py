@@ -1,7 +1,8 @@
 import inspect
 from inspect import signature
-from typing import Any, Callable, Annotated, get_origin, get_args
+from typing import Any, Callable, Dict, Annotated, get_origin, get_args
 
+from protest.core.fixture import Fixture
 from protest.core.scope import Scope
 from protest.di.markers import Use
 from protest.exceptions import ProTestException
@@ -12,67 +13,74 @@ class ScopeMismatchError(ProTestException):
     pass
 
 
-class DependencyContainer:
-    def __init__(self):
-        self._instance_cache: dict[Scope, dict[Callable, Any]] = {
-            scope: {} for scope in Scope
-        }
-        self._fixture_scopes: dict[Callable, Scope] = {}
-        self._signature_cache: dict[Callable, dict[str, Any]] = {}
+class Resolver:
+    """Manages fixture registration, dependency analysis, and resolution."""
 
-    def register(self, dependency: Callable, scope: Scope):
-        self._fixture_scopes[dependency] = scope
+    def __init__(self) -> None:
+        self._registry: Dict[Callable[..., Any], Fixture] = {}
+        self._dependencies: Dict[Callable[..., Any], Dict[str, Callable[..., Any]]] = {}
 
-    def get_scope(self, dependency: Callable) -> Scope:
-        return self._fixture_scopes.get(dependency, Scope.FUNCTION)
+    def register(self, func: Callable[..., Any], scope: Scope) -> None:
+        """Analyzes a function's dependencies and registers it as a Fixture."""
+        if func in self._registry:
+            if scope.value < self._registry[func].scope.value:
+                self._registry[func].scope = scope
+            return
 
-    def clear_cache(self, scope: Scope):
-        self._instance_cache[scope].clear()
+        fixture = Fixture(func, scope)
+        self._analyze_and_store_dependencies(fixture)
+        self._registry[func] = fixture
 
-    def _analyze_signature(self, call: Callable[..., Any]) -> dict[str, Any]:
-        if call in self._signature_cache:
-            return self._signature_cache[call]
+    def resolve(self, target_func: Callable[..., Any]) -> Any:
+        """Resolves a fixture by creating its dependencies and calling it."""
+        target_fixture = self._registry[target_func]
 
-        dependencies = {
-            param_name: dep_func
-            for param_name, param in signature(call).parameters.items()
-            if (dep_func := self._extract_dependency_from_parameter(param))
-        }
-        self._signature_cache[call] = {"dependencies": dependencies}
-        return self._signature_cache[call]
-
-    def resolve(self, call: Callable[..., Any]) -> Any:
-        call_scope = self.get_scope(call)
-
-        # 1. Check cache for the item's own registered scope.
-        if call in self._instance_cache[call_scope]:
-            return self._instance_cache[call_scope][call]
-
-        signature_info = self._analyze_signature(call)
+        if target_fixture.is_cached:
+            return target_fixture.cached_value
 
         kwargs = {}
-        for param_name, dependency in signature_info["dependencies"].items():
-            dep_scope = self.get_scope(dependency)
+        dependencies = self._dependencies.get(target_func, {})
+        for param_name, dep_func in dependencies.items():
+            kwargs[param_name] = self.resolve(dep_func)
 
-            # 2. Validate that the dependency has a wider or equal scope.
-            if dep_scope.value > call_scope.value:
-                raise ScopeMismatchError(
-                    f"Dependency '{dependency.__name__}' with scope {dep_scope.name} "
-                    f"cannot be injected into '{call.__name__}' with scope {call_scope.name}."
-                )
-            
-            # 3. Recursively resolve the dependency.
-            kwargs[param_name] = self.resolve(dependency)
-
-        # 4. Create and cache the instance in its own scope's cache.
-        result = call(**kwargs)
-        self._instance_cache[call_scope][call] = result
+        result = target_fixture.func(**kwargs)
+        target_fixture.cached_value = result
+        target_fixture.is_cached = True
         return result
 
+    def clear_cache(self, scope: Scope) -> None:
+        """Clears the cache for all fixtures within a specific scope."""
+        for fixture in self._registry.values():
+            if fixture.scope == scope:
+                fixture.clear_cache()
+
+    def _analyze_and_store_dependencies(self, fixture: Fixture) -> None:
+        """Analyzes a fixture's function signature and populates its dependencies."""
+        func_signature = signature(fixture.func)
+        dependencies = {}
+        for param_name, param in func_signature.parameters.items():
+            dep_func = self._extract_dependency_from_parameter(param)
+            if dep_func:
+                if dep_func not in self._registry:
+                    self.register(dep_func, Scope.FUNCTION)
+                
+                self._validate_scope(fixture, dep_func)
+                dependencies[param_name] = dep_func
+        
+        if dependencies:
+            self._dependencies[fixture.func] = dependencies
+
+    def _validate_scope(self, requester: Fixture, dependency_func: Callable[..., Any]) -> None:
+        """Ensures a dependency has a wider or equal scope than its requester."""
+        dependency_fixture = self._registry[dependency_func]
+        if dependency_fixture.scope.value > requester.scope.value:
+            raise ScopeMismatchError(
+                f"Fixture '{requester.func.__name__}' with scope {requester.scope.name} "
+                f"cannot depend on '{dependency_fixture.func.__name__}' with scope {dependency_fixture.scope.name}."
+            )
+
     @staticmethod
-    def _extract_dependency_from_parameter(
-        param: inspect.Parameter,
-    ) -> Callable[..., Any] | None:
+    def _extract_dependency_from_parameter(param: inspect.Parameter) -> Callable[..., Any] | None:
         if get_origin(param.annotation) is Annotated:
             for metadata in get_args(param.annotation)[1:]:
                 if isinstance(metadata, Use):
