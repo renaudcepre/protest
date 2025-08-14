@@ -11,12 +11,11 @@ from protest.di.resolver import (
     ScopeMismatchError,
     UnregisteredDependencyError,
 )
-from tests.di.test_dependencies import (
-    call_counts,
+from tests.di.dependencies import (
     function_dependency,
-    reset_call_counts,
     session_dependency,
 )
+from tests.di.utils import call_counts, reset_call_counts
 
 
 @pytest.fixture

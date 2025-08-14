@@ -10,8 +10,6 @@ from protest.exceptions import ProTestError
 
 
 class ScopeMismatchError(ProTestError):
-    """Raised when a dependency has an incompatible scope."""
-
     def __init__(
         self,
         requester_name: str,
@@ -19,10 +17,6 @@ class ScopeMismatchError(ProTestError):
         dependency_name: str,
         dependency_scope: str,
     ):
-        self.requester_name = requester_name
-        self.requester_scope = requester_scope
-        self.dependency_name = dependency_name
-        self.dependency_scope = dependency_scope
         super().__init__(
             f"Fixture '{requester_name}' with scope {requester_scope} "
             f"cannot depend on '{dependency_name}' with scope {dependency_scope}."
@@ -30,15 +24,11 @@ class ScopeMismatchError(ProTestError):
 
 
 class AlreadyRegisteredError(ProTestError):
-    """Raised when attempting to register a function that is already registered."""
-
     def __init__(self, function_name: str):
         super().__init__(f"Function '{function_name}' is already registered.")
 
 
 class UnregisteredDependencyError(ProTestError):
-    """Raised when a fixture depends on an unregistered function."""
-
     def __init__(self, fixture_name: str, dependency_name: str):
         super().__init__(
             f"Fixture '{fixture_name}' depends on unregistered "
@@ -91,18 +81,15 @@ class Resolver:
         func_signature = signature(fixture.func)
         dependencies = {}
         for param_name, param in func_signature.parameters.items():
-            dep_func = self._extract_dependency_from_parameter(param)
-            if dep_func:
-                if dep_func not in self._registry:
+            if dependency := self._extract_dependency_from_parameter(param):
+                if dependency not in self._registry:
                     raise UnregisteredDependencyError(
-                        fixture.func.__name__, dep_func.__name__
+                        fixture.func.__name__, dependency.__name__
                     )
 
-                self._validate_scope(fixture, dep_func)
-                dependencies[param_name] = dep_func
-
-        if dependencies:
-            self._dependencies[fixture.func] = dependencies
+                self._validate_scope(fixture, dependency)
+                dependencies[param_name] = dependency
+        self._dependencies[fixture.func] = dependencies
 
     def _validate_scope(
         self, requester: Fixture, dependency_func: Callable[..., Any]
