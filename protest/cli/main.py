@@ -10,7 +10,7 @@ def main() -> None:
     run_parser = subparsers.add_parser("run", help="Run tests")
     run_parser.add_argument(
         "target",
-        help="Module and session in format 'module:session' (e.g., 'tests.demo:session')",
+        help="Module and session in format 'module:session' (e.g., 'demo:session')",
     )
     run_parser.add_argument(
         "--app-dir",
@@ -52,6 +52,7 @@ def run_tests(target: str) -> None:
         print(f"Error: '{session_name}' is not a ProTestSession")
         sys.exit(1)
 
+    assert isinstance(session, ProTestSession)
     runner = TestRunner(session)
     success = runner.run()
     sys.exit(0 if success else 1)

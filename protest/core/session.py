@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from types import TracebackType
-from typing import Any
+from typing import Any, Self
 
 from protest.core.fixture import FixtureCallable
 from protest.core.scope import Scope
@@ -28,7 +28,9 @@ class ProTestSession:
     def tests(self) -> list[Callable[..., Any]]:
         return self._tests
 
-    def fixture(self, scope: Scope = Scope.SESSION) -> Callable[[FixtureCallable], FixtureCallable]:
+    def fixture(
+        self, scope: Scope = Scope.SESSION
+    ) -> Callable[[FixtureCallable], FixtureCallable]:
         def decorator(func: FixtureCallable) -> FixtureCallable:
             self._resolver.register(func, scope)
             return func
@@ -47,7 +49,7 @@ class ProTestSession:
         suite._attach_to_session(self)
         self._suites.append(suite)
 
-    async def __aenter__(self) -> ProTestSession:
+    async def __aenter__(self) -> Self:
         await self._resolver.__aenter__()
         return self
 

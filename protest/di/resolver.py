@@ -7,8 +7,8 @@ from typing import Annotated, Any, get_args, get_origin
 from protest.core.fixture import Fixture, FixtureCallable, get_callable_name
 from protest.core.scope import Scope
 from protest.di.markers import Use
-from protest.execution.async_bridge import ensure_async
 from protest.exceptions import ProTestError
+from protest.execution.async_bridge import ensure_async
 
 
 class ScopeMismatchError(ProTestError):
@@ -57,7 +57,12 @@ class Resolver:
         self._registry[func] = fixture
 
     async def resolve(self, target_func: FixtureCallable) -> Any:
-        """Resolves a fixture by creating its dependencies and calling it."""
+        """Resolve a fixture recursively, handling generators for setup/teardown.
+
+        Generator fixtures (with yield) are wrapped as context managers and pushed
+        onto the exit stack. Teardown runs when exiting the resolver context.
+        Regular fixtures are called via ensure_async.
+        """
         target_fixture = self._registry[target_func]
 
         if target_fixture.is_cached:
@@ -82,6 +87,7 @@ class Resolver:
         return result
 
     async def __aenter__(self) -> "Resolver":
+        """Enter resolver context. Use 'async with resolver:' for teardown."""
         return self
 
     async def __aexit__(
@@ -90,6 +96,7 @@ class Resolver:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:
+        """Exit resolver context, triggering teardown for generator fixtures."""
         result = await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
         return result or False
 
@@ -132,6 +139,7 @@ class Resolver:
     def _extract_dependency_from_parameter(
         param: inspect.Parameter,
     ) -> FixtureCallable | None:
+        """Extract dependency from Annotated[Type, Use(fixture)] or return None."""
         if get_origin(param.annotation) is Annotated:
             for metadata in get_args(param.annotation)[1:]:
                 if isinstance(metadata, Use):
@@ -140,4 +148,5 @@ class Resolver:
 
 
 def _is_generator_like(func: FixtureCallable) -> bool:
+    """Check if func contains yield (sync or async)."""
     return inspect.isgeneratorfunction(func) or inspect.isasyncgenfunction(func)
