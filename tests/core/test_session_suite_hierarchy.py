@@ -1,0 +1,141 @@
+"""TDD tests for Session/Suite hierarchy - skipped until implemented."""
+
+pytest = __import__("pytest")
+pytest.skip("ProTestSession/ProTestSuite not yet implemented", allow_module_level=True)
+
+from typing import Annotated  # noqa: E402
+
+from protest.core.scope import Scope  # noqa: E402
+from protest.core.session import ProTestSession  # noqa: E402
+from protest.core.suite import ProTestSuite, SuiteFixtureScopeError  # noqa: E402
+from protest.di.markers import Use  # noqa: E402
+from protest.di.resolver import UnregisteredDependencyError  # noqa: E402
+
+
+class TestSessionSuiteHierarchy:
+    """Test the session/suite hierarchy and fixture visibility rules."""
+
+    def test_session_fixture_visible_in_suite(self):
+        """Suite can use session-level fixtures."""
+        session = ProTestSession()
+        suite = ProTestSuite("test_suite")
+
+        @session.fixture(scope=Scope.SESSION)
+        def session_data() -> str:
+            return "session_value"
+
+        session.include_suite(suite)
+
+        @suite.fixture(scope=Scope.FUNCTION)
+        def suite_data(data: Annotated[str, Use(session_data)]) -> str:
+            return f"suite_{data}"
+
+        # Suite should be able to resolve session fixture through hierarchy
+        result = suite.resolver.resolve(suite_data)
+        assert result == "suite_session_value"
+
+    def test_suite_fixture_not_visible_from_other_suite(self):
+        """Suite A cannot access fixtures from Suite B."""
+        session = ProTestSession()
+        suite_a = ProTestSuite("suite_a")
+        suite_b = ProTestSuite("suite_b")
+
+        session.include_suite(suite_a)
+        session.include_suite(suite_b)
+
+        @suite_a.fixture(scope=Scope.FUNCTION)
+        def suite_a_data() -> str:
+            return "suite_a_value"
+
+        # Suite B tries to use Suite A's fixture - should fail
+        with pytest.raises(UnregisteredDependencyError):
+
+            @suite_b.fixture(scope=Scope.FUNCTION)
+            def suite_b_data(data: Annotated[str, Use(suite_a_data)]) -> str:
+                return f"suite_b_{data}"
+
+    def test_suite_cannot_define_session_scope_fixture(self):
+        """Suite cannot register fixtures with SESSION scope."""
+        session = ProTestSession()
+        suite = ProTestSuite("test_suite")
+        session.include_suite(suite)
+
+        with pytest.raises(
+            SuiteFixtureScopeError, match="cannot define SESSION-scoped fixture"
+        ):
+
+            @suite.fixture(scope=Scope.SESSION)
+            def invalid_fixture() -> str:
+                return "invalid"
+
+    def test_suite_fixture_before_include_fails(self):
+        """Cannot register suite fixtures before including in session."""
+        suite = ProTestSuite("test_suite")
+
+        with pytest.raises(RuntimeError, match="must be included in a session"):
+
+            @suite.fixture(scope=Scope.FUNCTION)
+            def early_fixture() -> str:
+                return "too_early"
+
+    def test_mixed_scope_hierarchy(self):
+        """Test complex hierarchy with mixed scopes."""
+        session = ProTestSession()
+        suite = ProTestSuite("test_suite")
+
+        @session.fixture(scope=Scope.SESSION)
+        def global_config() -> dict:
+            return {"env": "test"}
+
+        @session.fixture(scope=Scope.SESSION)
+        def session_temp() -> str:
+            return "temp_data"
+
+        session.include_suite(suite)
+
+        @suite.fixture(scope=Scope.SUITE)
+        def suite_service(
+            config: Annotated[dict, Use(global_config)],
+            temp: Annotated[str, Use(session_temp)],
+        ) -> str:
+            return f"service_{config['env']}_{temp}"
+
+        @suite.fixture(scope=Scope.FUNCTION)
+        def test_data(service: Annotated[str, Use(suite_service)]) -> str:
+            return f"test_{service}"
+
+        result = suite.resolver.resolve(test_data)
+        assert result == "test_service_test_temp_data"
+
+    def test_cache_isolation_between_suites(self):
+        """Cache is isolated between different suites."""
+        session = ProTestSession()
+        suite_a = ProTestSuite("suite_a")
+        suite_b = ProTestSuite("suite_b")
+
+        call_count = 0
+
+        @session.fixture(scope=Scope.SESSION)
+        def shared_session_fixture() -> str:
+            nonlocal call_count
+            call_count += 1
+            return f"shared_{call_count}"
+
+        session.include_suite(suite_a)
+        session.include_suite(suite_b)
+
+        @suite_a.fixture(scope=Scope.FUNCTION)
+        def suite_a_fixture(shared: Annotated[str, Use(shared_session_fixture)]) -> str:
+            return f"a_{shared}"
+
+        @suite_b.fixture(scope=Scope.FUNCTION)
+        def suite_b_fixture(shared: Annotated[str, Use(shared_session_fixture)]) -> str:
+            return f"b_{shared}"
+
+        # Both suites should get the same cached SESSION fixture
+        result_a = suite_a.resolver.resolve(suite_a_fixture)
+        result_b = suite_b.resolver.resolve(suite_b_fixture)
+
+        assert result_a == "a_shared_1"
+        assert result_b == "b_shared_1"
+        assert call_count == 1  # SESSION fixture called only once

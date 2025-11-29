@@ -1,4 +1,6 @@
-from tests.di.utils import call_counts
+from collections.abc import Generator
+
+from tests.di.utils import call_counts, teardown_counts
 
 
 def session_dependency() -> str:
@@ -9,3 +11,19 @@ def session_dependency() -> str:
 def function_dependency() -> str:
     call_counts["function"] += 1
     return "function_data"
+
+
+def generator_session_fixture() -> Generator[str, None, None]:
+    call_counts["generator_session"] += 1
+    try:
+        yield "generator_session_data"
+    finally:
+        teardown_counts["generator_session"] += 1
+
+
+def generator_function_fixture() -> Generator[str, None, None]:
+    call_counts["generator_function"] += 1
+    try:
+        yield "generator_function_data"
+    finally:
+        teardown_counts["generator_function"] += 1

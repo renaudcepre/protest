@@ -44,12 +44,6 @@ select = [
 ]
 
 
-[tool.mypy]
-strict = true
-exclude = [
-    "usage_examples",
-]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "strict"
@@ -60,6 +54,6 @@ log_cli_format = "[%(levelname)7s] %(name)20s - %(message)s"
 
 [dependency-groups]
 dev = [
-    "mypy>=1.17.1",
     "pytest-cov>=6.0.0",
+    "ty>=0.0.1a29",
 ]
