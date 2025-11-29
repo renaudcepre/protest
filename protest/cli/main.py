@@ -47,15 +47,17 @@ def run_tests(target: str) -> None:
 
     from protest.core.runner import TestRunner
     from protest.core.session import ProTestSession
+    from protest.reporting.console import ConsoleReporter
 
     if not isinstance(session, ProTestSession):
         print(f"Error: '{session_name}' is not a ProTestSession")
         sys.exit(1)
 
-    assert isinstance(session, ProTestSession)
+    reporter = ConsoleReporter()
+    reporter.register(session.events)
+
     runner = TestRunner(session)
     success = runner.run()
-    sys.exit(0 if success else 1)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,16 @@ Ce document décrit les objectifs, l'architecture, les fonctionnalités et les d
 de conception du framework de test Python "ProTest". Il est destiné à évoluer de manière
 itérative.
 
+## Quick Start - Lancer les exemples
+
+Chaque exemple est un projet indépendant avec son propre `pyproject.toml`.
+
+```bash
+cd examples/basic
+uv sync
+uv run protest run demo:session
+```
+
 ## Légende
 
 - 📋 Spécifié : Fonctionnalité dont les spécifications sont détaillées

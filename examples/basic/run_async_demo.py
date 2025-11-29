@@ -1,6 +1,6 @@
 import sys
 
-from examples.demo_async import session
+from demo_async import session
 from protest.core.runner import TestRunner
 
 
