@@ -25,12 +25,8 @@ class SuiteResolver(Resolver):
     def is_visible(self, func: FixtureCallable) -> bool:
         return func in self._registry or func in self._parent_resolver._registry
 
-
     def _analyze_and_store_dependencies(self, fixture: Fixture) -> None:
         from inspect import signature
-
-        from protest.di.markers import Use
-        from protest.di.resolver import get_args, get_origin, Annotated
 
         func_signature = signature(fixture.func)
         dependencies: dict[str, FixtureCallable] = {}
