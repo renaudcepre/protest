@@ -146,11 +146,15 @@ class TestSessionSuiteAPI:
         session.include_suite(suite_b)
 
         @suite_a.fixture(scope=Scope.SUITE)
-        def suite_a_config(config: Annotated[dict[str, str], Use(global_config)]) -> dict[str, str]:
+        def suite_a_config(
+            config: Annotated[dict[str, str], Use(global_config)],
+        ) -> dict[str, str]:
             return {**config, "suite": "A"}
 
         @suite_b.fixture(scope=Scope.SUITE)
-        def suite_b_config(config: Annotated[dict[str, str], Use(global_config)]) -> dict[str, str]:
+        def suite_b_config(
+            config: Annotated[dict[str, str], Use(global_config)],
+        ) -> dict[str, str]:
             return {**config, "suite": "B"}
 
         result_a = await suite_a.resolve_fixture(suite_a_config)
@@ -178,8 +182,8 @@ class TestSessionSuiteAPI:
 
         assert len(session.tests) == 1
         assert len(suite_a.tests) == 1
-        assert session.tests[0].__name__ == "session_test"
-        assert suite_a.tests[0].__name__ == "suite_test"
+        assert getattr(session.tests[0], "__name__", None) == "session_test"
+        assert getattr(suite_a.tests[0], "__name__", None) == "suite_test"
 
     @pytest.mark.asyncio
     async def test_complex_dependency_chain(self) -> None:

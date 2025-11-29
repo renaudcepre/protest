@@ -106,7 +106,7 @@ def test_api_request(
 
 @api_suite.test
 def test_api_broken() -> None:
-    assert False, "Intentional failure to demo error output"
+    raise AssertionError("Intentional failure to demo error output")
 
 
 # =============================================================================
@@ -133,7 +133,8 @@ def counter() -> int:
 
 @unit_suite.test
 def test_simple_assertion() -> None:
-    assert 1 + 1 == 2
+    expected_sum = 2
+    assert expected_sum == 1 + 1
 
 
 @unit_suite.test
@@ -143,7 +144,8 @@ def test_with_temp_file(path: Annotated[str, Use(temp_file)]) -> None:
 
 @unit_suite.test
 def test_with_counter(count: Annotated[int, Use(counter)]) -> None:
-    assert count == 42
+    expected_count = 42
+    assert count == expected_count
 
 
 @unit_suite.test

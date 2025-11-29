@@ -15,8 +15,8 @@ if TYPE_CHECKING:
 class SuiteFixtureScopeError(ProTestError):
     def __init__(self, suite_name: str, fixture_name: str):
         super().__init__(
-            f"Suite '{suite_name}' cannot define SESSION-scoped fixture '{fixture_name}'. "
-            f"SESSION fixtures must be defined on the session."
+            f"Suite '{suite_name}' cannot define SESSION-scoped fixture "
+            f"'{fixture_name}'. SESSION fixtures must be defined on the session."
         )
 
 
@@ -38,20 +38,21 @@ class ProTestSuite:
     @property
     def resolver(self) -> SuiteResolver:
         if self._resolver is None:
-            raise RuntimeError(
-                f"Suite '{self._name}' must be included in a session before accessing resolver."
-            )
+            msg = f"Suite '{self._name}' must be attached to a session first."
+            raise RuntimeError(msg)
         return self._resolver
 
-    def fixture(self, scope: Scope = Scope.FUNCTION) -> Callable[[FixtureCallable], FixtureCallable]:
+    def fixture(
+        self, scope: Scope = Scope.FUNCTION
+    ) -> Callable[[FixtureCallable], FixtureCallable]:
         def decorator(func: FixtureCallable) -> FixtureCallable:
             if self._session is None:
-                raise RuntimeError(
-                    f"Suite '{self._name}' must be included in a session before defining fixtures."
-                )
+                msg = f"Suite '{self._name}' must be attached to a session first."
+                raise RuntimeError(msg)
 
             if scope == Scope.SESSION:
                 from protest.core.fixture import get_callable_name
+
                 raise SuiteFixtureScopeError(self._name, get_callable_name(func))
 
             self.resolver.register(func, scope)

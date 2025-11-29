@@ -42,6 +42,16 @@ select = [
 "tests/**" = [
     "PLR2004", # Magic value used in comparison
 ]
+"examples/**" = [
+    "T201", # print allowed in examples
+    "PLR2004", # Magic values allowed in examples
+]
+"protest/cli/**" = [
+    "T201", # print allowed in CLI
+]
+"protest/reporting/console.py" = [
+    "T201", # print is the purpose of this module
+]
 
 
 [tool.pytest.ini_options]
