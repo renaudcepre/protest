@@ -25,7 +25,7 @@ def sync_service(db: Annotated[str, Use(async_db)]):
 
 
 # 3. Test Async
-@session.test
+@session.test()
 async def test_async_stuff(svc: Annotated[str, Use(sync_service)]):
     print("    [ASYNC TEST] doing async work...")
     await asyncio.sleep(0.01)
@@ -34,7 +34,7 @@ async def test_async_stuff(svc: Annotated[str, Use(sync_service)]):
 
 
 # 4. Regular sync test
-@session.test
+@session.test()
 def test_sync_stuff():
     assert True
 
@@ -46,6 +46,6 @@ def sync_fixture():
 
 
 # 5. Sync test with sync fixture
-@session.test
+@session.test()
 def test_sync_with_fixture(data: Annotated[str, Use(sync_fixture)]):
     assert data == "sync_data"
