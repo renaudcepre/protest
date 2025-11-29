@@ -1,3 +1,4 @@
+from collections.abc import Generator
 from inspect import Parameter
 from typing import Annotated
 
@@ -10,12 +11,15 @@ from protest.di.resolver import (
     Resolver,
     ScopeMismatchError,
     UnregisteredDependencyError,
+    _is_generator_callable,
 )
 from tests.di.dependencies import (
     function_dependency,
+    generator_function_fixture,
+    generator_session_fixture,
     session_dependency,
 )
-from tests.di.utils import call_counts, reset_call_counts
+from tests.di.utils import call_counts, reset_call_counts, teardown_counts
 
 
 @pytest.fixture
@@ -131,3 +135,133 @@ def test_extract_dependency_returns_none_for_regular_params() -> None:
     result = Resolver._extract_dependency_from_parameter(regular_param)
 
     assert result is None
+
+
+# --- Generator Fixture Tests ---
+
+
+def test_generator_fixture_yields_value(resolver: Resolver) -> None:
+    resolver.register(generator_session_fixture, Scope.SESSION)
+
+    with resolver:
+        result = resolver.resolve(generator_session_fixture)
+        assert result == "generator_session_data"
+        assert call_counts["generator_session"] == 1
+
+
+def test_generator_fixture_teardown_on_exit(resolver: Resolver) -> None:
+    resolver.register(generator_session_fixture, Scope.SESSION)
+
+    with resolver:
+        resolver.resolve(generator_session_fixture)
+        assert teardown_counts["generator_session"] == 0
+
+    assert teardown_counts["generator_session"] == 1
+
+
+def test_generator_fixture_is_cached(resolver: Resolver) -> None:
+    resolver.register(generator_session_fixture, Scope.SESSION)
+
+    with resolver:
+        result_first = resolver.resolve(generator_session_fixture)
+        result_second = resolver.resolve(generator_session_fixture)
+        assert result_first == result_second
+        assert call_counts["generator_session"] == 1
+
+
+def test_generator_fixture_with_dependency(resolver: Resolver) -> None:
+    resolver.register(session_dependency, Scope.SESSION)
+
+    def generator_with_dep(
+        data: Annotated[str, Use(session_dependency)],
+    ) -> Generator[str, None, None]:
+        call_counts["generator_with_dep"] += 1
+        yield f"generated_{data}"
+        teardown_counts["generator_with_dep"] += 1
+
+    resolver.register(generator_with_dep, Scope.SESSION)
+
+    with resolver:
+        result = resolver.resolve(generator_with_dep)
+        assert result == "generated_session_data"
+        assert call_counts["session"] == 1
+        assert call_counts["generator_with_dep"] == 1
+
+    assert teardown_counts["generator_with_dep"] == 1
+
+
+def test_multiple_generator_fixtures_teardown_in_reverse_order(
+    resolver: Resolver,
+) -> None:
+    teardown_order: list[str] = []
+
+    def first_generator() -> Generator[str, None, None]:
+        call_counts["first"] += 1
+        yield "first_value"
+        teardown_order.append("first")
+
+    def second_generator(
+        first: Annotated[str, Use(first_generator)],
+    ) -> Generator[str, None, None]:
+        call_counts["second"] += 1
+        yield f"second_with_{first}"
+        teardown_order.append("second")
+
+    resolver.register(first_generator, Scope.SESSION)
+    resolver.register(second_generator, Scope.SESSION)
+
+    with resolver:
+        result = resolver.resolve(second_generator)
+        assert result == "second_with_first_value"
+
+    assert teardown_order == ["second", "first"]
+
+
+def test_generator_fixture_teardown_on_exception(resolver: Resolver) -> None:
+    resolver.register(generator_session_fixture, Scope.SESSION)
+
+    with pytest.raises(ValueError, match="test exception"), resolver:
+        resolver.resolve(generator_session_fixture)
+        raise ValueError("test exception")
+
+    assert teardown_counts["generator_session"] == 1
+
+
+def test_mixed_regular_and_generator_fixtures(resolver: Resolver) -> None:
+    resolver.register(session_dependency, Scope.SESSION)
+    resolver.register(generator_function_fixture, Scope.FUNCTION)
+
+    def mixed_target(
+        regular: Annotated[str, Use(session_dependency)],
+        generated: Annotated[str, Use(generator_function_fixture)],
+    ) -> str:
+        return f"{regular}_{generated}"
+
+    resolver.register(mixed_target, Scope.FUNCTION)
+
+    with resolver:
+        result = resolver.resolve(mixed_target)
+        assert result == "session_data_generator_function_data"
+
+    assert teardown_counts["generator_function"] == 1
+
+
+def test_is_generator_callable_with_annotated_generator() -> None:
+    def annotated_gen() -> Generator[str, None, None]:
+        yield "value"
+
+    assert _is_generator_callable(annotated_gen) is True
+
+
+def test_is_generator_callable_with_unannotated_generator() -> None:
+    def unannotated_gen():  # type: ignore[no-untyped-def]
+        yield "value"
+
+    assert _is_generator_callable(unannotated_gen) is True
+
+
+def test_is_generator_callable_with_regular_function() -> None:
+    def regular_func() -> str:
+        return "value"
+
+    assert _is_generator_callable(regular_func) is False

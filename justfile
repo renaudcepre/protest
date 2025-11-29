@@ -4,10 +4,10 @@
     just --list
 
 # Run all linting and formatting
-@lintfix:
+@lint:
     ruff format .
     ruff check --fix .
-    mypy --strict .
+    ty check .
 
 # Run tests with verbose output
 @test *options="":
@@ -29,7 +29,6 @@ setup:
 # Clean cache and temp files
 clean:
     rm -rf .pytest_cache/
-    rm -rf .mypy_cache/
     rm -rf .ruff_cache/
     rm -rf htmlcov/
     find . -type d -name __pycache__ -exec rm -rf {} +
