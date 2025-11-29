@@ -14,8 +14,7 @@ session = ProTestSession()
 api_suite = ProTestSuite("API Tests")
 unit_suite = ProTestSuite("Unit Tests")
 
-slack = FakeSlackNotifier(delay=0.5)
-slack.register(session.events)
+session.use(FakeSlackNotifier(delay=0.5))
 
 
 # =============================================================================
