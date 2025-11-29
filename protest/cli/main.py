@@ -53,8 +53,7 @@ def run_tests(target: str) -> None:
         print(f"Error: '{session_name}' is not a ProTestSession")
         sys.exit(1)
 
-    reporter = ConsoleReporter()
-    reporter.register(session.events)
+    session.use(ConsoleReporter())
 
     runner = TestRunner(session)
     success = runner.run()

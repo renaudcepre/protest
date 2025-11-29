@@ -9,6 +9,7 @@ from protest.core.scope import Scope
 from protest.core.suite import ProTestSuite
 from protest.di.resolver import Resolver
 from protest.events.bus import EventBus
+from protest.events.types import Event
 
 
 class ProTestSession:
@@ -54,6 +55,17 @@ class ProTestSession:
     def include_suite(self, suite: ProTestSuite) -> None:
         suite._attach_to_session(self)
         self._suites.append(suite)
+
+    def use(self, plugin: object) -> None:
+        """Enregistre un plugin avec wiring automatique des hooks."""
+        if hasattr(plugin, "setup") and callable(plugin.setup):
+            plugin.setup(self)
+
+        for event in Event:
+            method_name = f"on_{event.value}"
+            handler = getattr(plugin, method_name, None)
+            if handler and callable(handler):
+                self._events.on(event, handler)
 
     async def __aenter__(self) -> Self:
         await self._resolver.__aenter__()
