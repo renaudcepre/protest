@@ -5,10 +5,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "colorlog>=6.9.0",
     "pytest>=8.3.5",
     "pytest-asyncio>=0.26.0",
-    "pyyaml>=6.0.2",
 ]
 
 

@@ -172,11 +172,11 @@ class TestSessionSuiteAPI:
         suite_a = ProTestSuite("Suite A")
         session.include_suite(suite_a)
 
-        @session.test
+        @session.test()
         def session_test() -> None:
             assert True
 
-        @suite_a.test
+        @suite_a.test()
         def suite_test() -> None:
             assert True
 

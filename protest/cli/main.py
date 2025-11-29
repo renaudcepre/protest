@@ -66,7 +66,8 @@ def run_tests(target: str, concurrency: int = 1) -> None:
     protest_session.use(ConsoleReporter())
 
     runner = TestRunner(protest_session)
-    runner.run()
+    success = runner.run()
+    sys.exit(0 if success else 1)
 
 
 if __name__ == "__main__":

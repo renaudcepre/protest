@@ -1,3 +1,4 @@
+import inspect
 from collections.abc import Callable
 from typing import Any
 
@@ -8,6 +9,11 @@ type FixtureCallable = Callable[..., Any]
 
 def get_callable_name(func: FixtureCallable) -> str:
     return getattr(func, "__name__", repr(func))
+
+
+def is_generator_like(func: FixtureCallable) -> bool:
+    """Check if func contains yield (sync or async)."""
+    return inspect.isgeneratorfunction(func) or inspect.isasyncgenfunction(func)
 
 
 class Fixture:

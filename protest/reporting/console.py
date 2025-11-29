@@ -1,9 +1,10 @@
 """Default console reporter implementation."""
 
 from protest.events.data import SessionResult, TestResult
+from protest.plugin import PluginBase
 
 
-class ConsoleReporter:
+class ConsoleReporter(PluginBase):
     """Simple console reporter plugin."""
 
     def on_session_start(self) -> None:

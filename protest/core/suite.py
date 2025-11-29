@@ -65,7 +65,6 @@ class ProTestSuite:
 
         return decorator
 
-    @property
     def test(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self._tests.append(func)

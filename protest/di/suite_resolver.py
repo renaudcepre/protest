@@ -13,9 +13,9 @@ class SuiteResolver(Resolver):
         self._suite_name = suite_name
 
     async def resolve(self, target_func: FixtureCallable) -> Any:
-        if target_func in self._registry:
+        if self.has_fixture(target_func):
             return await super().resolve(target_func)
-        if target_func in self._parent_resolver._registry:
+        if self._parent_resolver.has_fixture(target_func):
             return await self._parent_resolver.resolve(target_func)
         raise UnregisteredDependencyError(
             get_callable_name(target_func),
@@ -23,7 +23,7 @@ class SuiteResolver(Resolver):
         )
 
     def is_visible(self, func: FixtureCallable) -> bool:
-        return func in self._registry or func in self._parent_resolver._registry
+        return self.has_fixture(func) or self._parent_resolver.has_fixture(func)
 
     def _analyze_and_store_dependencies(self, fixture: Fixture) -> None:
         from inspect import signature
@@ -49,10 +49,12 @@ class SuiteResolver(Resolver):
     ) -> None:
         from protest.di.resolver import ScopeMismatchError
 
-        if dependency_func in self._registry:
-            dependency_fixture = self._registry[dependency_func]
-        else:
-            dependency_fixture = self._parent_resolver._registry[dependency_func]
+        dependency_fixture = self.get_fixture(dependency_func)
+        if dependency_fixture is None:
+            dependency_fixture = self._parent_resolver.get_fixture(dependency_func)
+
+        if dependency_fixture is None:
+            return
 
         if dependency_fixture.scope.value > requester.scope.value:
             raise ScopeMismatchError(
