@@ -23,3 +23,8 @@ class ConsoleReporter(PluginBase):
 
     def on_test_fail(self, result: TestResult) -> None:
         print(f"  ✗ {result.name}: {result.error}")
+        if result.output:
+            print("    --- Captured output ---")
+            for line in result.output.rstrip().splitlines():
+                print(f"    {line}")
+            print("    --------------------------")

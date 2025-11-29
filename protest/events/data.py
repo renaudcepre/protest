@@ -10,6 +10,7 @@ class TestResult:
     name: str
     error: Exception | None = None
     duration: float | None = None
+    output: str = ""
 
 
 @dataclass

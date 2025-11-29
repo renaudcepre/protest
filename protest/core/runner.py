@@ -10,6 +10,7 @@ from protest.di.suite_resolver import SuiteResolver
 from protest.events.data import SessionResult, TestResult
 from protest.events.types import Event
 from protest.execution.async_bridge import ensure_async
+from protest.execution.capture import CaptureCurrentTest, GlobalCapturePatch
 from protest.execution.context import TestExecutionContext
 
 
@@ -32,28 +33,29 @@ class TestRunner:
 
         semaphore = asyncio.Semaphore(concurrency)
 
-        async with self._session:
-            session_passed, session_failed = await self._run_tests_parallel(
-                self._session.tests,
-                self._session.resolver,
-                semaphore,
-            )
-            passed += session_passed
-            failed += session_failed
+        with GlobalCapturePatch():
+            async with self._session:
+                session_passed, session_failed = await self._run_tests_parallel(
+                    self._session.tests,
+                    self._session.resolver,
+                    semaphore,
+                )
+                passed += session_passed
+                failed += session_failed
 
-            for suite in self._session.suites:
-                await self._session.events.emit(Event.SUITE_START, suite.name)
-                suite_concurrency = suite.concurrency or concurrency
-                suite_semaphore = asyncio.Semaphore(suite_concurrency)
-                async with suite.resolver:
-                    suite_passed, suite_failed = await self._run_tests_parallel(
-                        suite.tests,
-                        suite.resolver,
-                        suite_semaphore,
-                    )
-                    passed += suite_passed
-                    failed += suite_failed
-                await self._session.events.emit(Event.SUITE_END, suite.name)
+                for suite in self._session.suites:
+                    await self._session.events.emit(Event.SUITE_START, suite.name)
+                    suite_concurrency = suite.concurrency or concurrency
+                    suite_semaphore = asyncio.Semaphore(suite_concurrency)
+                    async with suite.resolver:
+                        suite_passed, suite_failed = await self._run_tests_parallel(
+                            suite.tests,
+                            suite.resolver,
+                            suite_semaphore,
+                        )
+                        passed += suite_passed
+                        failed += suite_failed
+                    await self._session.events.emit(Event.SUITE_END, suite.name)
 
         session_duration = time.perf_counter() - session_start
         session_result = SessionResult(
@@ -99,14 +101,23 @@ class TestRunner:
 
         test_name = getattr(test_func, "__name__", "<unnamed>")
         start = time.perf_counter()
-        try:
-            await ensure_async(test_func, **kwargs)
-            duration = time.perf_counter() - start
-            result = TestResult(name=test_name, duration=duration)
-            await self._session.events.emit(Event.TEST_PASS, result)
-            return True
-        except Exception as exc:
-            duration = time.perf_counter() - start
-            result = TestResult(name=test_name, error=exc, duration=duration)
-            await self._session.events.emit(Event.TEST_FAIL, result)
-            return False
+
+        with CaptureCurrentTest() as buffer:
+            try:
+                await ensure_async(test_func, **kwargs)
+                duration = time.perf_counter() - start
+                result = TestResult(
+                    name=test_name, duration=duration, output=buffer.getvalue()
+                )
+                await self._session.events.emit(Event.TEST_PASS, result)
+                return True
+            except Exception as exc:
+                duration = time.perf_counter() - start
+                result = TestResult(
+                    name=test_name,
+                    error=exc,
+                    duration=duration,
+                    output=buffer.getvalue(),
+                )
+                await self._session.events.emit(Event.TEST_FAIL, result)
+                return False
