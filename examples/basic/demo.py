@@ -3,12 +3,12 @@
 from collections.abc import Generator
 from typing import Annotated
 
+from slack_notifier import FakeSlackNotifier
+
 from protest.core.scope import Scope
 from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
 from protest.di.markers import Use
-
-from slack_notifier import FakeSlackNotifier
 
 session = ProTestSession()
 api_suite = ProTestSuite("API Tests")

@@ -28,17 +28,14 @@ class EventBus:
                     task = asyncio.create_task(self._run_async_handler(handler, data))
                     self._pending_tasks.add(task)
                     task.add_done_callback(self._pending_tasks.discard)
+                elif data is not None:
+                    await run_in_threadpool(handler, data)
                 else:
-                    if data is not None:
-                        await run_in_threadpool(handler, data)
-                    else:
-                        await run_in_threadpool(handler)
+                    await run_in_threadpool(handler)
             except Exception:
                 pass  # TODO: log errors
 
-    async def _run_async_handler(
-        self, handler: Callable[..., Any], data: Any
-    ) -> None:
+    async def _run_async_handler(self, handler: Callable[..., Any], data: Any) -> None:
         """Run async handler with error handling."""
         try:
             if data is not None:

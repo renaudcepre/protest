@@ -13,11 +13,20 @@ from protest.events.types import Event
 
 
 class ProTestSession:
-    def __init__(self) -> None:
+    def __init__(self, concurrency: int = 1) -> None:
         self._resolver = Resolver()
         self._events = EventBus()
         self._suites: list[ProTestSuite] = []
         self._tests: list[Callable[..., Any]] = []
+        self._concurrency = concurrency
+
+    @property
+    def concurrency(self) -> int:
+        return self._concurrency
+
+    @concurrency.setter
+    def concurrency(self, value: int) -> None:
+        self._concurrency = max(1, value)
 
     @property
     def resolver(self) -> Resolver:
