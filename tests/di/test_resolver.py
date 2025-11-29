@@ -298,3 +298,48 @@ async def test_resolve_unregistered_fixture_raises_fixture_not_found(
 
     with pytest.raises(FixtureNotFoundError, match=r"not registered"):
         await resolver.resolve(unregistered_fixture)
+
+
+# --- Edge Case Tests ---
+
+
+@pytest.mark.asyncio
+async def test_fixture_error_during_setup_propagates(resolver: Resolver) -> None:
+    """Test that errors during fixture setup are propagated correctly."""
+
+    def failing_fixture() -> str:
+        raise RuntimeError("Setup failed intentionally")
+
+    resolver.register(failing_fixture, Scope.SESSION)
+
+    with pytest.raises(RuntimeError, match="Setup failed intentionally"):
+        await resolver.resolve(failing_fixture)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_resolution_only_executes_fixture_once(
+    resolver: Resolver,
+) -> None:
+    """Test that concurrent resolution of the same fixture only executes it once."""
+    import asyncio
+
+    execution_count = 0
+
+    async def slow_fixture() -> str:
+        nonlocal execution_count
+        execution_count += 1
+        await asyncio.sleep(0.05)
+        return "slow_value"
+
+    resolver.register(slow_fixture, Scope.SESSION)
+
+    async with resolver:
+        results = await asyncio.gather(
+            resolver.resolve(slow_fixture),
+            resolver.resolve(slow_fixture),
+            resolver.resolve(slow_fixture),
+        )
+
+    expected_execution_count = 1
+    assert execution_count == expected_execution_count
+    assert all(result == "slow_value" for result in results)
