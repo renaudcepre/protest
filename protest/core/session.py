@@ -47,14 +47,14 @@ class ProTestSession:
         suite._attach_to_session(self)
         self._suites.append(suite)
 
-    def __enter__(self) -> ProTestSession:
-        self._resolver.__enter__()
+    async def __aenter__(self) -> ProTestSession:
+        await self._resolver.__aenter__()
         return self
 
-    def __exit__(
+    async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:
-        return self._resolver.__exit__(exc_type, exc_val, exc_tb)
+        return await self._resolver.__aexit__(exc_type, exc_val, exc_tb)

@@ -12,11 +12,11 @@ class SuiteResolver(Resolver):
         self._parent_resolver = parent_resolver
         self._suite_name = suite_name
 
-    def resolve(self, target_func: FixtureCallable) -> Any:
+    async def resolve(self, target_func: FixtureCallable) -> Any:
         if target_func in self._registry:
-            return super().resolve(target_func)
+            return await super().resolve(target_func)
         if target_func in self._parent_resolver._registry:
-            return self._parent_resolver.resolve(target_func)
+            return await self._parent_resolver.resolve(target_func)
         raise UnregisteredDependencyError(
             get_callable_name(target_func),
             get_callable_name(target_func),
@@ -24,6 +24,7 @@ class SuiteResolver(Resolver):
 
     def is_visible(self, func: FixtureCallable) -> bool:
         return func in self._registry or func in self._parent_resolver._registry
+
 
     def _analyze_and_store_dependencies(self, fixture: Fixture) -> None:
         from inspect import signature
