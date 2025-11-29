@@ -1,10 +1,10 @@
 import inspect
 from collections.abc import Callable
-from typing import Any
+from typing import Any, TypeAlias
 
 from protest.core.scope import Scope
 
-type FixtureCallable = Callable[..., Any]
+FixtureCallable: TypeAlias = Callable[..., Any]
 
 
 def get_callable_name(func: FixtureCallable) -> str:

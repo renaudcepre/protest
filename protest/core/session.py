@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any
+
+from protest.compat import Self
 
 if TYPE_CHECKING:
     from protest.plugin import PluginBase

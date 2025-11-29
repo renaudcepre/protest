@@ -3,12 +3,14 @@
 import asyncio
 import functools
 from collections.abc import Awaitable, Callable
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
+
+from protest.compat import TypeIs
 
 T = TypeVar("T")
 
 
-def is_async_callable(obj: Any) -> bool:
+def is_async_callable(obj: object) -> TypeIs[Callable[..., Awaitable[Any]]]:
     """Check if obj is async. Unwraps functools.partial and checks __call__."""
     while isinstance(obj, functools.partial):
         obj = obj.func
@@ -29,6 +31,5 @@ async def run_in_threadpool(func: Callable[..., T], *args: Any, **kwargs: Any) -
 async def ensure_async(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
     """Call func and return result. Async awaited, sync runs in threadpool."""
     if is_async_callable(func):
-        coro = cast(Awaitable[T], func(*args, **kwargs))
-        return await coro
+        return await func(*args, **kwargs)
     return await run_in_threadpool(func, *args, **kwargs)

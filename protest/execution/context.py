@@ -3,8 +3,9 @@
 import inspect
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from types import TracebackType
-from typing import Any, Self
+from typing import Any
 
+from protest.compat import Self
 from protest.core.fixture import (
     FixtureCallable,
     get_callable_name,
