@@ -1,10 +1,16 @@
+import asyncio
 import inspect
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from inspect import signature
 from types import TracebackType
 from typing import Annotated, Any, get_args, get_origin
 
-from protest.core.fixture import Fixture, FixtureCallable, get_callable_name
+from protest.core.fixture import (
+    Fixture,
+    FixtureCallable,
+    get_callable_name,
+    is_generator_like,
+)
 from protest.core.scope import Scope
 from protest.di.markers import Use
 from protest.exceptions import ProTestError
@@ -39,6 +45,11 @@ class UnregisteredDependencyError(ProTestError):
         )
 
 
+class FixtureNotFoundError(ProTestError):
+    def __init__(self, fixture_name: str):
+        super().__init__(f"Fixture '{fixture_name}' is not registered.")
+
+
 class Resolver:
     """Manages fixture registration, dependency analysis, and resolution."""
 
@@ -46,6 +57,7 @@ class Resolver:
         self._registry: dict[FixtureCallable, Fixture] = {}
         self._dependencies: dict[FixtureCallable, dict[str, FixtureCallable]] = {}
         self._exit_stack: AsyncExitStack = AsyncExitStack()
+        self._resolve_locks: dict[FixtureCallable, asyncio.Lock] = {}
 
     def register(self, func: FixtureCallable, scope: Scope) -> None:
         """Analyzes a function's dependencies and registers it as a Fixture."""
@@ -55,6 +67,19 @@ class Resolver:
         fixture = Fixture(func, scope)
         self._analyze_and_store_dependencies(fixture)
         self._registry[func] = fixture
+        self._resolve_locks[func] = asyncio.Lock()
+
+    def has_fixture(self, func: FixtureCallable) -> bool:
+        """Check if a fixture is registered."""
+        return func in self._registry
+
+    def get_fixture(self, func: FixtureCallable) -> Fixture | None:
+        """Get a fixture by its function, or None if not registered."""
+        return self._registry.get(func)
+
+    def get_dependencies(self, func: FixtureCallable) -> dict[str, FixtureCallable]:
+        """Get dependencies for a fixture function."""
+        return self._dependencies.get(func, {})
 
     async def resolve(self, target_func: FixtureCallable) -> Any:
         """Resolve a fixture recursively, handling generators for setup/teardown.
@@ -62,29 +87,38 @@ class Resolver:
         Generator fixtures (with yield) are wrapped as context managers and pushed
         onto the exit stack. Teardown runs when exiting the resolver context.
         Regular fixtures are called via ensure_async.
+
+        Uses per-fixture locks to prevent race conditions in parallel execution.
         """
+        if target_func not in self._registry:
+            raise FixtureNotFoundError(get_callable_name(target_func))
+
         target_fixture = self._registry[target_func]
 
         if target_fixture.is_cached:
             return target_fixture.cached_value
 
-        kwargs = {}
-        for param_name, dep_func in self._dependencies.get(target_func, {}).items():
-            kwargs[param_name] = await self.resolve(dep_func)
+        async with self._resolve_locks[target_func]:
+            if target_fixture.is_cached:
+                return target_fixture.cached_value
 
-        if _is_generator_like(target_fixture.func):
-            if inspect.isasyncgenfunction(target_fixture.func):
-                async_cm = asynccontextmanager(target_fixture.func)(**kwargs)
-                result = await self._exit_stack.enter_async_context(async_cm)
+            kwargs = {}
+            for param_name, dep_func in self._dependencies.get(target_func, {}).items():
+                kwargs[param_name] = await self.resolve(dep_func)
+
+            if is_generator_like(target_fixture.func):
+                if inspect.isasyncgenfunction(target_fixture.func):
+                    async_cm = asynccontextmanager(target_fixture.func)(**kwargs)
+                    result = await self._exit_stack.enter_async_context(async_cm)
+                else:
+                    sync_cm = contextmanager(target_fixture.func)(**kwargs)
+                    result = self._exit_stack.enter_context(sync_cm)
             else:
-                sync_cm = contextmanager(target_fixture.func)(**kwargs)
-                result = self._exit_stack.enter_context(sync_cm)
-        else:
-            result = await ensure_async(target_fixture.func, **kwargs)
+                result = await ensure_async(target_fixture.func, **kwargs)
 
-        target_fixture.cached_value = result
-        target_fixture.is_cached = True
-        return result
+            target_fixture.cached_value = result
+            target_fixture.is_cached = True
+            return result
 
     async def __aenter__(self) -> "Resolver":
         """Enter resolver context. Use 'async with resolver:' for teardown."""
@@ -145,8 +179,3 @@ class Resolver:
                 if isinstance(metadata, Use):
                     return metadata.dependency
         return None
-
-
-def _is_generator_like(func: FixtureCallable) -> bool:
-    """Check if func contains yield (sync or async)."""
-    return inspect.isgeneratorfunction(func) or inspect.isasyncgenfunction(func)

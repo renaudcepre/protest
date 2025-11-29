@@ -4,14 +4,15 @@ from typing import Annotated
 
 import pytest
 
+from protest.core.fixture import is_generator_like
 from protest.core.scope import Scope
 from protest.di.markers import Use
 from protest.di.resolver import (
     AlreadyRegisteredError,
+    FixtureNotFoundError,
     Resolver,
     ScopeMismatchError,
     UnregisteredDependencyError,
-    _is_generator_like,
 )
 from tests.di.dependencies import (
     function_dependency,
@@ -259,25 +260,41 @@ def test_is_generator_like_with_sync_generator() -> None:
     def sync_gen() -> Generator[str, None, None]:
         yield "value"
 
-    assert _is_generator_like(sync_gen) is True
+    assert is_generator_like(sync_gen) is True
 
 
 def test_is_generator_like_with_unannotated_generator() -> None:
     def unannotated_gen():  # type: ignore[no-untyped-def]
         yield "value"
 
-    assert _is_generator_like(unannotated_gen) is True
+    assert is_generator_like(unannotated_gen) is True
 
 
 def test_is_generator_like_with_regular_function() -> None:
     def regular_func() -> str:
         return "value"
 
-    assert _is_generator_like(regular_func) is False
+    assert is_generator_like(regular_func) is False
 
 
 def test_is_generator_like_ignores_annotation_without_yield() -> None:
     def fake_gen() -> Generator[str, None, None]:
         return "value"  # type: ignore[return-value]
 
-    assert _is_generator_like(fake_gen) is False
+    assert is_generator_like(fake_gen) is False
+
+
+# --- FixtureNotFoundError Tests ---
+
+
+@pytest.mark.asyncio
+async def test_resolve_unregistered_fixture_raises_fixture_not_found(
+    resolver: Resolver,
+) -> None:
+    """Test that resolving an unregistered fixture raises FixtureNotFoundError."""
+
+    def unregistered_fixture() -> str:
+        return "data"
+
+    with pytest.raises(FixtureNotFoundError, match=r"not registered"):
+        await resolver.resolve(unregistered_fixture)

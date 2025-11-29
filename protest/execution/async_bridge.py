@@ -2,8 +2,8 @@
 
 import asyncio
 import functools
-from collections.abc import Callable, Coroutine
-from typing import Any, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar, cast
 
 T = TypeVar("T")
 
@@ -26,10 +26,9 @@ async def run_in_threadpool(func: Callable[..., T], *args: Any, **kwargs: Any) -
     return await loop.run_in_executor(None, func, *args)
 
 
-async def ensure_async(
-    func: Callable[..., T | Coroutine[Any, Any, T]], *args: Any, **kwargs: Any
-) -> T:
+async def ensure_async(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
     """Call func and return result. Async awaited, sync runs in threadpool."""
     if is_async_callable(func):
-        return await func(*args, **kwargs)  # type: ignore[return-value]
+        coro = cast(Awaitable[T], func(*args, **kwargs))
+        return await coro
     return await run_in_threadpool(func, *args, **kwargs)

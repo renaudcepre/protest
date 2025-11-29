@@ -87,19 +87,19 @@ def request_id() -> Generator[str, None, None]:
 # =============================================================================
 
 
-@api_suite.test
+@api_suite.test()
 def test_api_client_creation(client: Annotated[str, Use(api_client)]) -> None:
     assert "APIClient" in client
     assert "db_connection" in client
 
 
-@api_suite.test
+@api_suite.test()
 def test_api_with_auth(token: Annotated[str, Use(auth_token)]) -> None:
     assert "token_for_" in token
     assert "cache" in token
 
 
-@api_suite.test
+@api_suite.test()
 def test_api_request(
     client: Annotated[str, Use(api_client)],
     req_id: Annotated[str, Use(request_id)],
@@ -108,7 +108,7 @@ def test_api_request(
     assert req_id.startswith("req_")
 
 
-@api_suite.test
+@api_suite.test()
 def test_api_broken() -> None:
     raise AssertionError("Intentional failure to demo error output")
 
@@ -135,24 +135,24 @@ def counter() -> int:
 # =============================================================================
 
 
-@unit_suite.test
+@unit_suite.test()
 def test_simple_assertion() -> None:
     expected_sum = 2
     assert expected_sum == 1 + 1
 
 
-@unit_suite.test
+@unit_suite.test()
 def test_with_temp_file(path: Annotated[str, Use(temp_file)]) -> None:
     assert path.endswith(".txt")
 
 
-@unit_suite.test
+@unit_suite.test()
 def test_with_counter(count: Annotated[int, Use(counter)]) -> None:
     expected_count = 42
     assert count == expected_count
 
 
-@unit_suite.test
+@unit_suite.test()
 def test_with_session_fixture(db: Annotated[str, Use(database)]) -> None:
     assert db == "db_connection"
 
@@ -162,12 +162,12 @@ def test_with_session_fixture(db: Annotated[str, Use(database)]) -> None:
 # =============================================================================
 
 
-@session.test
+@session.test()
 def test_config_loaded(cfg: Annotated[dict[str, str], Use(config)]) -> None:
     assert cfg["env"] == "test"
     assert cfg["debug"] == "true"
 
 
-@session.test
+@session.test()
 def test_cache_url(url: Annotated[str, Use(cache)]) -> None:
     assert "test.cache.local" in url

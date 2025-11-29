@@ -9,6 +9,7 @@ from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
 from protest.di.markers import Use
 from protest.events.data import SessionResult, TestResult
+from protest.plugin import PluginBase
 
 
 class TestRunnerBasics:
@@ -18,7 +19,7 @@ class TestRunnerBasics:
         """Runner returns True when all tests pass."""
         session = ProTestSession()
 
-        @session.test
+        @session.test()
         def passing_test() -> None:
             assert True
 
@@ -31,7 +32,7 @@ class TestRunnerBasics:
         """Runner returns False when any test fails."""
         session = ProTestSession()
 
-        @session.test
+        @session.test()
         def failing_test() -> None:
             raise AssertionError("intentional failure")
 
@@ -44,11 +45,11 @@ class TestRunnerBasics:
         """Runner returns False if any test fails."""
         session = ProTestSession()
 
-        @session.test
+        @session.test()
         def passing_test() -> None:
             assert True
 
-        @session.test
+        @session.test()
         def failing_test() -> None:
             raise ValueError("intentional failure")
 
@@ -74,7 +75,7 @@ class TestRunnerEvents:
         session = ProTestSession()
         events_received: list[str] = []
 
-        class EventCollector:
+        class EventCollector(PluginBase):
             def on_session_start(self) -> None:
                 events_received.append("session_start")
 
@@ -86,7 +87,7 @@ class TestRunnerEvents:
 
         session.use(EventCollector())
 
-        @session.test
+        @session.test()
         def simple_test() -> None:
             pass
 
@@ -102,13 +103,13 @@ class TestRunnerEvents:
         session = ProTestSession()
         results: list[TestResult] = []
 
-        class ResultCollector:
+        class ResultCollector(PluginBase):
             def on_test_pass(self, result: TestResult) -> None:
                 results.append(result)
 
         session.use(ResultCollector())
 
-        @session.test
+        @session.test()
         def my_passing_test() -> None:
             pass
 
@@ -124,13 +125,13 @@ class TestRunnerEvents:
         session = ProTestSession()
         results: list[TestResult] = []
 
-        class ResultCollector:
+        class ResultCollector(PluginBase):
             def on_test_fail(self, result: TestResult) -> None:
                 results.append(result)
 
         session.use(ResultCollector())
 
-        @session.test
+        @session.test()
         def my_failing_test() -> None:
             raise ValueError("test error")
 
@@ -154,7 +155,7 @@ class TestRunnerWithFixtures:
         def my_fixture() -> str:
             return "fixture_value"
 
-        @session.test
+        @session.test()
         def test_with_fixture(val: Annotated[str, Use(my_fixture)]) -> None:
             received_value.append(val)
 
@@ -174,7 +175,7 @@ class TestRunnerWithFixtures:
             nonlocal teardown_called
             teardown_called = True
 
-        @session.test
+        @session.test()
         def test_with_gen(val: Annotated[str, Use(generator_fixture)]) -> None:
             assert val == "gen_value"
 
@@ -195,7 +196,7 @@ class TestRunnerWithSuites:
 
         executed: list[str] = []
 
-        @suite.test
+        @suite.test()
         def suite_test() -> None:
             executed.append("suite_test")
 
@@ -211,7 +212,7 @@ class TestRunnerWithSuites:
         session.include_suite(suite)
         events_received: list[tuple[str, str]] = []
 
-        class SuiteEventCollector:
+        class SuiteEventCollector(PluginBase):
             def on_suite_start(self, name: str) -> None:
                 events_received.append(("start", name))
 
@@ -220,7 +221,7 @@ class TestRunnerWithSuites:
 
         session.use(SuiteEventCollector())
 
-        @suite.test
+        @suite.test()
         def suite_test() -> None:
             pass
 
@@ -238,11 +239,11 @@ class TestRunnerWithSuites:
 
         execution_order: list[int] = []
 
-        @suite.test
+        @suite.test()
         def test_first() -> None:
             execution_order.append(1)
 
-        @suite.test
+        @suite.test()
         def test_second() -> None:
             execution_order.append(2)
 
@@ -263,7 +264,7 @@ class TestRunnerParallelExecution:
         current_concurrent = 0
         lock = asyncio.Lock()
 
-        @session.test
+        @session.test()
         async def test_a() -> None:
             nonlocal max_concurrent, current_concurrent
             async with lock:
@@ -273,7 +274,7 @@ class TestRunnerParallelExecution:
             async with lock:
                 current_concurrent -= 1
 
-        @session.test
+        @session.test()
         async def test_b() -> None:
             nonlocal max_concurrent, current_concurrent
             async with lock:
@@ -283,7 +284,7 @@ class TestRunnerParallelExecution:
             async with lock:
                 current_concurrent -= 1
 
-        @session.test
+        @session.test()
         async def test_c() -> None:
             nonlocal max_concurrent, current_concurrent
             async with lock:
@@ -305,15 +306,15 @@ class TestRunnerParallelExecution:
 
         session = ProTestSession(concurrency=3)
 
-        @session.test
+        @session.test()
         async def test_a() -> None:
             await asyncio.sleep(0.1)
 
-        @session.test
+        @session.test()
         async def test_b() -> None:
             await asyncio.sleep(0.1)
 
-        @session.test
+        @session.test()
         async def test_c() -> None:
             await asyncio.sleep(0.1)
 

@@ -34,7 +34,7 @@ def sync_client() -> TestClient:
     return TestClient(app)
 
 
-@session.test
+@session.test()
 async def test_health(client: Annotated[httpx.AsyncClient, Use(async_client)]) -> None:
     """Simple async health check."""
     response = await client.get("/health")
@@ -42,7 +42,7 @@ async def test_health(client: Annotated[httpx.AsyncClient, Use(async_client)]) -
     assert response.json() == {"status": "ok"}
 
 
-@session.test
+@session.test()
 async def test_get_user(
     client: Annotated[httpx.AsyncClient, Use(async_client)],
 ) -> None:
@@ -53,7 +53,7 @@ async def test_get_user(
     assert data["name"] == "Alice"
 
 
-@session.test
+@session.test()
 async def test_parallel_user_fetches(
     client: Annotated[httpx.AsyncClient, Use(async_client)],
 ) -> None:
@@ -79,7 +79,7 @@ async def test_parallel_user_fetches(
     )
 
 
-@session.test
+@session.test()
 async def test_parallel_mixed_endpoints(
     client: Annotated[httpx.AsyncClient, Use(async_client)],
 ) -> None:
@@ -102,7 +102,7 @@ async def test_parallel_mixed_endpoints(
     assert duration < max_expected_duration
 
 
-@session.test
+@session.test()
 async def test_parallel_slow_endpoints(
     client: Annotated[httpx.AsyncClient, Use(async_client)],
 ) -> None:
@@ -125,7 +125,7 @@ async def test_parallel_slow_endpoints(
     assert duration < max_expected_duration, f"Should be ~0.5s, got {duration:.3f}s"
 
 
-@session.test
+@session.test()
 def test_sync_for_comparison(
     client: Annotated[TestClient, Use(sync_client)],
 ) -> None:
@@ -134,25 +134,25 @@ def test_sync_for_comparison(
     assert response.status_code == 200
 
 
-@session.test
+@session.test()
 async def test_slow_1(client: Annotated[httpx.AsyncClient, Use(async_client)]) -> None:
     """Slow test 1 - 200ms each. With -n 4, all 4 run in ~200ms instead of 800ms."""
     await client.get("/users/1")
 
 
-@session.test
+@session.test()
 async def test_slow_2(client: Annotated[httpx.AsyncClient, Use(async_client)]) -> None:
     """Slow test 2."""
     await client.get("/users/2")
 
 
-@session.test
+@session.test()
 async def test_slow_3(client: Annotated[httpx.AsyncClient, Use(async_client)]) -> None:
     """Slow test 3."""
     await client.get("/users/3")
 
 
-@session.test
+@session.test()
 async def test_slow_4(client: Annotated[httpx.AsyncClient, Use(async_client)]) -> None:
     """Slow test 4."""
     await client.get("/products/1")

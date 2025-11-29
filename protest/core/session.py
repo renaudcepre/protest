@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from types import TracebackType
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
+
+if TYPE_CHECKING:
+    from protest.plugin import PluginBase
 
 from protest.core.fixture import FixtureCallable
 from protest.core.scope import Scope
@@ -18,7 +21,7 @@ class ProTestSession:
         self._events = EventBus()
         self._suites: list[ProTestSuite] = []
         self._tests: list[Callable[..., Any]] = []
-        self._concurrency = concurrency
+        self._concurrency = max(1, concurrency)
 
     @property
     def concurrency(self) -> int:
@@ -53,7 +56,6 @@ class ProTestSession:
 
         return decorator
 
-    @property
     def test(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             self._tests.append(func)
@@ -65,10 +67,10 @@ class ProTestSession:
         suite._attach_to_session(self)
         self._suites.append(suite)
 
-    def use(self, plugin: object) -> None:
+    def use(self, plugin: PluginBase) -> None:
         """Enregistre un plugin avec wiring automatique des hooks."""
         if hasattr(plugin, "setup") and callable(plugin.setup):
-            plugin.setup(self)  # type: ignore[call-arg]
+            plugin.setup(self)
 
         for event in Event:
             method_name = f"on_{event.value}"

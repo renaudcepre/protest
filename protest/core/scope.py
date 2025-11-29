@@ -1,9 +1,13 @@
-from enum import Enum, auto
+from enum import Enum
 
 
 class Scope(Enum):
-    """Defines the lifecycle scope for fixtures and tests."""
+    """Defines the lifecycle scope for fixtures and tests.
 
-    SESSION = auto()
-    SUITE = auto()
-    FUNCTION = auto()
+    Values are ordered: SESSION (1) < SUITE (2) < FUNCTION (3).
+    Lower values indicate wider scopes.
+    """
+
+    SESSION = 1
+    SUITE = 2
+    FUNCTION = 3

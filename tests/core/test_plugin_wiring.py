@@ -5,6 +5,7 @@ import pytest
 from protest.core.session import ProTestSession
 from protest.events.data import SessionResult, TestResult
 from protest.events.types import Event
+from protest.plugin import PluginBase
 
 
 class TestPluginWiring:
@@ -16,7 +17,7 @@ class TestPluginWiring:
         session = ProTestSession()
         received: list[TestResult] = []
 
-        class TestPlugin:
+        class TestPlugin(PluginBase):
             def on_test_pass(self, result: TestResult) -> None:
                 received.append(result)
 
@@ -34,7 +35,7 @@ class TestPluginWiring:
         session = ProTestSession()
         events_received: list[str] = []
 
-        class MultiPlugin:
+        class MultiPlugin(PluginBase):
             def on_session_start(self) -> None:
                 events_received.append("session_start")
 
@@ -59,7 +60,7 @@ class TestPluginWiring:
         """Methods not matching on_* pattern are ignored."""
         session = ProTestSession()
 
-        class PluginWithOtherMethods:
+        class PluginWithOtherMethods(PluginBase):
             def __init__(self) -> None:
                 self.helper_called = False
 
@@ -79,14 +80,14 @@ class TestPluginWiring:
         """setup(session) is called if the plugin has it."""
         session = ProTestSession()
 
-        class PluginWithSetup:
+        class PluginWithSetup(PluginBase):
             def __init__(self) -> None:
                 self.setup_called = False
-                self.received_session = None
+                self.received_session: ProTestSession | None = None
 
-            def setup(self, sess: ProTestSession) -> None:
+            def setup(self, session: ProTestSession) -> None:
                 self.setup_called = True
-                self.received_session = sess
+                self.received_session = session
 
         plugin = PluginWithSetup()
         session.use(plugin)
@@ -100,7 +101,7 @@ class TestPluginWiring:
         session = ProTestSession()
         received: list[str] = []
 
-        class PluginWithoutSetup:
+        class PluginWithoutSetup(PluginBase):
             def on_session_start(self) -> None:
                 received.append("started")
 
@@ -119,7 +120,7 @@ class TestPluginWiring:
             async def on_test_pass(self, result: TestResult) -> None:
                 received.append(result.name)
 
-        session.use(AsyncPlugin())
+        session.use(AsyncPlugin())  # type: ignore[arg-type]
         await session.events.emit(Event.TEST_PASS, TestResult(name="async_test"))
         await session.events.wait_pending()
 

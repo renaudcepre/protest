@@ -5,9 +5,13 @@ from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from types import TracebackType
 from typing import Any, Self
 
-from protest.core.fixture import FixtureCallable
+from protest.core.fixture import (
+    FixtureCallable,
+    get_callable_name,
+    is_generator_like,
+)
 from protest.core.scope import Scope
-from protest.di.resolver import Resolver
+from protest.di.resolver import FixtureNotFoundError, Resolver
 from protest.di.suite_resolver import SuiteResolver
 from protest.execution.async_bridge import ensure_async
 
@@ -53,7 +57,7 @@ class TestExecutionContext:
         fixture = self._get_fixture(target_func)
         kwargs = await self._resolve_dependencies(target_func)
 
-        if _is_generator_like(fixture.func):
+        if is_generator_like(fixture.func):
             if inspect.isasyncgenfunction(fixture.func):
                 async_cm = asynccontextmanager(fixture.func)(**kwargs)
                 result = await self._exit_stack.enter_async_context(async_cm)
@@ -85,27 +89,20 @@ class TestExecutionContext:
 
     def _get_fixture(self, func: FixtureCallable):
         """Get fixture from parent registry."""
-        if func in self._parent._registry:
-            return self._parent._registry[func]
-        if (
-            isinstance(self._parent, SuiteResolver)
-            and func in self._parent._parent_resolver._registry
-        ):
-            return self._parent._parent_resolver._registry[func]
-        raise KeyError(f"Fixture {func} not found in registry")
+        fixture = self._parent.get_fixture(func)
+        if fixture is not None:
+            return fixture
+        if isinstance(self._parent, SuiteResolver):
+            fixture = self._parent._parent_resolver.get_fixture(func)
+            if fixture is not None:
+                return fixture
+        raise FixtureNotFoundError(get_callable_name(func))
 
     def _get_dependencies(self, func: FixtureCallable) -> dict[str, FixtureCallable]:
         """Get dependencies from parent resolver."""
-        if func in self._parent._dependencies:
-            return self._parent._dependencies[func]
-        if (
-            isinstance(self._parent, SuiteResolver)
-            and func in self._parent._parent_resolver._dependencies
-        ):
-            return self._parent._parent_resolver._dependencies[func]
+        deps = self._parent.get_dependencies(func)
+        if deps:
+            return deps
+        if isinstance(self._parent, SuiteResolver):
+            return self._parent._parent_resolver.get_dependencies(func)
         return {}
-
-
-def _is_generator_like(func: FixtureCallable) -> bool:
-    """Check if func contains yield (sync or async)."""
-    return inspect.isgeneratorfunction(func) or inspect.isasyncgenfunction(func)
