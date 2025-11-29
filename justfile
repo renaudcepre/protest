@@ -7,7 +7,7 @@
 @lint:
     ruff format .
     ruff check --fix .
-    ty check .
+    ty check protest tests
 
 # Run tests with verbose output
 @test *options="":

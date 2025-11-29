@@ -1,6 +1,7 @@
 """Event bus for decoupled event handling."""
 
 import asyncio
+import logging
 from collections import defaultdict
 from collections.abc import Callable
 from typing import Any
@@ -8,9 +9,11 @@ from typing import Any
 from protest.events.types import Event
 from protest.execution.async_bridge import run_in_threadpool
 
+logger = logging.getLogger(__name__)
+
 
 class EventBus:
-    """Event bus with async support. Sync handlers block, async handlers are fire-and-forget."""
+    """Event bus with async support. Sync handlers block, async fire-and-forget."""
 
     def __init__(self) -> None:
         self._handlers: dict[Event, list[Callable[..., Any]]] = defaultdict(list)
@@ -21,7 +24,7 @@ class EventBus:
         self._handlers[event].append(handler)
 
     async def emit(self, event: Event, data: Any = None) -> None:
-        """Emit event. Sync handlers block, async handlers run as fire-and-forget tasks."""
+        """Emit event. Sync handlers block, async handlers run fire-and-forget."""
         for handler in self._handlers[event]:
             try:
                 if asyncio.iscoroutinefunction(handler):
@@ -33,7 +36,10 @@ class EventBus:
                 else:
                     await run_in_threadpool(handler)
             except Exception:
-                pass  # TODO: log errors
+                handler_name = getattr(handler, "__name__", "<unknown>")
+                logger.exception(
+                    "Handler %s failed for event %s", handler_name, event.value
+                )
 
     async def _run_async_handler(self, handler: Callable[..., Any], data: Any) -> None:
         """Run async handler with error handling."""
@@ -43,7 +49,8 @@ class EventBus:
             else:
                 await handler()
         except Exception:
-            pass  # TODO: log errors
+            handler_name = getattr(handler, "__name__", "<unknown>")
+            logger.exception("Async handler %s failed", handler_name)
 
     async def wait_pending(self) -> None:
         """Wait for all fire-and-forget async tasks to complete."""

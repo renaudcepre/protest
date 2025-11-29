@@ -1,6 +1,7 @@
 import argparse
 import importlib
 import sys
+from typing import cast
 
 
 def main() -> None:
@@ -60,10 +61,11 @@ def run_tests(target: str, concurrency: int = 1) -> None:
         print(f"Error: '{session_name}' is not a ProTestSession")
         sys.exit(1)
 
-    session.concurrency = concurrency
-    session.use(ConsoleReporter())
+    protest_session = cast(ProTestSession, session)
+    protest_session.concurrency = concurrency
+    protest_session.use(ConsoleReporter())
 
-    runner = TestRunner(session)
+    runner = TestRunner(protest_session)
     runner.run()
 
 
