@@ -1,6 +1,5 @@
 import inspect
-from collections.abc import Generator
-from contextlib import ExitStack, contextmanager
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from inspect import signature
 from types import TracebackType
 from typing import Annotated, Any, get_args, get_origin
@@ -8,6 +7,7 @@ from typing import Annotated, Any, get_args, get_origin
 from protest.core.fixture import Fixture, FixtureCallable, get_callable_name
 from protest.core.scope import Scope
 from protest.di.markers import Use
+from protest.execution.async_bridge import ensure_async
 from protest.exceptions import ProTestError
 
 
@@ -45,7 +45,7 @@ class Resolver:
     def __init__(self) -> None:
         self._registry: dict[FixtureCallable, Fixture] = {}
         self._dependencies: dict[FixtureCallable, dict[str, FixtureCallable]] = {}
-        self._exit_stack: ExitStack = ExitStack()
+        self._exit_stack: AsyncExitStack = AsyncExitStack()
 
     def register(self, func: FixtureCallable, scope: Scope) -> None:
         """Analyzes a function's dependencies and registers it as a Fixture."""
@@ -56,38 +56,41 @@ class Resolver:
         self._analyze_and_store_dependencies(fixture)
         self._registry[func] = fixture
 
-    def resolve(self, target_func: FixtureCallable) -> Any:
+    async def resolve(self, target_func: FixtureCallable) -> Any:
         """Resolves a fixture by creating its dependencies and calling it."""
         target_fixture = self._registry[target_func]
 
         if target_fixture.is_cached:
             return target_fixture.cached_value
 
-        kwargs = {
-            param_name: self.resolve(dep_func)
-            for param_name, dep_func in self._dependencies.get(target_func, {}).items()
-        }
+        kwargs = {}
+        for param_name, dep_func in self._dependencies.get(target_func, {}).items():
+            kwargs[param_name] = await self.resolve(dep_func)
 
-        if _is_generator_callable(target_fixture.func):
-            context_manager = contextmanager(target_fixture.func)(**kwargs)
-            result = self._exit_stack.enter_context(context_manager)
+        if _is_generator_like(target_fixture.func):
+            if inspect.isasyncgenfunction(target_fixture.func):
+                async_cm = asynccontextmanager(target_fixture.func)(**kwargs)
+                result = await self._exit_stack.enter_async_context(async_cm)
+            else:
+                sync_cm = contextmanager(target_fixture.func)(**kwargs)
+                result = self._exit_stack.enter_context(sync_cm)
         else:
-            result = target_fixture.func(**kwargs)
+            result = await ensure_async(target_fixture.func, **kwargs)
 
         target_fixture.cached_value = result
         target_fixture.is_cached = True
         return result
 
-    def __enter__(self) -> "Resolver":
+    async def __aenter__(self) -> "Resolver":
         return self
 
-    def __exit__(
+    async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:
-        result = self._exit_stack.__exit__(exc_type, exc_val, exc_tb)
+        result = await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
         return result or False
 
     def clear_cache(self, scope: Scope) -> None:
@@ -136,9 +139,5 @@ class Resolver:
         return None
 
 
-def _is_generator_callable(func: FixtureCallable) -> bool:
-    if inspect.isgeneratorfunction(func):
-        return True
-    return_annotation = signature(func).return_annotation
-    origin = get_origin(return_annotation)
-    return origin is not None and origin is Generator
+def _is_generator_like(func: FixtureCallable) -> bool:
+    return inspect.isgeneratorfunction(func) or inspect.isasyncgenfunction(func)
