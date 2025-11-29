@@ -17,17 +17,24 @@ def main() -> None:
         default=".",
         help="Look for module in this directory (default: current directory)",
     )
+    run_parser.add_argument(
+        "-n",
+        "--concurrency",
+        type=int,
+        default=1,
+        help="Number of concurrent tests (default: 1, sequential)",
+    )
 
     args = parser.parse_args()
 
     if args.command == "run":
         sys.path.insert(0, args.app_dir)
-        run_tests(args.target)
+        run_tests(args.target, args.concurrency)
     else:
         parser.print_help()
 
 
-def run_tests(target: str) -> None:
+def run_tests(target: str, concurrency: int = 1) -> None:
     if ":" not in target:
         print(f"Error: Invalid format '{target}'. Use 'module:session'")
         sys.exit(1)
@@ -53,10 +60,11 @@ def run_tests(target: str) -> None:
         print(f"Error: '{session_name}' is not a ProTestSession")
         sys.exit(1)
 
+    session.concurrency = concurrency
     session.use(ConsoleReporter())
 
     runner = TestRunner(session)
-    success = runner.run()
+    runner.run()
 
 
 if __name__ == "__main__":

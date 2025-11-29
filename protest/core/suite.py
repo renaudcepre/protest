@@ -21,15 +21,20 @@ class SuiteFixtureScopeError(ProTestError):
 
 
 class ProTestSuite:
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, concurrency: int | None = None) -> None:
         self._name = name
         self._session: ProTestSession | None = None
         self._resolver: SuiteResolver | None = None
         self._tests: list[Callable[..., Any]] = []
+        self._concurrency = concurrency
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def concurrency(self) -> int | None:
+        return self._concurrency
 
     @property
     def tests(self) -> list[Callable[..., Any]]:

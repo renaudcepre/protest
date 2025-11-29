@@ -6,9 +6,9 @@ from collections.abc import AsyncGenerator
 from typing import Annotated
 
 import httpx
+from app import app
 from fastapi.testclient import TestClient
 
-from app import app
 from protest.core.scope import Scope
 from protest.core.session import ProTestSession
 from protest.di.markers import Use
@@ -43,7 +43,9 @@ async def test_health(client: Annotated[httpx.AsyncClient, Use(async_client)]) -
 
 
 @session.test
-async def test_get_user(client: Annotated[httpx.AsyncClient, Use(async_client)]) -> None:
+async def test_get_user(
+    client: Annotated[httpx.AsyncClient, Use(async_client)],
+) -> None:
     """Test single user fetch."""
     response = await client.get("/users/1")
     assert response.status_code == 200
@@ -72,7 +74,9 @@ async def test_parallel_user_fetches(
 
     print(f"  [PARALLEL] 3 users fetched in {duration:.3f}s (should be ~0.1s)")
     max_expected_duration = 0.2
-    assert duration < max_expected_duration, f"Parallel calls took {duration:.3f}s, expected < 0.2s"
+    assert duration < max_expected_duration, (
+        f"Parallel calls took {duration:.3f}s, expected < 0.2s"
+    )
 
 
 @session.test
@@ -128,3 +132,27 @@ def test_sync_for_comparison(
     """Sync test - just to show we can mix sync/async."""
     response = client.get("/health")
     assert response.status_code == 200
+
+
+@session.test
+async def test_slow_1(client: Annotated[httpx.AsyncClient, Use(async_client)]) -> None:
+    """Slow test 1 - 200ms each. With -n 4, all 4 run in ~200ms instead of 800ms."""
+    await client.get("/users/1")
+
+
+@session.test
+async def test_slow_2(client: Annotated[httpx.AsyncClient, Use(async_client)]) -> None:
+    """Slow test 2."""
+    await client.get("/users/2")
+
+
+@session.test
+async def test_slow_3(client: Annotated[httpx.AsyncClient, Use(async_client)]) -> None:
+    """Slow test 3."""
+    await client.get("/users/3")
+
+
+@session.test
+async def test_slow_4(client: Annotated[httpx.AsyncClient, Use(async_client)]) -> None:
+    """Slow test 4."""
+    await client.get("/products/1")

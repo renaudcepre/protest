@@ -4,13 +4,13 @@ from collections.abc import Callable
 from inspect import signature
 from typing import Any
 
-from protest.core.scope import Scope
 from protest.core.session import ProTestSession
 from protest.di.resolver import Resolver
 from protest.di.suite_resolver import SuiteResolver
 from protest.events.data import SessionResult, TestResult
 from protest.events.types import Event
 from protest.execution.async_bridge import ensure_async
+from protest.execution.context import TestExecutionContext
 
 
 class TestRunner:
@@ -26,25 +26,33 @@ class TestRunner:
         passed = 0
         failed = 0
         session_start = time.perf_counter()
+        concurrency = self._session.concurrency
 
         await self._session.events.emit(Event.SESSION_START)
 
+        semaphore = asyncio.Semaphore(concurrency)
+
         async with self._session:
-            for test_func in self._session.tests:
-                if await self._run_test(test_func, self._session.resolver):
-                    passed += 1
-                else:
-                    failed += 1
+            session_passed, session_failed = await self._run_tests_parallel(
+                self._session.tests,
+                self._session.resolver,
+                semaphore,
+            )
+            passed += session_passed
+            failed += session_failed
 
             for suite in self._session.suites:
                 await self._session.events.emit(Event.SUITE_START, suite.name)
+                suite_concurrency = suite.concurrency or concurrency
+                suite_semaphore = asyncio.Semaphore(suite_concurrency)
                 async with suite.resolver:
-                    for test_func in suite.tests:
-                        if await self._run_test(test_func, suite.resolver):
-                            passed += 1
-                        else:
-                            failed += 1
-                        suite.resolver.clear_cache(Scope.FUNCTION)
+                    suite_passed, suite_failed = await self._run_tests_parallel(
+                        suite.tests,
+                        suite.resolver,
+                        suite_semaphore,
+                    )
+                    passed += suite_passed
+                    failed += suite_failed
                 await self._session.events.emit(Event.SUITE_END, suite.name)
 
         session_duration = time.perf_counter() - session_start
@@ -56,17 +64,39 @@ class TestRunner:
         await self._session.events.emit(Event.SESSION_COMPLETE, session_result)
         return failed == 0
 
+    async def _run_tests_parallel(
+        self,
+        tests: list[Callable[..., Any]],
+        resolver: Resolver | SuiteResolver,
+        semaphore: asyncio.Semaphore,
+    ) -> tuple[int, int]:
+        """Run tests with concurrency control. Returns (passed, failed)."""
+        if not tests:
+            return 0, 0
+
+        async def run_one(test_func: Callable[..., Any]) -> bool:
+            async with semaphore:
+                async with TestExecutionContext(resolver) as ctx:
+                    return await self._run_test(test_func, ctx)
+
+        tasks = [asyncio.create_task(run_one(test)) for test in tests]
+        results = await asyncio.gather(*tasks)
+
+        passed = sum(results)
+        failed = len(results) - passed
+        return passed, failed
+
     async def _run_test(
         self,
         test_func: Callable[..., Any],
-        resolver: Resolver | SuiteResolver,
+        ctx: TestExecutionContext,
     ) -> bool:
         func_signature = signature(test_func)
         kwargs: dict[str, Any] = {}
 
         for param_name, param in func_signature.parameters.items():
             if dependency := Resolver._extract_dependency_from_parameter(param):
-                kwargs[param_name] = await resolver.resolve(dependency)
+                kwargs[param_name] = await ctx.resolve(dependency)
 
         test_name = getattr(test_func, "__name__", "<unnamed>")
         start = time.perf_counter()
