@@ -1,0 +1,9 @@
+[project]
+name = "protest-example-fastapi"
+version = "0.1.0"
+description = "FastAPI async testing example for ProTest"
+requires-python = ">=3.12"
+dependencies = ["protest", "fastapi", "httpx"]
+
+[tool.uv.sources]
+protest = { path = "../..", editable = true }
