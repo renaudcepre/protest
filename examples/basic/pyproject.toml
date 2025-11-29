@@ -1,0 +1,9 @@
+[project]
+name = "protest-example-basic"
+version = "0.1.0"
+description = "Basic ProTest examples"
+requires-python = ">=3.12"
+dependencies = ["protest"]
+
+[tool.uv.sources]
+protest = { path = "../..", editable = true }

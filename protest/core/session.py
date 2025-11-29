@@ -8,17 +8,23 @@ from protest.core.fixture import FixtureCallable
 from protest.core.scope import Scope
 from protest.core.suite import ProTestSuite
 from protest.di.resolver import Resolver
+from protest.events.bus import EventBus
 
 
 class ProTestSession:
     def __init__(self) -> None:
         self._resolver = Resolver()
+        self._events = EventBus()
         self._suites: list[ProTestSuite] = []
         self._tests: list[Callable[..., Any]] = []
 
     @property
     def resolver(self) -> Resolver:
         return self._resolver
+
+    @property
+    def events(self) -> EventBus:
+        return self._events
 
     @property
     def suites(self) -> list[ProTestSuite]:

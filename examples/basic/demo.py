@@ -8,9 +8,14 @@ from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
 from protest.di.markers import Use
 
+from slack_notifier import FakeSlackNotifier
+
 session = ProTestSession()
 api_suite = ProTestSuite("API Tests")
 unit_suite = ProTestSuite("Unit Tests")
+
+slack = FakeSlackNotifier(delay=0.5)
+slack.register(session.events)
 
 
 # =============================================================================

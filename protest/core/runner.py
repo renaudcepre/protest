@@ -1,4 +1,5 @@
 import asyncio
+import time
 from collections.abc import Callable
 from inspect import signature
 from typing import Any
@@ -7,17 +8,14 @@ from protest.core.scope import Scope
 from protest.core.session import ProTestSession
 from protest.di.resolver import Resolver
 from protest.di.suite_resolver import SuiteResolver
+from protest.events.data import SessionResult, TestResult
+from protest.events.types import Event
 from protest.execution.async_bridge import ensure_async
-from protest.reporting.console import ConsoleReporter
-from protest.reporting.protocol import Reporter
 
 
 class TestRunner:
-    def __init__(
-        self, session: ProTestSession, reporter: Reporter | None = None
-    ) -> None:
+    def __init__(self, session: ProTestSession) -> None:
         self._session = session
-        self._reporter: Reporter = reporter or ConsoleReporter()
 
     def run(self) -> bool:
         """Synchronous entry point to run the test session."""
@@ -27,8 +25,9 @@ class TestRunner:
         """The main async loop for running tests."""
         passed = 0
         failed = 0
+        session_start = time.perf_counter()
 
-        await ensure_async(self._reporter.on_session_start)
+        await self._session.events.emit(Event.SESSION_START)
 
         async with self._session:
             for test_func in self._session.tests:
@@ -38,7 +37,7 @@ class TestRunner:
                     failed += 1
 
             for suite in self._session.suites:
-                await ensure_async(self._reporter.on_suite_start, suite.name)
+                await self._session.events.emit(Event.SUITE_START, suite.name)
                 async with suite.resolver:
                     for test_func in suite.tests:
                         if await self._run_test(test_func, suite.resolver):
@@ -46,9 +45,15 @@ class TestRunner:
                         else:
                             failed += 1
                         suite.resolver.clear_cache(Scope.FUNCTION)
-                await ensure_async(self._reporter.on_suite_end, suite.name)
+                await self._session.events.emit(Event.SUITE_END, suite.name)
 
-        await ensure_async(self._reporter.on_session_end, passed, failed)
+        session_duration = time.perf_counter() - session_start
+        session_result = SessionResult(
+            passed=passed, failed=failed, duration=session_duration
+        )
+        await self._session.events.emit(Event.SESSION_END, session_result)
+        await self._session.events.wait_pending()
+        await self._session.events.emit(Event.SESSION_COMPLETE, session_result)
         return failed == 0
 
     async def _run_test(
@@ -64,10 +69,15 @@ class TestRunner:
                 kwargs[param_name] = await resolver.resolve(dependency)
 
         test_name = getattr(test_func, "__name__", "<unnamed>")
+        start = time.perf_counter()
         try:
             await ensure_async(test_func, **kwargs)
-            await ensure_async(self._reporter.on_test_pass, test_name)
+            duration = time.perf_counter() - start
+            result = TestResult(name=test_name, duration=duration)
+            await self._session.events.emit(Event.TEST_PASS, result)
             return True
         except Exception as exc:
-            await ensure_async(self._reporter.on_test_fail, test_name, exc)
+            duration = time.perf_counter() - start
+            result = TestResult(name=test_name, error=exc, duration=duration)
+            await self._session.events.emit(Event.TEST_FAIL, result)
             return False

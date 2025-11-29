@@ -70,7 +70,7 @@ class TestSessionSuiteHierarchy:
         """Cannot register suite fixtures before including in session."""
         suite = ProTestSuite("test_suite")
 
-        with pytest.raises(RuntimeError, match="must be included in a session"):
+        with pytest.raises(RuntimeError, match="must be attached to a session"):
 
             @suite.fixture(scope=Scope.FUNCTION)
             def early_fixture() -> str:
