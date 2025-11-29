@@ -1,15 +1,14 @@
-"""TDD tests for Session/Suite hierarchy - skipped until implemented."""
+"""TDD tests for Session/Suite hierarchy."""
 
-pytest = __import__("pytest")
-pytest.skip("ProTestSession/ProTestSuite not yet implemented", allow_module_level=True)
+from typing import Annotated
 
-from typing import Annotated  # noqa: E402
+import pytest
 
-from protest.core.scope import Scope  # noqa: E402
-from protest.core.session import ProTestSession  # noqa: E402
-from protest.core.suite import ProTestSuite, SuiteFixtureScopeError  # noqa: E402
-from protest.di.markers import Use  # noqa: E402
-from protest.di.resolver import UnregisteredDependencyError  # noqa: E402
+from protest.core.scope import Scope
+from protest.core.session import ProTestSession
+from protest.core.suite import ProTestSuite, SuiteFixtureScopeError
+from protest.di.markers import Use
+from protest.di.resolver import UnregisteredDependencyError
 
 
 class TestSessionSuiteHierarchy:

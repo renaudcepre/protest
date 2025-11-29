@@ -52,6 +52,12 @@ log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "[%(levelname)7s] %(name)20s - %(message)s"
 
+[project.scripts]
+protest = "protest.cli.main:main"
+
+[tool.setuptools]
+packages = ["protest"]
+
 [dependency-groups]
 dev = [
     "pytest-cov>=6.0.0",
