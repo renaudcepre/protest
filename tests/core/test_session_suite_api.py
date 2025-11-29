@@ -2,20 +2,17 @@
 
 These tests define the desired behavior before implementation.
 Architecture: Single global resolver + explicit fixture visibility lists.
-
-These tests are skipped until ProTestSession and ProTestSuite are implemented.
 """
 
-pytest = __import__("pytest")
-pytest.skip("ProTestSession/ProTestSuite not yet implemented", allow_module_level=True)
+from typing import Annotated
 
-from typing import Annotated  # noqa: E402
+import pytest
 
-from protest.core.scope import Scope  # noqa: E402
-from protest.core.session import ProTestSession  # noqa: E402
-from protest.core.suite import ProTestSuite  # noqa: E402
-from protest.di.markers import Use  # noqa: E402
-from protest.di.resolver import UnregisteredDependencyError  # noqa: E402
+from protest.core.scope import Scope
+from protest.core.session import ProTestSession
+from protest.core.suite import ProTestSuite
+from protest.di.markers import Use
+from protest.di.resolver import UnregisteredDependencyError
 
 
 class TestSessionSuiteAPI:
@@ -86,16 +83,11 @@ class TestSessionSuiteAPI:
             return f"processed_{data}"
 
         # Suite B tries to use Suite A's fixture - should fail
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(UnregisteredDependencyError):
 
             @suite_b.fixture(scope=Scope.FUNCTION)
             def suite_b_illegal(data: Annotated[str, Use(suite_a_data)]) -> str:
                 return f"illegal_{data}"
-
-        assert (
-            "not visible" in str(exc_info.value).lower()
-            or "not allowed" in str(exc_info.value).lower()
-        )
 
     def test_suite_cannot_define_session_scope(self):
         """Suites should not be allowed to define SESSION-scoped fixtures."""
