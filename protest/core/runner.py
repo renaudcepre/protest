@@ -75,9 +75,8 @@ class TestRunner:
             return 0, 0
 
         async def run_one(test_func: Callable[..., Any]) -> bool:
-            async with semaphore:
-                async with TestExecutionContext(resolver) as ctx:
-                    return await self._run_test(test_func, ctx)
+            async with semaphore, TestExecutionContext(resolver) as ctx:
+                return await self._run_test(test_func, ctx)
 
         tasks = [asyncio.create_task(run_one(test)) for test in tests]
         results = await asyncio.gather(*tasks)

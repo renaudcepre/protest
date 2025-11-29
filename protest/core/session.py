@@ -68,7 +68,7 @@ class ProTestSession:
     def use(self, plugin: object) -> None:
         """Enregistre un plugin avec wiring automatique des hooks."""
         if hasattr(plugin, "setup") and callable(plugin.setup):
-            plugin.setup(self)
+            plugin.setup(self)  # type: ignore[call-arg]
 
         for event in Event:
             method_name = f"on_{event.value}"

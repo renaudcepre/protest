@@ -87,18 +87,22 @@ class TestExecutionContext:
         """Get fixture from parent registry."""
         if func in self._parent._registry:
             return self._parent._registry[func]
-        if isinstance(self._parent, SuiteResolver):
-            if func in self._parent._parent_resolver._registry:
-                return self._parent._parent_resolver._registry[func]
+        if (
+            isinstance(self._parent, SuiteResolver)
+            and func in self._parent._parent_resolver._registry
+        ):
+            return self._parent._parent_resolver._registry[func]
         raise KeyError(f"Fixture {func} not found in registry")
 
     def _get_dependencies(self, func: FixtureCallable) -> dict[str, FixtureCallable]:
         """Get dependencies from parent resolver."""
         if func in self._parent._dependencies:
             return self._parent._dependencies[func]
-        if isinstance(self._parent, SuiteResolver):
-            if func in self._parent._parent_resolver._dependencies:
-                return self._parent._parent_resolver._dependencies[func]
+        if (
+            isinstance(self._parent, SuiteResolver)
+            and func in self._parent._parent_resolver._dependencies
+        ):
+            return self._parent._parent_resolver._dependencies[func]
         return {}
 
 
