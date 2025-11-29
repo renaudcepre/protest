@@ -11,7 +11,7 @@ from protest.di.resolver import (
     Resolver,
     ScopeMismatchError,
     UnregisteredDependencyError,
-    _is_generator_callable,
+    _is_generator_like,
 )
 from tests.di.dependencies import (
     function_dependency,
@@ -24,7 +24,6 @@ from tests.di.utils import call_counts, reset_call_counts, teardown_counts
 
 @pytest.fixture
 def resolver() -> Resolver:
-    """Provides a clean Resolver for each test."""
     reset_call_counts()
     return Resolver()
 
@@ -32,7 +31,8 @@ def resolver() -> Resolver:
 # --- Scoping and Caching Tests ---
 
 
-def test_session_scope_is_cached(resolver: Resolver) -> None:
+@pytest.mark.asyncio
+async def test_session_scope_is_cached(resolver: Resolver) -> None:
     resolver.register(session_dependency, Scope.SESSION)
 
     def target(session_data: Annotated[str, Use(session_dependency)]) -> str:
@@ -40,13 +40,14 @@ def test_session_scope_is_cached(resolver: Resolver) -> None:
 
     resolver.register(target, Scope.SESSION)
 
-    resolver.resolve(target)
-    resolver.resolve(target)
+    await resolver.resolve(target)
+    await resolver.resolve(target)
 
     assert call_counts["session"] == 1
 
 
-def test_function_scope_is_not_cached_across_runs(resolver: Resolver) -> None:
+@pytest.mark.asyncio
+async def test_function_scope_is_not_cached_across_runs(resolver: Resolver) -> None:
     resolver.register(function_dependency, Scope.FUNCTION)
 
     def target(function_data: Annotated[str, Use(function_dependency)]) -> str:
@@ -54,16 +55,19 @@ def test_function_scope_is_not_cached_across_runs(resolver: Resolver) -> None:
 
     resolver.register(target, Scope.FUNCTION)
 
-    resolver.resolve(target)
+    await resolver.resolve(target)
     assert call_counts["function"] == 1
 
     resolver.clear_cache(Scope.FUNCTION)
 
-    resolver.resolve(target)
+    await resolver.resolve(target)
     assert call_counts["function"] == 2
 
 
-def test_session_dependency_is_available_in_function_scope(resolver: Resolver) -> None:
+@pytest.mark.asyncio
+async def test_session_dependency_is_available_in_function_scope(
+    resolver: Resolver,
+) -> None:
     resolver.register(session_dependency, Scope.SESSION)
 
     def target(session_data: Annotated[str, Use(session_dependency)]) -> str:
@@ -71,9 +75,9 @@ def test_session_dependency_is_available_in_function_scope(resolver: Resolver) -
 
     resolver.register(target, Scope.FUNCTION)
 
-    resolver.resolve(target)
+    await resolver.resolve(target)
     resolver.clear_cache(Scope.FUNCTION)
-    resolver.resolve(target)
+    await resolver.resolve(target)
 
     assert call_counts["session"] == 1
 
@@ -89,7 +93,6 @@ def test_session_scope_cannot_depend_on_function_scope(resolver: Resolver) -> No
     ) -> str:
         return f"session_using_{function_data}"
 
-    # This will fail fast, during registration/analysis
     with pytest.raises(ScopeMismatchError):
         resolver.register(invalid_session_fixture, Scope.SESSION)
 
@@ -101,10 +104,8 @@ def test_cannot_register_same_function_twice(resolver: Resolver) -> None:
     def my_fixture() -> str:
         return "test"
 
-    # First registration should work
     resolver.register(my_fixture, Scope.FUNCTION)
 
-    # Second registration should fail
     with pytest.raises(
         AlreadyRegisteredError, match=r"Function 'my_fixture' is already registered\."
     ):
@@ -140,36 +141,40 @@ def test_extract_dependency_returns_none_for_regular_params() -> None:
 # --- Generator Fixture Tests ---
 
 
-def test_generator_fixture_yields_value(resolver: Resolver) -> None:
+@pytest.mark.asyncio
+async def test_generator_fixture_yields_value(resolver: Resolver) -> None:
     resolver.register(generator_session_fixture, Scope.SESSION)
 
-    with resolver:
-        result = resolver.resolve(generator_session_fixture)
+    async with resolver:
+        result = await resolver.resolve(generator_session_fixture)
         assert result == "generator_session_data"
         assert call_counts["generator_session"] == 1
 
 
-def test_generator_fixture_teardown_on_exit(resolver: Resolver) -> None:
+@pytest.mark.asyncio
+async def test_generator_fixture_teardown_on_exit(resolver: Resolver) -> None:
     resolver.register(generator_session_fixture, Scope.SESSION)
 
-    with resolver:
-        resolver.resolve(generator_session_fixture)
+    async with resolver:
+        await resolver.resolve(generator_session_fixture)
         assert teardown_counts["generator_session"] == 0
 
     assert teardown_counts["generator_session"] == 1
 
 
-def test_generator_fixture_is_cached(resolver: Resolver) -> None:
+@pytest.mark.asyncio
+async def test_generator_fixture_is_cached(resolver: Resolver) -> None:
     resolver.register(generator_session_fixture, Scope.SESSION)
 
-    with resolver:
-        result_first = resolver.resolve(generator_session_fixture)
-        result_second = resolver.resolve(generator_session_fixture)
+    async with resolver:
+        result_first = await resolver.resolve(generator_session_fixture)
+        result_second = await resolver.resolve(generator_session_fixture)
         assert result_first == result_second
         assert call_counts["generator_session"] == 1
 
 
-def test_generator_fixture_with_dependency(resolver: Resolver) -> None:
+@pytest.mark.asyncio
+async def test_generator_fixture_with_dependency(resolver: Resolver) -> None:
     resolver.register(session_dependency, Scope.SESSION)
 
     def generator_with_dep(
@@ -181,8 +186,8 @@ def test_generator_fixture_with_dependency(resolver: Resolver) -> None:
 
     resolver.register(generator_with_dep, Scope.SESSION)
 
-    with resolver:
-        result = resolver.resolve(generator_with_dep)
+    async with resolver:
+        result = await resolver.resolve(generator_with_dep)
         assert result == "generated_session_data"
         assert call_counts["session"] == 1
         assert call_counts["generator_with_dep"] == 1
@@ -190,7 +195,8 @@ def test_generator_fixture_with_dependency(resolver: Resolver) -> None:
     assert teardown_counts["generator_with_dep"] == 1
 
 
-def test_multiple_generator_fixtures_teardown_in_reverse_order(
+@pytest.mark.asyncio
+async def test_multiple_generator_fixtures_teardown_in_reverse_order(
     resolver: Resolver,
 ) -> None:
     teardown_order: list[str] = []
@@ -210,24 +216,27 @@ def test_multiple_generator_fixtures_teardown_in_reverse_order(
     resolver.register(first_generator, Scope.SESSION)
     resolver.register(second_generator, Scope.SESSION)
 
-    with resolver:
-        result = resolver.resolve(second_generator)
+    async with resolver:
+        result = await resolver.resolve(second_generator)
         assert result == "second_with_first_value"
 
     assert teardown_order == ["second", "first"]
 
 
-def test_generator_fixture_teardown_on_exception(resolver: Resolver) -> None:
+@pytest.mark.asyncio
+async def test_generator_fixture_teardown_on_exception(resolver: Resolver) -> None:
     resolver.register(generator_session_fixture, Scope.SESSION)
 
-    with pytest.raises(ValueError, match="test exception"), resolver:
-        resolver.resolve(generator_session_fixture)
-        raise ValueError("test exception")
+    with pytest.raises(ValueError, match="test exception"):
+        async with resolver:
+            await resolver.resolve(generator_session_fixture)
+            raise ValueError("test exception")
 
     assert teardown_counts["generator_session"] == 1
 
 
-def test_mixed_regular_and_generator_fixtures(resolver: Resolver) -> None:
+@pytest.mark.asyncio
+async def test_mixed_regular_and_generator_fixtures(resolver: Resolver) -> None:
     resolver.register(session_dependency, Scope.SESSION)
     resolver.register(generator_function_fixture, Scope.FUNCTION)
 
@@ -239,29 +248,36 @@ def test_mixed_regular_and_generator_fixtures(resolver: Resolver) -> None:
 
     resolver.register(mixed_target, Scope.FUNCTION)
 
-    with resolver:
-        result = resolver.resolve(mixed_target)
+    async with resolver:
+        result = await resolver.resolve(mixed_target)
         assert result == "session_data_generator_function_data"
 
     assert teardown_counts["generator_function"] == 1
 
 
-def test_is_generator_callable_with_annotated_generator() -> None:
-    def annotated_gen() -> Generator[str, None, None]:
+def test_is_generator_like_with_sync_generator() -> None:
+    def sync_gen() -> Generator[str, None, None]:
         yield "value"
 
-    assert _is_generator_callable(annotated_gen) is True
+    assert _is_generator_like(sync_gen) is True
 
 
-def test_is_generator_callable_with_unannotated_generator() -> None:
+def test_is_generator_like_with_unannotated_generator() -> None:
     def unannotated_gen():  # type: ignore[no-untyped-def]
         yield "value"
 
-    assert _is_generator_callable(unannotated_gen) is True
+    assert _is_generator_like(unannotated_gen) is True
 
 
-def test_is_generator_callable_with_regular_function() -> None:
+def test_is_generator_like_with_regular_function() -> None:
     def regular_func() -> str:
         return "value"
 
-    assert _is_generator_callable(regular_func) is False
+    assert _is_generator_like(regular_func) is False
+
+
+def test_is_generator_like_ignores_annotation_without_yield() -> None:
+    def fake_gen() -> Generator[str, None, None]:
+        return "value"  # type: ignore[return-value]
+
+    assert _is_generator_like(fake_gen) is False

@@ -14,7 +14,8 @@ from protest.di.resolver import UnregisteredDependencyError
 class TestSessionSuiteHierarchy:
     """Test the session/suite hierarchy and fixture visibility rules."""
 
-    def test_session_fixture_visible_in_suite(self):
+    @pytest.mark.asyncio
+    async def test_session_fixture_visible_in_suite(self) -> None:
         """Suite can use session-level fixtures."""
         session = ProTestSession()
         suite = ProTestSuite("test_suite")
@@ -29,11 +30,10 @@ class TestSessionSuiteHierarchy:
         def suite_data(data: Annotated[str, Use(session_data)]) -> str:
             return f"suite_{data}"
 
-        # Suite should be able to resolve session fixture through hierarchy
-        result = suite.resolver.resolve(suite_data)
+        result = await suite.resolver.resolve(suite_data)
         assert result == "suite_session_value"
 
-    def test_suite_fixture_not_visible_from_other_suite(self):
+    def test_suite_fixture_not_visible_from_other_suite(self) -> None:
         """Suite A cannot access fixtures from Suite B."""
         session = ProTestSession()
         suite_a = ProTestSuite("suite_a")
@@ -46,14 +46,13 @@ class TestSessionSuiteHierarchy:
         def suite_a_data() -> str:
             return "suite_a_value"
 
-        # Suite B tries to use Suite A's fixture - should fail
         with pytest.raises(UnregisteredDependencyError):
 
             @suite_b.fixture(scope=Scope.FUNCTION)
             def suite_b_data(data: Annotated[str, Use(suite_a_data)]) -> str:
                 return f"suite_b_{data}"
 
-    def test_suite_cannot_define_session_scope_fixture(self):
+    def test_suite_cannot_define_session_scope_fixture(self) -> None:
         """Suite cannot register fixtures with SESSION scope."""
         session = ProTestSession()
         suite = ProTestSuite("test_suite")
@@ -67,7 +66,7 @@ class TestSessionSuiteHierarchy:
             def invalid_fixture() -> str:
                 return "invalid"
 
-    def test_suite_fixture_before_include_fails(self):
+    def test_suite_fixture_before_include_fails(self) -> None:
         """Cannot register suite fixtures before including in session."""
         suite = ProTestSuite("test_suite")
 
@@ -77,13 +76,14 @@ class TestSessionSuiteHierarchy:
             def early_fixture() -> str:
                 return "too_early"
 
-    def test_mixed_scope_hierarchy(self):
+    @pytest.mark.asyncio
+    async def test_mixed_scope_hierarchy(self) -> None:
         """Test complex hierarchy with mixed scopes."""
         session = ProTestSession()
         suite = ProTestSuite("test_suite")
 
         @session.fixture(scope=Scope.SESSION)
-        def global_config() -> dict:
+        def global_config() -> dict[str, str]:
             return {"env": "test"}
 
         @session.fixture(scope=Scope.SESSION)
@@ -94,7 +94,7 @@ class TestSessionSuiteHierarchy:
 
         @suite.fixture(scope=Scope.SUITE)
         def suite_service(
-            config: Annotated[dict, Use(global_config)],
+            config: Annotated[dict[str, str], Use(global_config)],
             temp: Annotated[str, Use(session_temp)],
         ) -> str:
             return f"service_{config['env']}_{temp}"
@@ -103,10 +103,11 @@ class TestSessionSuiteHierarchy:
         def test_data(service: Annotated[str, Use(suite_service)]) -> str:
             return f"test_{service}"
 
-        result = suite.resolver.resolve(test_data)
+        result = await suite.resolver.resolve(test_data)
         assert result == "test_service_test_temp_data"
 
-    def test_cache_isolation_between_suites(self):
+    @pytest.mark.asyncio
+    async def test_cache_isolation_between_suites(self) -> None:
         """Cache is isolated between different suites."""
         session = ProTestSession()
         suite_a = ProTestSuite("suite_a")
@@ -131,10 +132,9 @@ class TestSessionSuiteHierarchy:
         def suite_b_fixture(shared: Annotated[str, Use(shared_session_fixture)]) -> str:
             return f"b_{shared}"
 
-        # Both suites should get the same cached SESSION fixture
-        result_a = suite_a.resolver.resolve(suite_a_fixture)
-        result_b = suite_b.resolver.resolve(suite_b_fixture)
+        result_a = await suite_a.resolver.resolve(suite_a_fixture)
+        result_b = await suite_b.resolver.resolve(suite_b_fixture)
 
         assert result_a == "a_shared_1"
         assert result_b == "b_shared_1"
-        assert call_count == 1  # SESSION fixture called only once
+        assert call_count == 1
