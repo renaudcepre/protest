@@ -1,5 +1,6 @@
 """Tests for the simplified fixture system with global @fixture decorator."""
 
+from collections.abc import Generator
 from typing import Annotated
 
 import pytest
@@ -158,11 +159,11 @@ class TestGlobalFixtureDecorator:
 
         session = ProTestSession()
 
-        async with session:
-            async with TestExecutionContext(
-                session.resolver, suite_name="my_suite"
-            ) as ctx:
-                result = await ctx.resolve(test_helper)
+        async with (
+            session,
+            TestExecutionContext(session.resolver, suite_name="my_suite") as ctx,
+        ):
+            result = await ctx.resolve(test_helper)
 
         assert result == "test_suite_global"
 
@@ -221,7 +222,7 @@ class TestSuiteTeardown:
         teardown_log: list[str] = []
 
         @fixture(scope=Scope.SUITE)
-        def suite_resource() -> str:
+        def suite_resource() -> Generator[str, None, None]:
             yield "resource"
             teardown_log.append("torn_down")
 

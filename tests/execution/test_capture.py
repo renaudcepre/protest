@@ -57,8 +57,8 @@ class TestTaskAwareStream:
         original = io.StringIO()
         stream = TaskAwareStream(original)
 
-        assert stream.readable() == original.readable()
-        assert stream.writable() == original.writable()
+        assert getattr(stream, "readable")() == original.readable()
+        assert getattr(stream, "writable")() == original.writable()
 
 
 class TestCaptureCurrentTest:
@@ -104,9 +104,8 @@ class TestGlobalCapturePatch:
         original_stdout = sys.stdout
         original_stderr = sys.stderr
 
-        with pytest.raises(ValueError):
-            with GlobalCapturePatch():
-                raise ValueError("test error")
+        with pytest.raises(ValueError), GlobalCapturePatch():
+            raise ValueError("test error")
 
         assert sys.stdout is original_stdout
         assert sys.stderr is original_stderr
@@ -114,9 +113,8 @@ class TestGlobalCapturePatch:
 
 class TestCaptureIntegration:
     def test_print_captured_within_context(self) -> None:
-        with GlobalCapturePatch():
-            with CaptureCurrentTest() as buffer:
-                print("hello from print")
+        with GlobalCapturePatch(), CaptureCurrentTest() as buffer:
+            print("hello from print")  # noqa: T201
 
         assert buffer.getvalue() == "hello from print\n"
 
@@ -126,7 +124,7 @@ class TestCaptureIntegration:
 
         try:
             with GlobalCapturePatch():
-                print("not captured")
+                print("not captured")  # noqa: T201
         finally:
             sys.stdout = sys.__stdout__
 
@@ -138,9 +136,9 @@ class TestCaptureIntegration:
 
         async def task_with_output(name: str, delay: float) -> None:
             with CaptureCurrentTest() as buffer:
-                print(f"[{name}] start")
+                print(f"[{name}] start")  # noqa: T201
                 await asyncio.sleep(delay)
-                print(f"[{name}] end")
+                print(f"[{name}] end")  # noqa: T201
                 results[name] = buffer.getvalue()
 
         with GlobalCapturePatch():
@@ -159,7 +157,7 @@ class TestCaptureIntegration:
         async def interleaved_task(name: str) -> None:
             with CaptureCurrentTest() as buffer:
                 for step in range(3):
-                    print(f"[{name}] step {step}")
+                    print(f"[{name}] step {step}")  # noqa: T201
                     await asyncio.sleep(0.005)
                 results[name] = buffer.getvalue()
 
@@ -269,11 +267,10 @@ class TestLogCaptureIntegration:
             logging.root.setLevel(logging.WARNING)
 
     def test_full_log_capture_flow(self) -> None:
-        with GlobalCapturePatch():
-            with LogCaptureContext() as records:
-                logging.debug("debug msg")
-                logging.info("info msg")
-                logging.warning("warning msg")
+        with GlobalCapturePatch(), LogCaptureContext() as records:
+            logging.debug("debug msg")
+            logging.info("info msg")
+            logging.warning("warning msg")
 
         assert len(records) == 3
         assert records[0].levelname == "DEBUG"
