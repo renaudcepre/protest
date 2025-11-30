@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from protest.core.collector import TestItem
     from protest.core.session import ProTestSession
     from protest.events.data import SessionResult, TestResult
 
@@ -14,6 +15,10 @@ class PluginBase:
 
     def setup(self, session: ProTestSession) -> None:
         """Called when plugin is registered via session.use()."""
+
+    def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
+        """Called after collection. Can filter/sort items."""
+        return items
 
     def on_session_start(self) -> None:
         """Called before any test runs."""

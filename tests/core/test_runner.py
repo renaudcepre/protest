@@ -5,6 +5,7 @@ import time
 from typing import Annotated
 
 from protest import Scope, fixture
+from protest.core.collector import TestItem
 from protest.core.runner import TestRunner
 from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
@@ -324,3 +325,124 @@ class TestRunnerParallelExecution:
 
         sequential_would_take = 0.3
         assert duration < sequential_would_take
+
+
+class TestRunnerCollectionEvent:
+    """COLLECTION_FINISH event allows filtering tests."""
+
+    def test_collection_finish_event_emitted(self) -> None:
+        """COLLECTION_FINISH event is emitted with collected items."""
+        session = ProTestSession()
+        collected_items: list[TestItem] = []
+
+        class CollectionCollector(PluginBase):
+            def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
+                collected_items.extend(items)
+                return items
+
+        session.use(CollectionCollector())
+
+        @session.test()
+        def test_a() -> None:
+            pass
+
+        @session.test()
+        def test_b() -> None:
+            pass
+
+        runner = TestRunner(session)
+        runner.run()
+
+        expected_collected_count = 2
+        assert len(collected_items) == expected_collected_count
+
+    def test_collection_finish_can_filter_tests(self) -> None:
+        """COLLECTION_FINISH handler can filter which tests run."""
+        session = ProTestSession()
+        executed: list[str] = []
+
+        class FilterPlugin(PluginBase):
+            def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
+                return [
+                    item
+                    for item in items
+                    if "run" in getattr(item.func, "__name__", "")
+                ]
+
+        session.use(FilterPlugin())
+
+        @session.test()
+        def test_run_this() -> None:
+            executed.append("run_this")
+
+        @session.test()
+        def test_skip_this() -> None:
+            executed.append("skip_this")
+
+        runner = TestRunner(session)
+        runner.run()
+
+        assert executed == ["run_this"]
+
+
+class TestRunnerSmartTeardown:
+    """Suite teardown happens only after last chunk of that suite."""
+
+    def test_suite_fixture_available_throughout_suite_tests(self) -> None:
+        """Suite-scoped fixture remains available for all suite tests."""
+        session = ProTestSession()
+        suite = ProTestSuite("my_suite")
+        session.include_suite(suite)
+
+        @fixture(scope=Scope.SUITE)
+        def suite_resource() -> str:
+            return "resource_value"
+
+        results: list[str] = []
+
+        @suite.test()
+        def test_first(res: Annotated[str, Use(suite_resource)]) -> None:
+            results.append(res)
+
+        @suite.test()
+        def test_second(res: Annotated[str, Use(suite_resource)]) -> None:
+            results.append(res)
+
+        runner = TestRunner(session)
+        runner.run()
+
+        expected_result_count = 2
+        assert len(results) == expected_result_count
+        assert all(res == "resource_value" for res in results)
+
+    def test_suite_teardown_called_after_all_suite_tests(self) -> None:
+        """Suite generator fixture teardown runs after all suite tests complete."""
+        session = ProTestSession()
+        suite = ProTestSuite("my_suite")
+        session.include_suite(suite)
+
+        teardown_at_test_count = -1
+        test_execution_count = 0
+
+        @fixture(scope=Scope.SUITE)
+        def tracked_fixture():
+            yield "tracked"
+            nonlocal teardown_at_test_count, test_execution_count
+            teardown_at_test_count = test_execution_count
+
+        @suite.test()
+        def test_one(val: Annotated[str, Use(tracked_fixture)]) -> None:
+            nonlocal test_execution_count
+            test_execution_count += 1
+
+        @suite.test()
+        def test_two(val: Annotated[str, Use(tracked_fixture)]) -> None:
+            nonlocal test_execution_count
+            test_execution_count += 1
+
+        runner = TestRunner(session)
+        runner.run()
+
+        expected_test_count = 2
+        assert test_execution_count == expected_test_count
+        assert teardown_at_test_count == expected_test_count

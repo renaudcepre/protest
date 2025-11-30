@@ -192,3 +192,101 @@ class TestEventTypes:
 
         assert pass_received == ["pass_data"]
         assert fail_received == ["fail_data"]
+
+
+class TestEmitAndCollect:
+    """emit_and_collect chains handlers and returns modified data."""
+
+    @pytest.mark.asyncio
+    async def test_emit_and_collect_returns_data_unchanged(self) -> None:
+        """Without handlers, emit_and_collect returns original data."""
+        bus = EventBus()
+
+        result = await bus.emit_and_collect(Event.COLLECTION_FINISH, ["item1", "item2"])
+
+        assert result == ["item1", "item2"]
+
+    @pytest.mark.asyncio
+    async def test_emit_and_collect_sync_handler_modifies_data(self) -> None:
+        """Sync handler can modify and return data."""
+        bus = EventBus()
+
+        def filter_handler(items: list[str]) -> list[str]:
+            return [item for item in items if "keep" in item]
+
+        bus.on(Event.COLLECTION_FINISH, filter_handler)
+
+        result = await bus.emit_and_collect(
+            Event.COLLECTION_FINISH, ["keep_a", "drop_b", "keep_c"]
+        )
+
+        assert result == ["keep_a", "keep_c"]
+
+    @pytest.mark.asyncio
+    async def test_emit_and_collect_async_handler_modifies_data(self) -> None:
+        """Async handler can modify and return data."""
+        bus = EventBus()
+
+        async def async_filter(items: list[str]) -> list[str]:
+            await asyncio.sleep(0)
+            return [item.upper() for item in items]
+
+        bus.on(Event.COLLECTION_FINISH, async_filter)
+
+        result = await bus.emit_and_collect(Event.COLLECTION_FINISH, ["a", "b"])
+
+        assert result == ["A", "B"]
+
+    @pytest.mark.asyncio
+    async def test_emit_and_collect_chains_multiple_handlers(self) -> None:
+        """Multiple handlers chain their results."""
+        bus = EventBus()
+
+        def add_prefix(items: list[str]) -> list[str]:
+            return [f"prefix_{item}" for item in items]
+
+        def add_suffix(items: list[str]) -> list[str]:
+            return [f"{item}_suffix" for item in items]
+
+        bus.on(Event.COLLECTION_FINISH, add_prefix)
+        bus.on(Event.COLLECTION_FINISH, add_suffix)
+
+        result = await bus.emit_and_collect(Event.COLLECTION_FINISH, ["a", "b"])
+
+        assert result == ["prefix_a_suffix", "prefix_b_suffix"]
+
+    @pytest.mark.asyncio
+    async def test_emit_and_collect_handler_returning_none_preserves_data(self) -> None:
+        """Handler returning None keeps previous data."""
+        bus = EventBus()
+
+        def pass_through(items: list[str]) -> None:
+            pass
+
+        def transform(items: list[str]) -> list[str]:
+            return [item.upper() for item in items]
+
+        bus.on(Event.COLLECTION_FINISH, pass_through)
+        bus.on(Event.COLLECTION_FINISH, transform)
+
+        result = await bus.emit_and_collect(Event.COLLECTION_FINISH, ["a", "b"])
+
+        assert result == ["A", "B"]
+
+    @pytest.mark.asyncio
+    async def test_emit_and_collect_handler_error_continues(self) -> None:
+        """Handler error doesn't break chain, keeps previous data."""
+        bus = EventBus()
+
+        def failing_handler(items: list[str]) -> list[str]:
+            raise ValueError("boom")
+
+        def transform(items: list[str]) -> list[str]:
+            return [item.upper() for item in items]
+
+        bus.on(Event.COLLECTION_FINISH, failing_handler)
+        bus.on(Event.COLLECTION_FINISH, transform)
+
+        result = await bus.emit_and_collect(Event.COLLECTION_FINISH, ["a", "b"])
+
+        assert result == ["A", "B"]

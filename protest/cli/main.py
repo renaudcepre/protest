@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import importlib
 import sys
 from typing import cast
@@ -25,17 +26,48 @@ def main() -> None:
         default=1,
         help="Number of concurrent tests (default: 1, sequential)",
     )
+    run_parser.add_argument(
+        "--lf",
+        "--last-failed",
+        dest="last_failed",
+        action="store_true",
+        help="Re-run only failed tests from last run",
+    )
+    run_parser.add_argument(
+        "--cache-clear",
+        dest="cache_clear",
+        action="store_true",
+        help="Clear cache before run",
+    )
+    run_parser.add_argument(
+        "--collect-only",
+        dest="collect_only",
+        action="store_true",
+        help="Only collect and list tests, don't run them",
+    )
 
     args = parser.parse_args()
 
     if args.command == "run":
         sys.path.insert(0, args.app_dir)
-        run_tests(args.target, args.concurrency)
+        run_tests(
+            args.target,
+            args.concurrency,
+            last_failed=args.last_failed,
+            cache_clear=args.cache_clear,
+            collect_only=args.collect_only,
+        )
     else:
         parser.print_help()
 
 
-def run_tests(target: str, concurrency: int = 1) -> None:
+def run_tests(
+    target: str,
+    concurrency: int = 1,
+    last_failed: bool = False,
+    cache_clear: bool = False,
+    collect_only: bool = False,
+) -> None:
     if ":" not in target:
         print(f"Error: Invalid format '{target}'. Use 'module:session'")
         sys.exit(1)
@@ -53,6 +85,8 @@ def run_tests(target: str, concurrency: int = 1) -> None:
         print(f"Error: No '{session_name}' found in module '{module_path}'")
         sys.exit(1)
 
+    from protest.cache.plugin import CachePlugin
+    from protest.core.collector import Collector
     from protest.core.runner import TestRunner
     from protest.core.session import ProTestSession
     from protest.reporting.console import ConsoleReporter
@@ -63,6 +97,21 @@ def run_tests(target: str, concurrency: int = 1) -> None:
 
     protest_session = cast("ProTestSession", session)
     protest_session.concurrency = concurrency
+    protest_session.use(CachePlugin(last_failed=last_failed, cache_clear=cache_clear))
+
+    if collect_only:
+        from protest.events.types import Event
+
+        collector = Collector()
+        items = collector.collect(protest_session)
+        items = asyncio.run(
+            protest_session.events.emit_and_collect(Event.COLLECTION_FINISH, items)
+        )
+        print(f"Collected {len(items)} test(s):\n")
+        for item in items:
+            print(f"  {item.node_id}")
+        sys.exit(0)
+
     protest_session.use(ConsoleReporter())
 
     runner = TestRunner(protest_session)

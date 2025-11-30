@@ -6,6 +6,7 @@ from enum import Enum
 class Event(Enum):
     """Events emitted during test execution."""
 
+    COLLECTION_FINISH = "collection_finish"
     SESSION_START = "session_start"
     SESSION_END = "session_end"
     SESSION_COMPLETE = "session_complete"

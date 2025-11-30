@@ -56,3 +56,20 @@ class EventBus:
         """Wait for all fire-and-forget async tasks to complete."""
         if self._pending_tasks:
             await asyncio.gather(*self._pending_tasks, return_exceptions=True)
+
+    async def emit_and_collect(self, event: Event, data: Any) -> Any:
+        """Emit event and allow handlers to modify data in chain."""
+        for handler in self._handlers[event]:
+            try:
+                if asyncio.iscoroutinefunction(handler):
+                    result = await handler(data)
+                else:
+                    result = handler(data)
+                if result is not None:
+                    data = result
+            except Exception:
+                handler_name = getattr(handler, "__name__", "<unknown>")
+                logger.exception(
+                    "Handler %s failed for event %s", handler_name, event.value
+                )
+        return data
