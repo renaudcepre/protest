@@ -9,6 +9,11 @@
     ruff check --fix .
     ty check protest tests
 
+@fullcheck:
+  ruff format --check . && ruff check .  # lint
+  uv run ty check protest tests          # types
+  uv run pytest -vv                      # t
+
 # Run tests with verbose output
 @test *options="":
     uv run pytest -vv {{ options }}

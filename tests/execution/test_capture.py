@@ -57,8 +57,8 @@ class TestTaskAwareStream:
         original = io.StringIO()
         stream = TaskAwareStream(original)
 
-        assert getattr(stream, "readable")() == original.readable()
-        assert getattr(stream, "writable")() == original.writable()
+        assert stream.readable() == original.readable()  # type: ignore[operator]
+        assert stream.writable() == original.writable()  # type: ignore[operator]
 
 
 class TestCaptureCurrentTest:
