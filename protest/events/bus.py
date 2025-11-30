@@ -13,7 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 class EventBus:
-    """Event bus with async support. Sync handlers block, async fire-and-forget."""
+    """Decoupled event dispatch with async support.
+
+    Sync handlers are executed in a thread pool (blocking the event emission).
+    Async handlers run fire-and-forget and are tracked for cleanup.
+
+    Use wait_pending() before session end to ensure all async handlers complete.
+    Handler exceptions are logged but don't stop other handlers or the session.
+    """
 
     def __init__(self) -> None:
         self._handlers: dict[Event, list[Callable[..., Any]]] = defaultdict(list)

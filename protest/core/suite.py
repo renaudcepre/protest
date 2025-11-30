@@ -9,7 +9,15 @@ if TYPE_CHECKING:
 
 
 class ProTestSuite:
-    """A suite groups related tests together and provides scope context for fixtures."""
+    """Groups related tests with optional concurrency override.
+
+    Suites provide SUITE-scoped fixture context. Fixtures with Scope.SUITE
+    are created once per suite and torn down when the suite completes.
+
+    Args:
+        name: Unique identifier for this suite.
+        concurrency: Override session's default concurrency for this suite's tests.
+    """
 
     def __init__(self, name: str, concurrency: int | None = None) -> None:
         self._name = name

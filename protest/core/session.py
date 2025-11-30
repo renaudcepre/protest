@@ -17,6 +17,15 @@ from protest.events.types import Event
 
 
 class ProTestSession:
+    """Main test session orchestrator.
+
+    Manages test collection, fixture resolution, and plugin coordination.
+    Use as async context manager to ensure proper fixture teardown.
+
+    Args:
+        concurrency: Number of parallel test workers (default: 1).
+        autouse: Fixtures to auto-resolve at session start before any test runs.
+    """
     def __init__(
         self,
         concurrency: int = 1,
