@@ -9,14 +9,14 @@ import httpx
 from app import app
 from fastapi.testclient import TestClient
 
-from protest.core.scope import Scope
+from protest import Scope, fixture
 from protest.core.session import ProTestSession
 from protest.di.markers import Use
 
 session = ProTestSession()
 
 
-@session.fixture(scope=Scope.SESSION)
+@fixture(scope=Scope.SESSION)
 async def async_client() -> AsyncGenerator[httpx.AsyncClient, None]:
     """Async HTTP client for the FastAPI app."""
     print("  [FIXTURE] Creating async client...")
@@ -28,7 +28,7 @@ async def async_client() -> AsyncGenerator[httpx.AsyncClient, None]:
     print("  [FIXTURE] Async client closed")
 
 
-@session.fixture(scope=Scope.SESSION)
+@fixture(scope=Scope.SESSION)
 def sync_client() -> TestClient:
     """Sync HTTP client for comparison."""
     return TestClient(app)

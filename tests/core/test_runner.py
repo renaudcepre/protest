@@ -3,8 +3,8 @@
 import asyncio
 from typing import Annotated
 
+from protest import Scope, fixture
 from protest.core.runner import TestRunner
-from protest.core.scope import Scope
 from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
 from protest.di.markers import Use
@@ -151,7 +151,7 @@ class TestRunnerWithFixtures:
         session = ProTestSession()
         received_value: list[str] = []
 
-        @session.fixture(scope=Scope.SESSION)
+        @fixture(scope=Scope.SESSION)
         def my_fixture() -> str:
             return "fixture_value"
 
@@ -169,7 +169,7 @@ class TestRunnerWithFixtures:
         session = ProTestSession()
         teardown_called = False
 
-        @session.fixture(scope=Scope.SESSION)
+        @fixture(scope=Scope.SESSION)
         def generator_fixture():
             yield "gen_value"
             nonlocal teardown_called

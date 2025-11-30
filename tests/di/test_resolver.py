@@ -9,10 +9,8 @@ from protest.core.scope import Scope
 from protest.di.markers import Use
 from protest.di.resolver import (
     AlreadyRegisteredError,
-    FixtureNotFoundError,
     Resolver,
     ScopeMismatchError,
-    UnregisteredDependencyError,
 )
 from tests.di.dependencies import (
     function_dependency,
@@ -113,10 +111,18 @@ def test_cannot_register_same_function_twice(resolver: Resolver) -> None:
         resolver.register(my_fixture, Scope.SESSION)
 
 
-# --- Unregistered Dependency Error Test ---
+# --- Auto-registration and Scope Mismatch Tests ---
 
 
-def test_fails_on_unregistered_dependency(resolver: Resolver) -> None:
+def test_undecorated_dependency_auto_registered_as_function_scope(
+    resolver: Resolver,
+) -> None:
+    """Undecorated functions are auto-registered with FUNCTION scope.
+
+    A SESSION-scoped fixture cannot depend on a FUNCTION-scoped fixture,
+    so this raises ScopeMismatchError (not UnregisteredDependencyError).
+    """
+
     def unregistered_dependency() -> str:
         return "unregistered_data"
 
@@ -125,7 +131,7 @@ def test_fails_on_unregistered_dependency(resolver: Resolver) -> None:
     ) -> str:
         return f"fixture({dep})"
 
-    with pytest.raises(UnregisteredDependencyError, match=r"unregistered function"):
+    with pytest.raises(ScopeMismatchError):
         resolver.register(fixture_with_unregistered_dep, Scope.SESSION)
 
 
@@ -284,20 +290,21 @@ def test_is_generator_like_ignores_annotation_without_yield() -> None:
     assert is_generator_like(fake_gen) is False
 
 
-# --- FixtureNotFoundError Tests ---
+# --- Auto-registration Tests ---
 
 
 @pytest.mark.asyncio
-async def test_resolve_unregistered_fixture_raises_fixture_not_found(
+async def test_undecorated_function_auto_registered_and_resolved(
     resolver: Resolver,
 ) -> None:
-    """Test that resolving an unregistered fixture raises FixtureNotFoundError."""
+    """Undecorated functions are auto-registered with FUNCTION scope and resolved."""
 
     def unregistered_fixture() -> str:
-        return "data"
+        return "auto_registered_data"
 
-    with pytest.raises(FixtureNotFoundError, match=r"not registered"):
-        await resolver.resolve(unregistered_fixture)
+    async with resolver:
+        result = await resolver.resolve(unregistered_fixture)
+        assert result == "auto_registered_data"
 
 
 # --- Edge Case Tests ---

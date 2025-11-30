@@ -10,7 +10,6 @@ if TYPE_CHECKING:
     from protest.plugin import PluginBase
 
 from protest.core.fixture import FixtureCallable
-from protest.core.scope import Scope
 from protest.core.suite import ProTestSuite
 from protest.di.resolver import Resolver
 from protest.events.bus import EventBus
@@ -18,12 +17,26 @@ from protest.events.types import Event
 
 
 class ProTestSession:
-    def __init__(self, concurrency: int = 1) -> None:
+    def __init__(
+        self,
+        concurrency: int = 1,
+        autouse: list[FixtureCallable] | None = None,
+    ) -> None:
         self._resolver = Resolver()
         self._events = EventBus()
         self._suites: list[ProTestSuite] = []
         self._tests: list[Callable[..., Any]] = []
         self._concurrency = max(1, concurrency)
+        self._autouse = autouse or []
+
+    @property
+    def autouse(self) -> list[FixtureCallable]:
+        return self._autouse
+
+    async def resolve_autouse(self) -> None:
+        """Resolve all autouse fixtures at session start."""
+        for fixture_func in self._autouse:
+            await self._resolver.resolve(fixture_func)
 
     @property
     def concurrency(self) -> int:
@@ -48,15 +61,6 @@ class ProTestSession:
     @property
     def tests(self) -> list[Callable[..., Any]]:
         return self._tests
-
-    def fixture(
-        self, scope: Scope = Scope.SESSION
-    ) -> Callable[[FixtureCallable], FixtureCallable]:
-        def decorator(func: FixtureCallable) -> FixtureCallable:
-            self._resolver.register(func, scope)
-            return func
-
-        return decorator
 
     def test(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:

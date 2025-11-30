@@ -5,7 +5,7 @@ from typing import Annotated
 
 from slack_notifier import FakeSlackNotifier
 
-from protest.core.scope import Scope
+from protest import Scope, fixture
 from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
 from protest.di.markers import Use
@@ -22,25 +22,25 @@ session.use(FakeSlackNotifier(delay=0.5))
 # =============================================================================
 
 
-@session.fixture(scope=Scope.SESSION)
+@fixture(scope=Scope.SESSION)
 def database() -> Generator[str, None, None]:
     print("    [SESSION setup] database connection")
     yield "db_connection"
     print("    [SESSION teardown] database disconnected")
 
 
-@session.fixture(scope=Scope.SESSION)
+@fixture(scope=Scope.SESSION)
 def config() -> dict[str, str]:
     return {"env": "test", "debug": "true"}
 
 
-@session.fixture(scope=Scope.SESSION)
+@fixture(scope=Scope.SESSION)
 def cache(cfg: Annotated[dict[str, str], Use(config)]) -> str:
     return f"redis://{cfg['env']}.cache.local"
 
 
 # =============================================================================
-# INCLUDE SUITES (must be done before defining suite fixtures)
+# INCLUDE SUITES
 # =============================================================================
 
 session.include_suite(api_suite)
@@ -52,14 +52,14 @@ session.include_suite(unit_suite)
 # =============================================================================
 
 
-@api_suite.fixture(scope=Scope.SUITE)
+@fixture(scope=Scope.SUITE)
 def api_client(db: Annotated[str, Use(database)]) -> Generator[str, None, None]:
     print("    [SUITE setup] api_client created")
     yield f"APIClient({db})"
     print("    [SUITE teardown] api_client closed")
 
 
-@api_suite.fixture(scope=Scope.SUITE)
+@fixture(scope=Scope.SUITE)
 def auth_token(
     client: Annotated[str, Use(api_client)],
     cache_url: Annotated[str, Use(cache)],
@@ -72,7 +72,7 @@ def auth_token(
 # =============================================================================
 
 
-@api_suite.fixture(scope=Scope.FUNCTION)
+@fixture(scope=Scope.FUNCTION)
 def request_id() -> Generator[str, None, None]:
     import random
 
@@ -118,14 +118,13 @@ def test_api_broken() -> None:
 # =============================================================================
 
 
-@unit_suite.fixture(scope=Scope.FUNCTION)
+@fixture(scope=Scope.FUNCTION)
 def temp_file() -> Generator[str, None, None]:
     print("    [FUNCTION setup] temp file created")
     yield "/tmp/test_file.txt"
     print("    [FUNCTION teardown] temp file deleted")
 
 
-@unit_suite.fixture(scope=Scope.FUNCTION)
 def counter() -> int:
     return 42
 
