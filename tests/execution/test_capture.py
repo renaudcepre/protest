@@ -4,11 +4,16 @@ import sys
 
 import pytest
 
+import logging
+
 from protest.execution.capture import (
     CaptureCurrentTest,
     GlobalCapturePatch,
+    LogCaptureContext,
+    TaskAwareLogHandler,
     TaskAwareStream,
     _capture_buffer,
+    _log_records,
 )
 
 
@@ -169,3 +174,158 @@ class TestCaptureIntegration:
         assert results["X"] == "[X] step 0\n[X] step 1\n[X] step 2\n"
         assert results["Y"] == "[Y] step 0\n[Y] step 1\n[Y] step 2\n"
         assert results["Z"] == "[Z] step 0\n[Z] step 1\n[Z] step 2\n"
+
+
+class TestTaskAwareLogHandler:
+    def test_does_not_capture_when_no_records_list(self) -> None:
+        handler = TaskAwareLogHandler()
+        handler.setLevel(logging.DEBUG)
+        logger = logging.getLogger("test.no_capture")
+        logger.addHandler(handler)
+
+        try:
+            logger.info("should not be captured")
+        finally:
+            logger.removeHandler(handler)
+
+        assert _log_records.get() is None
+
+    def test_captures_when_records_list_set(self) -> None:
+        handler = TaskAwareLogHandler()
+        handler.setLevel(logging.DEBUG)
+        logger = logging.getLogger("test.capture")
+        logger.addHandler(handler)
+        logger.setLevel(logging.DEBUG)
+
+        records: list[logging.LogRecord] = []
+        token = _log_records.set(records)
+
+        try:
+            logger.info("captured message")
+        finally:
+            _log_records.reset(token)
+            logger.removeHandler(handler)
+
+        assert len(records) == 1
+        assert records[0].getMessage() == "captured message"
+
+
+class TestLogCaptureContext:
+    def test_captures_logs_in_context(self) -> None:
+        handler = TaskAwareLogHandler()
+        handler.setLevel(logging.DEBUG)
+        logging.root.addHandler(handler)
+        original_level = logging.root.level
+        logging.root.setLevel(logging.NOTSET)
+
+        try:
+            with LogCaptureContext() as records:
+                logging.info("test log message")
+
+            assert len(records) == 1
+            assert records[0].getMessage() == "test log message"
+        finally:
+            logging.root.removeHandler(handler)
+            logging.root.setLevel(original_level)
+
+    def test_no_capture_outside_context(self) -> None:
+        handler = TaskAwareLogHandler()
+        handler.setLevel(logging.DEBUG)
+        logging.root.addHandler(handler)
+
+        try:
+            logging.info("outside context")
+            assert _log_records.get() is None
+        finally:
+            logging.root.removeHandler(handler)
+
+    def test_resets_context_var_on_exit(self) -> None:
+        with LogCaptureContext():
+            assert _log_records.get() is not None
+
+        assert _log_records.get() is None
+
+
+class TestLogCaptureIntegration:
+    def test_global_patch_installs_and_removes_handler(self) -> None:
+        initial_handler_count = len(logging.root.handlers)
+
+        with GlobalCapturePatch():
+            handler_count_during = len(logging.root.handlers)
+
+        final_handler_count = len(logging.root.handlers)
+
+        assert handler_count_during == initial_handler_count + 1
+        assert final_handler_count == initial_handler_count
+
+    def test_global_patch_sets_log_level_to_notset(self) -> None:
+        logging.root.setLevel(logging.WARNING)
+
+        try:
+            with GlobalCapturePatch():
+                assert logging.root.level == logging.NOTSET
+
+            assert logging.root.level == logging.WARNING
+        finally:
+            logging.root.setLevel(logging.WARNING)
+
+    def test_full_log_capture_flow(self) -> None:
+        with GlobalCapturePatch():
+            with LogCaptureContext() as records:
+                logging.debug("debug msg")
+                logging.info("info msg")
+                logging.warning("warning msg")
+
+        assert len(records) == 3
+        assert records[0].levelname == "DEBUG"
+        assert records[1].levelname == "INFO"
+        assert records[2].levelname == "WARNING"
+
+    @pytest.mark.asyncio
+    async def test_concurrent_tasks_have_isolated_logs(self) -> None:
+        results: dict[str, list[logging.LogRecord]] = {}
+
+        async def task_with_logs(name: str, delay: float) -> None:
+            with LogCaptureContext() as records:
+                logging.info(f"[{name}] start")
+                await asyncio.sleep(delay)
+                logging.info(f"[{name}] end")
+                results[name] = list(records)
+
+        with GlobalCapturePatch():
+            await asyncio.gather(
+                task_with_logs("A", 0.02),
+                task_with_logs("B", 0.01),
+            )
+
+        assert len(results["A"]) == 2
+        assert results["A"][0].getMessage() == "[A] start"
+        assert results["A"][1].getMessage() == "[A] end"
+
+        assert len(results["B"]) == 2
+        assert results["B"][0].getMessage() == "[B] start"
+        assert results["B"][1].getMessage() == "[B] end"
+
+    @pytest.mark.asyncio
+    async def test_interleaved_logs_stay_isolated(self) -> None:
+        results: dict[str, list[logging.LogRecord]] = {}
+
+        async def interleaved_task(name: str) -> None:
+            with LogCaptureContext() as records:
+                for step in range(3):
+                    logging.info(f"[{name}] step {step}")
+                    await asyncio.sleep(0.005)
+                results[name] = list(records)
+
+        with GlobalCapturePatch():
+            await asyncio.gather(
+                interleaved_task("X"),
+                interleaved_task("Y"),
+                interleaved_task("Z"),
+            )
+
+        expected_message_count = 3
+        for name in ["X", "Y", "Z"]:
+            assert len(results[name]) == expected_message_count
+            for step in range(3):
+                assert results[name][step].getMessage() == f"[{name}] step {step}"
