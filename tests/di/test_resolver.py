@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Generator
 from inspect import Parameter
 from typing import Annotated
@@ -328,8 +329,6 @@ async def test_concurrent_resolution_only_executes_fixture_once(
     resolver: Resolver,
 ) -> None:
     """Test that concurrent resolution of the same fixture only executes it once."""
-    import asyncio
-
     execution_count = 0
 
     async def slow_fixture() -> str:

@@ -3,6 +3,7 @@
 import pytest
 
 from protest.core.session import ProTestSession
+from protest.core.suite import ProTestSuite
 from protest.events.data import SessionResult, TestResult
 from protest.events.types import Event
 from protest.plugin import PluginBase
@@ -155,28 +156,24 @@ class TestSuiteConcurrency:
 
     def test_default_suite_concurrency_is_none(self) -> None:
         """Default suite concurrency is None (inherits from session)."""
-        from protest.core.suite import ProTestSuite
 
         suite = ProTestSuite("test_suite")
         assert suite.concurrency is None
 
     def test_suite_concurrency_can_be_set_in_constructor(self) -> None:
         """Suite concurrency can be set via constructor."""
-        from protest.core.suite import ProTestSuite
 
         suite = ProTestSuite("test_suite", concurrency=2)
         assert suite.concurrency == 2
 
     def test_suite_concurrency_one_means_sequential(self) -> None:
         """Suite with concurrency=1 forces sequential execution."""
-        from protest.core.suite import ProTestSuite
 
         suite = ProTestSuite("sequential_suite", concurrency=1)
         assert suite.concurrency == 1
 
     def test_multiple_suites_different_concurrency(self) -> None:
         """Different suites can have different concurrency settings."""
-        from protest.core.suite import ProTestSuite
 
         fast_suite = ProTestSuite("fast_tests", concurrency=10)
         slow_suite = ProTestSuite("db_tests", concurrency=1)
