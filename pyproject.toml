@@ -18,24 +18,28 @@ exclude = ["examples"]
 
 [tool.ruff.lint]
 select = [
-    "F", # Pyflakes
+    "F",      # Pyflakes
     "E", "W", # pycodestyle
-    "UP", # pyupgrade
-    "B", # flake8-bugbear
-    "I", # isort
-    "SIM", # flake8-simplify
-    "PL", # Pylint
-
-    # pydocstyle
-    "D212", # Multi-line docstring summary should start at the first line
-
-    "N", # pep8-naming
-    "C4", # flake8-comprehensions
-    "PIE", # flake8-pie
-    "T20", # flake8-print
-    "PYI", # flake8-pyi
-    "RET", # flake8-return
-    "RUF", # Ruff-specific rules
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "PL",     # Pylint
+    "RUF",    # Ruff-specific
+    "SIM",    # flake8-simplify
+    "C4",     # flake8-comprehensions
+    "RET",    # flake8-return
+    "S",      # flake8-bandit
+    "ASYNC",  # flake8-async
+    "TCH",    # flake8-type-checking
+    "PYI",    # flake8-pyi
+    "N",      # pep8-naming
+    "T20",    # flake8-print
+    "PIE",    # flake8-pie
+    "D212",   # pydocstyle (multiline docstring)
+]
+ignore = [
+    "E501", # Line length handled by formatter
+    "S101", # Allow assert (pytest)
 ]
 
 [tool.ruff.lint.per-file-ignores]

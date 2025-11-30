@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from types import TracebackType
 from typing import TYPE_CHECKING, Any
 
-from protest.compat import Self
-
 if TYPE_CHECKING:
+    from collections.abc import Callable
+    from types import TracebackType
+
+    from protest.compat import Self
+    from protest.core.fixture import FixtureCallable
+    from protest.core.suite import ProTestSuite
     from protest.plugin import PluginBase
 
-from protest.core.fixture import FixtureCallable
-from protest.core.suite import ProTestSuite
 from protest.di.resolver import Resolver
 from protest.events.bus import EventBus
 from protest.events.types import Event
