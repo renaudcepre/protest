@@ -21,11 +21,17 @@ from protest.execution.context import TestExecutionContext
 
 
 class TestRunner:
+    """Executes tests with parallel support and fixture lifecycle management.
+
+    Handles chunking by suite, concurrent execution within chunks,
+    and proper teardown of SUITE-scoped fixtures between suites.
+    """
+
     def __init__(self, session: ProTestSession) -> None:
         self._session = session
 
     def run(self) -> bool:
-        """Synchronous entry point to run the test session."""
+        """Run the test session synchronously. Returns True if all tests passed."""
         return asyncio.run(self._main_loop())
 
     async def _main_loop(self) -> bool:
