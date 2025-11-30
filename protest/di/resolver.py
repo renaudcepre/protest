@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import inspect
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from inspect import signature
@@ -12,10 +13,36 @@ from protest.core.fixture import (
     is_generator_like,
 )
 from protest.core.scope import Scope
-from protest.di.decorators import get_fixture_scope
+from protest.di.decorators import get_fixture_scope, is_factory_fixture
 from protest.di.markers import Use
-from protest.exceptions import ProTestError
+from protest.exceptions import FixtureError, ProTestError
 from protest.execution.async_bridge import ensure_async
+
+
+def _wrap_factory(result: Any, fixture_name: str) -> Any:
+    """Wrap a factory to convert its exceptions to FixtureError."""
+    if not callable(result):
+        return result
+
+    if inspect.iscoroutinefunction(result):
+
+        @functools.wraps(result)
+        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+            try:
+                return await result(*args, **kwargs)
+            except Exception as exc:
+                raise FixtureError(fixture_name, exc) from exc
+
+        return async_wrapper
+
+    @functools.wraps(result)
+    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return result(*args, **kwargs)
+        except Exception as exc:
+            raise FixtureError(fixture_name, exc) from exc
+
+    return sync_wrapper
 
 
 class ScopeMismatchError(ProTestError):
@@ -67,7 +94,8 @@ class Resolver:
         if func in self._registry:
             raise AlreadyRegisteredError(get_callable_name(func))
 
-        fixture = Fixture(func, scope)
+        is_factory = is_factory_fixture(func)
+        fixture = Fixture(func, scope, is_factory=is_factory)
         self._analyze_and_store_dependencies(fixture)
         self._registry[func] = fixture
         self._resolve_locks[func] = asyncio.Lock()
@@ -113,7 +141,10 @@ class Resolver:
 
         if target_fixture.scope == Scope.SUITE:
             if suite_name is None:
-                msg = f"SUITE-scoped fixture '{get_callable_name(target_func)}' requires suite context"
+                msg = (
+                    f"SUITE-scoped fixture '{get_callable_name(target_func)}'"
+                    f" requires suite context"
+                )
                 raise RuntimeError(msg)
             return await self._resolve_suite_scoped(target_fixture, suite_name)
 
@@ -178,10 +209,16 @@ class Resolver:
         if is_generator_like(fixture.func):
             if inspect.isasyncgenfunction(fixture.func):
                 async_cm = asynccontextmanager(fixture.func)(**kwargs)
-                return await exit_stack.enter_async_context(async_cm)
-            sync_cm = contextmanager(fixture.func)(**kwargs)
-            return exit_stack.enter_context(sync_cm)
-        return await ensure_async(fixture.func, **kwargs)
+                result = await exit_stack.enter_async_context(async_cm)
+            else:
+                sync_cm = contextmanager(fixture.func)(**kwargs)
+                result = exit_stack.enter_context(sync_cm)
+        else:
+            result = await ensure_async(fixture.func, **kwargs)
+
+        if fixture.is_factory:
+            return _wrap_factory(result, get_callable_name(fixture.func))
+        return result
 
     async def teardown_suite(self, suite_name: str) -> None:
         """Teardown all SUITE-scoped fixtures for a given suite."""

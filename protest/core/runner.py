@@ -9,6 +9,7 @@ from protest.core.session import ProTestSession
 from protest.di.resolver import Resolver
 from protest.events.data import SessionResult, TestResult
 from protest.events.types import Event
+from protest.exceptions import FixtureError
 from protest.execution.async_bridge import ensure_async
 from protest.execution.capture import CaptureCurrentTest, GlobalCapturePatch
 from protest.execution.context import TestExecutionContext
@@ -26,6 +27,7 @@ class TestRunner:
         """The main async loop for running tests."""
         passed = 0
         failed = 0
+        errored = 0
         session_start = time.perf_counter()
         concurrency = self._session.concurrency
 
@@ -37,40 +39,42 @@ class TestRunner:
             async with self._session:
                 await self._session.resolve_autouse()
 
-                session_passed, session_failed = await self._run_tests_parallel(
+                counts = await self._run_tests_parallel(
                     self._session.tests,
                     self._session.resolver,
                     semaphore,
                     suite_name=None,
                 )
-                passed += session_passed
-                failed += session_failed
+                passed += counts[0]
+                failed += counts[1]
+                errored += counts[2]
 
                 for suite in self._session.suites:
                     await self._session.events.emit(Event.SUITE_START, suite.name)
                     suite_concurrency = suite.concurrency or concurrency
                     suite_semaphore = asyncio.Semaphore(suite_concurrency)
 
-                    suite_passed, suite_failed = await self._run_tests_parallel(
+                    counts = await self._run_tests_parallel(
                         suite.tests,
                         self._session.resolver,
                         suite_semaphore,
                         suite_name=suite.name,
                     )
-                    passed += suite_passed
-                    failed += suite_failed
+                    passed += counts[0]
+                    failed += counts[1]
+                    errored += counts[2]
 
                     await self._session.resolver.teardown_suite(suite.name)
                     await self._session.events.emit(Event.SUITE_END, suite.name)
 
         session_duration = time.perf_counter() - session_start
         session_result = SessionResult(
-            passed=passed, failed=failed, duration=session_duration
+            passed=passed, failed=failed, errors=errored, duration=session_duration
         )
         await self._session.events.emit(Event.SESSION_END, session_result)
         await self._session.events.wait_pending()
         await self._session.events.emit(Event.SESSION_COMPLETE, session_result)
-        return failed == 0
+        return failed == 0 and errored == 0
 
     async def _run_tests_parallel(
         self,
@@ -78,12 +82,12 @@ class TestRunner:
         resolver: Resolver,
         semaphore: asyncio.Semaphore,
         suite_name: str | None = None,
-    ) -> tuple[int, int]:
-        """Run tests with concurrency control. Returns (passed, failed)."""
+    ) -> tuple[int, int, int]:
+        """Run tests with concurrency control. Returns (passed, failed, errored)."""
         if not tests:
-            return 0, 0
+            return 0, 0, 0
 
-        async def run_one(test_func: Callable[..., Any]) -> bool:
+        async def run_one(test_func: Callable[..., Any]) -> tuple[int, int, int]:
             async with semaphore:
                 with CaptureCurrentTest() as buffer:
                     async with TestExecutionContext(resolver, suite_name) as ctx:
@@ -92,25 +96,39 @@ class TestRunner:
         tasks = [asyncio.create_task(run_one(test)) for test in tests]
         results = await asyncio.gather(*tasks)
 
-        passed = sum(results)
-        failed = len(results) - passed
-        return passed, failed
+        passed = sum(result[0] for result in results)
+        failed = sum(result[1] for result in results)
+        errored = sum(result[2] for result in results)
+        return passed, failed, errored
 
     async def _run_test(
         self,
         test_func: Callable[..., Any],
         ctx: TestExecutionContext,
         buffer: io.StringIO,
-    ) -> bool:
+    ) -> tuple[int, int, int]:
+        """Run a single test. Returns (passed, failed, errored)."""
+        test_name = getattr(test_func, "__name__", "<unnamed>")
+        start = time.perf_counter()
+
         func_signature = signature(test_func)
         kwargs: dict[str, Any] = {}
 
-        for param_name, param in func_signature.parameters.items():
-            if dependency := Resolver._extract_dependency_from_parameter(param):
-                kwargs[param_name] = await ctx.resolve(dependency)
-
-        test_name = getattr(test_func, "__name__", "<unnamed>")
-        start = time.perf_counter()
+        try:
+            for param_name, param in func_signature.parameters.items():
+                if dependency := Resolver._extract_dependency_from_parameter(param):
+                    kwargs[param_name] = await ctx.resolve(dependency)
+        except Exception as exc:
+            duration = time.perf_counter() - start
+            result = TestResult(
+                name=test_name,
+                error=exc,
+                duration=duration,
+                output=buffer.getvalue(),
+                is_fixture_error=True,
+            )
+            await self._session.events.emit(Event.TEST_FAIL, result)
+            return (0, 0, 1)
 
         try:
             await ensure_async(test_func, **kwargs)
@@ -119,7 +137,18 @@ class TestRunner:
                 name=test_name, duration=duration, output=buffer.getvalue()
             )
             await self._session.events.emit(Event.TEST_PASS, result)
-            return True
+            return (1, 0, 0)
+        except FixtureError as exc:
+            duration = time.perf_counter() - start
+            result = TestResult(
+                name=test_name,
+                error=exc.original,
+                duration=duration,
+                output=buffer.getvalue(),
+                is_fixture_error=True,
+            )
+            await self._session.events.emit(Event.TEST_FAIL, result)
+            return (0, 0, 1)
         except Exception as exc:
             duration = time.perf_counter() - start
             result = TestResult(
@@ -129,4 +158,4 @@ class TestRunner:
                 output=buffer.getvalue(),
             )
             await self._session.events.emit(Event.TEST_FAIL, result)
-            return False
+            return (0, 1, 0)

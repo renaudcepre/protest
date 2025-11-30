@@ -9,10 +9,11 @@ from protest.compat import Self
 from protest.core.fixture import (
     Fixture,
     FixtureCallable,
+    get_callable_name,
     is_generator_like,
 )
 from protest.core.scope import Scope
-from protest.di.resolver import Resolver
+from protest.di.resolver import Resolver, _wrap_factory
 from protest.execution.async_bridge import ensure_async
 
 
@@ -68,6 +69,9 @@ class TestExecutionContext:
                 result = self._exit_stack.enter_context(sync_cm)
         else:
             result = await ensure_async(fixture.func, **kwargs)
+
+        if fixture.is_factory:
+            result = _wrap_factory(result, get_callable_name(fixture.func))
 
         self._cache[target_func] = result
         return result
