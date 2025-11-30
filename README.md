@@ -1,128 +1,100 @@
 # ProTest
 
-Modern, async-first testing framework for Python 3.10+. Inspired by FastAPI's explicit dependency injection.
+Modern, async-first testing framework for Python 3.10+. Inspired by FastAPI's explicit
+dependency injection.
+
+
+---
+
+## A Simple Example
+
+```python
+from protest import ProTestSession
+
+session = ProTestSession()
+
+
+def inc(x):
+    return x + 1
+
+
+@session.test()
+def test_answer():
+    assert inc(3) == 5
+```
+
+```bash
+protest run test_sample:session
+```
+
+## Explicit Dependencies
+
+No magic fixture names. You declare what you need:
+
+```python
+from typing import Annotated
+from protest import Use, Scope, fixture
+
+
+@fixture(scope=Scope.SESSION)
+async def database():
+    db = await Database.connect()
+    yield db
+    await db.close()
+
+
+@session.test()
+async def test_create_user(db: Annotated[Database, Use(database)]):
+    user = await db.create_user("alice")
+    assert user.name == "alice"
+```
+
+Functions without `@fixture` are treated as `FUNCTION` scope by default:
+
+```python
+def get_test_user():
+    return User(name="alice")
+
+
+@session.test()
+def test_user(user: Annotated[User, Use(get_test_user)]):
+    assert user.name == "alice"
+```
+
+## Features
+
+- **Explicit DI** - No guessing which fixture you're using
+- **Async native** - No plugin needed, just `async def`
+- **Parallel execution** - Built-in with `-n 4`
+- **Scoped fixtures** - `SESSION`, `SUITE`, `FUNCTION`
+- **Mix sync/async** - They just work together
 
 ## Installation
 
 ```bash
-pip install protest
+git clone <repo-url>
+cd protest
+uv sync
 ```
 
-## Quick Start
-
-```python
-from typing import Annotated
-from protest import ProTestSession, ProTestSuite, Scope, Use
-
-session = ProTestSession()
-suite = ProTestSuite("User Tests")
-session.include_suite(suite)
-
-@session.fixture(scope=Scope.SESSION)
-async def database():
-    db = await connect_database()
-    yield db
-    await db.close()
-
-@suite.fixture(scope=Scope.FUNCTION)
-def api_client(db: Annotated[Database, Use(database)]):
-    return APIClient(db)
-
-@suite.test()
-async def test_create_user(client: Annotated[APIClient, Use(api_client)]):
-    user = await client.create_user("alice")
-    assert user.name == "alice"
-```
+## Usage
 
 ```bash
-protest run myapp.tests:session
+protest run module:session           # Run tests
+protest run module:session -n 4      # Parallel
 ```
 
-## Key Concepts
+## Why not pytest?
 
-### Explicit Dependencies
-
-No magic fixture names. Dependencies declared in the signature:
-
-```python
-@suite.test()
-def test_something(
-    db: Annotated[Database, Use(database)],
-    cache: Annotated[Redis, Use(redis)],
-):
-    ...
-```
-
-### Fixture Scopes
-
-| Scope | Lifetime |
-|-------|----------|
-| `SESSION` | Entire test run |
-| `SUITE` | Single suite |
-| `FUNCTION` | Single test (default) |
-
-### Parallel Execution
-
-```bash
-protest run tests:session -n 4
-```
-
-`FUNCTION`-scoped fixtures are isolated per test. `SESSION`/`SUITE` fixtures use automatic locking.
-
-### Sync/Async Transparency
-
-Mix sync and async freely:
-
-```python
-@session.fixture(scope=Scope.SESSION)
-async def async_db():
-    return await connect()
-
-@suite.fixture(scope=Scope.FUNCTION)
-def sync_service(db: Annotated[DB, Use(async_db)]):  # Just works
-    return Service(db)
-```
-
-### Generator Fixtures
-
-Use `yield` for setup/teardown:
-
-```python
-@session.fixture(scope=Scope.SESSION)
-async def database():
-    db = await Database.connect()
-    yield db
-    await db.disconnect()
-```
-
-### Plugins
-
-```python
-from protest import PluginBase
-
-class SlackNotifier(PluginBase):
-    def on_test_fail(self, result):
-        slack.post(f"FAILED: {result.name}")
-
-session.use(SlackNotifier())
-```
-
-## CLI
-
-```bash
-protest run module:session           # Run all tests
-protest run module:session -n 4      # Parallel execution
-protest run module:session --app-dir ./src
-```
-
-## vs pytest
-
-| | pytest | ProTest |
-|-|--------|---------|
+|          | pytest             | ProTest                   |
+|----------|--------------------|---------------------------|
 | Fixtures | Implicit (by name) | Explicit (`Use(fixture)`) |
-| Async | Plugin | Native |
-| Parallel | Plugin | Built-in |
+| Async    | Plugin required    | Native                    |
+| Parallel | Plugin required    | Built-in                  |
 
-## Examples
+pytest is battle-tested and has a huge ecosystem. Use ProTest if you want FastAPI-style
+explicit dependencies in your tests.
 
-See [`examples/`](./examples) for complete demos.
+## License
+
+MIT
