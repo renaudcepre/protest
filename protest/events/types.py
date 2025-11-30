@@ -11,5 +11,5 @@ class Event(Enum):
     SESSION_COMPLETE = "session_complete"
     SUITE_START = "suite_start"
     SUITE_END = "suite_end"
-    TEST_PASS = "test_pass"
+    TEST_PASS = "test_pass"  # noqa: S105
     TEST_FAIL = "test_fail"

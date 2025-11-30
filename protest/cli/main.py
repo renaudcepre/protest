@@ -61,7 +61,7 @@ def run_tests(target: str, concurrency: int = 1) -> None:
         print(f"Error: '{session_name}' is not a ProTestSession")
         sys.exit(1)
 
-    protest_session = cast(ProTestSession, session)
+    protest_session = cast("ProTestSession", session)
     protest_session.concurrency = concurrency
     protest_session.use(ConsoleReporter())
 
