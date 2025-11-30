@@ -4,6 +4,7 @@ from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
 from protest.di.decorators import fixture
 from protest.di.markers import Use
+from protest.fixtures.builtins import caplog
 from protest.plugin import PluginBase
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     "ProTestSuite",
     "Scope",
     "Use",
+    "caplog",
     "fixture",
 ]

@@ -1,10 +1,16 @@
 import io
+import logging
 import sys
 from contextvars import ContextVar, Token
+from logging import LogRecord
 from typing import TextIO
 
 _capture_buffer: ContextVar[io.StringIO | None] = ContextVar(
     "capture_buffer", default=None
+)
+
+_log_records: ContextVar[list[LogRecord] | None] = ContextVar(
+    "log_records", default=None
 )
 
 
@@ -28,16 +34,45 @@ class TaskAwareStream:
         return getattr(self._original, name)
 
 
+class TaskAwareLogHandler(logging.Handler):
+    def emit(self, record: LogRecord) -> None:
+        records = _log_records.get()
+        if records is not None:
+            records.append(record)
+
+
+class LogCaptureContext:
+    def __init__(self) -> None:
+        self._records: list[LogRecord] = []
+        self._token: Token[list[LogRecord] | None] | None = None
+
+    def __enter__(self) -> list[LogRecord]:
+        self._token = _log_records.set(self._records)
+        return self._records
+
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+        if self._token is not None:
+            _log_records.reset(self._token)
+
+
 class GlobalCapturePatch:
     def __init__(self) -> None:
         self._orig_stdout: TextIO | None = None
         self._orig_stderr: TextIO | None = None
+        self._log_handler: TaskAwareLogHandler | None = None
+        self._orig_log_level: int | None = None
 
     def __enter__(self) -> "GlobalCapturePatch":
         self._orig_stdout = sys.stdout
         self._orig_stderr = sys.stderr
         sys.stdout = TaskAwareStream(sys.stdout)  # type: ignore[assignment]
         sys.stderr = TaskAwareStream(sys.stderr)  # type: ignore[assignment]
+
+        self._orig_log_level = logging.root.level
+        logging.root.setLevel(logging.NOTSET)
+        self._log_handler = TaskAwareLogHandler()
+        self._log_handler.setLevel(logging.DEBUG)
+        logging.root.addHandler(self._log_handler)
         return self
 
     def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
@@ -45,6 +80,10 @@ class GlobalCapturePatch:
             sys.stdout = self._orig_stdout
         if self._orig_stderr is not None:
             sys.stderr = self._orig_stderr
+        if self._log_handler is not None:
+            logging.root.removeHandler(self._log_handler)
+        if self._orig_log_level is not None:
+            logging.root.setLevel(self._orig_log_level)
 
 
 class CaptureCurrentTest:

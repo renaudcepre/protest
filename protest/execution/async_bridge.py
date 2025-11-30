@@ -29,7 +29,7 @@ async def run_in_threadpool(func: Callable[..., T], *args: Any, **kwargs: Any) -
 
 
 async def ensure_async(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
-    """Call func and return result. Async awaited, sync runs in threadpool."""
+    """Call func and return result. Async functions are awaited, sync called directly."""
     if is_async_callable(func):
         return await func(*args, **kwargs)
-    return await run_in_threadpool(func, *args, **kwargs)
+    return func(*args, **kwargs)
