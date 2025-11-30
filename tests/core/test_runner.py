@@ -1,6 +1,7 @@
 """Tests for TestRunner - the core test execution engine."""
 
 import asyncio
+import time
 from typing import Annotated
 
 from protest import Scope, fixture
@@ -302,8 +303,6 @@ class TestRunnerParallelExecution:
 
     def test_parallel_execution_faster_than_sequential(self) -> None:
         """Parallel execution should be faster than sequential."""
-        import time
-
         session = ProTestSession(concurrency=3)
 
         @session.test()

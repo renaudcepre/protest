@@ -1,8 +1,11 @@
 """Tests for TestExecutionContext - parallel execution isolation."""
 
+from typing import Annotated
+
 import pytest
 
 from protest.core.scope import Scope
+from protest.di.markers import Use
 from protest.di.resolver import Resolver
 from protest.execution.context import TestExecutionContext
 
@@ -176,10 +179,6 @@ class TestDependencyResolution:
 
         resolver.register(base_fixture, Scope.FUNCTION)
 
-        from typing import Annotated
-
-        from protest.di.markers import Use
-
         def dependent_with_annotation(
             base: Annotated[str, Use(base_fixture)],
         ) -> str:
@@ -197,9 +196,6 @@ class TestDependencyResolution:
         self, resolver: Resolver
     ) -> None:
         """FUNCTION fixture can depend on SESSION fixture."""
-        from typing import Annotated
-
-        from protest.di.markers import Use
 
         def session_fixture() -> str:
             return "session_value"
