@@ -240,6 +240,10 @@ class Resolver:
         exc_tb: TracebackType | None,
     ) -> bool:
         """Exit resolver context, triggering teardown for generator fixtures."""
+        for suite_name in list(self._suite_exit_stacks.keys()):
+            await self._suite_exit_stacks[suite_name].aclose()
+            del self._suite_exit_stacks[suite_name]
+        self._suite_cache.clear()
         result = await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
         return result or False
 

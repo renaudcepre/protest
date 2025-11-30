@@ -13,3 +13,4 @@ wheels/
 .idea
 /.coverage
 /.claude/
+.protest/
