@@ -1,10 +1,9 @@
 import asyncio
 import io
+import logging
 import sys
 
 import pytest
-
-import logging
 
 from protest.execution.capture import (
     CaptureCurrentTest,
