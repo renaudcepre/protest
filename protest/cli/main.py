@@ -5,41 +5,54 @@ import sys
 from typing import cast
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(prog="protest", description="ProTest runner")
-    subparsers = parser.add_subparsers(dest="command")
+HELP_EPILOG = """
+Examples:
+  protest demo:session              Run all tests
+  protest demo:session -n 4         Run with 4 concurrent workers
+  protest demo:session --lf         Re-run only failed tests
+  protest demo:session --collect-only   List tests without running
+  protest demo:session --lf --collect-only  List failed tests
+"""
 
-    run_parser = subparsers.add_parser("run", help="Run tests")
-    run_parser.add_argument(
-        "target",
-        help="Module and session in format 'module:session' (e.g., 'demo:session')",
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        prog="protest",
+        description="ProTest - Async-first Python test framework",
+        epilog=HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    run_parser.add_argument(
+    parser.add_argument(
+        "target",
+        nargs="?",
+        help="Module and session: 'module:session' (e.g., 'demo:session')",
+    )
+    parser.add_argument(
         "--app-dir",
         default=".",
-        help="Look for module in this directory (default: current directory)",
+        help="Look for module in this directory (default: .)",
     )
-    run_parser.add_argument(
+    parser.add_argument(
         "-n",
         "--concurrency",
         type=int,
         default=1,
-        help="Number of concurrent tests (default: 1, sequential)",
+        help="Number of concurrent tests (default: 1)",
     )
-    run_parser.add_argument(
+    parser.add_argument(
         "--lf",
         "--last-failed",
         dest="last_failed",
         action="store_true",
         help="Re-run only failed tests from last run",
     )
-    run_parser.add_argument(
+    parser.add_argument(
         "--cache-clear",
         dest="cache_clear",
         action="store_true",
         help="Clear cache before run",
     )
-    run_parser.add_argument(
+    parser.add_argument(
         "--collect-only",
         dest="collect_only",
         action="store_true",
@@ -48,7 +61,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    if args.command == "run":
+    if args.target:
         sys.path.insert(0, args.app_dir)
         run_tests(
             args.target,

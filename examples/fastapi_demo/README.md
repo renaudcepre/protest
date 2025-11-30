@@ -14,7 +14,7 @@ uv sync
 ### Basic run (sequential)
 
 ```bash
-uv run protest run tests:session
+uv run protest tests:session
 ```
 
 ### Parallel execution
@@ -23,10 +23,10 @@ This is where ProTest shines for async tests. The demo has tests that make HTTP 
 
 ```bash
 # Run 4 tests concurrently - much faster for I/O bound tests
-uv run protest run tests:session -n 4
+uv run protest tests:session -n 4
 
 # Run 8 tests concurrently
-uv run protest run tests:session -n 8
+uv run protest tests:session -n 8
 ```
 
 **Why parallel matters here:**
@@ -38,39 +38,39 @@ uv run protest run tests:session -n 8
 
 ```bash
 # First run
-uv run protest run tests:session -n 4
+uv run protest tests:session -n 4
 
 # Re-run only failed tests
-uv run protest run tests:session --lf
+uv run protest tests:session --lf
 
 # Combine with concurrency
-uv run protest run tests:session --lf -n 4
+uv run protest tests:session --lf -n 4
 ```
 
 ### Clear cache
 
 ```bash
-uv run protest run tests:session --cache-clear
+uv run protest tests:session --cache-clear
 ```
 
 ### Collect only (list tests without running)
 
 ```bash
 # See all tests
-uv run protest run tests:session --collect-only
+uv run protest tests:session --collect-only
 
 # See which tests would run with --lf
-uv run protest run tests:session --lf --collect-only
+uv run protest tests:session --lf --collect-only
 ```
 
 ### Combined options
 
 ```bash
 # Typical workflow for FastAPI testing
-uv run protest run tests:session -n 4                    # Run all in parallel
-uv run protest run tests:session --lf -n 4               # Iterate on failures
-uv run protest run tests:session --collect-only --lf     # Check what would run
-uv run protest run tests:session --cache-clear -n 4      # Fresh run
+uv run protest tests:session -n 4                    # Run all in parallel
+uv run protest tests:session --lf -n 4               # Iterate on failures
+uv run protest tests:session --collect-only --lf     # Check what would run
+uv run protest tests:session --cache-clear -n 4      # Fresh run
 ```
 
 ## Demo Files
