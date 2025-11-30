@@ -1,12 +1,8 @@
-<p align="center">
-  <img src="assets/logo-term.svg" alt="ProTest" width="400">
-</p>
-<p align="center">
-  <em>Modern, async-first testing framework for Python 3.10+</em>
-</p>
-<p align="center">
-  <strong>Explicit dependencies. Native async. Built-in parallelism.</strong>
-</p>
+![ProTest](assets/logo-term.svg)
+
+Modern, async-first testing framework for Python 3.10+
+
+**Explicit dependencies. Native async. Built-in parallelism.**
 
 ---
 
