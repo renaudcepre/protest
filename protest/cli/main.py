@@ -4,7 +4,6 @@ import importlib
 import sys
 from typing import cast
 
-
 HELP_EPILOG = """
 Examples:
   protest demo:session              Run all tests
