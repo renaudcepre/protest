@@ -11,6 +11,7 @@ class TestResult:
     error: Exception | None = None
     duration: float | None = None
     output: str = ""
+    is_fixture_error: bool = False
 
 
 @dataclass
@@ -19,4 +20,5 @@ class SessionResult:
 
     passed: int
     failed: int
+    errors: int = 0
     duration: float | None = None
