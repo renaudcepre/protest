@@ -26,6 +26,7 @@ class ProTestSession:
         concurrency: Number of parallel test workers (default: 1).
         autouse: Fixtures to auto-resolve at session start before any test runs.
     """
+
     def __init__(
         self,
         concurrency: int = 1,
