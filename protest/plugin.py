@@ -13,25 +13,25 @@ class PluginBase:
     """Base class for ProTest plugins. Override only the hooks you need."""
 
     def setup(self, session: ProTestSession) -> None:
-        pass
+        """Called when plugin is registered via session.use()."""
 
     def on_session_start(self) -> None:
-        pass
+        """Called before any test runs."""
 
     def on_session_end(self, result: SessionResult) -> None:
-        pass
+        """Tests done. Async handlers (Slack, etc.) start here."""
 
     def on_session_complete(self, result: SessionResult) -> None:
-        pass
+        """After wait_pending(). All async handlers finished."""
 
     def on_suite_start(self, name: str) -> None:
-        pass
+        """Called before a suite's tests run."""
 
     def on_suite_end(self, name: str) -> None:
-        pass
+        """Called after a suite's tests and SUITE teardown."""
 
     def on_test_pass(self, result: TestResult) -> None:
-        pass
+        """Called when a test passes."""
 
     def on_test_fail(self, result: TestResult) -> None:
-        pass
+        """Called when a test fails."""
