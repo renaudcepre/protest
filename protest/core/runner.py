@@ -1,4 +1,5 @@
 import asyncio
+import io
 import time
 from collections.abc import Callable
 from inspect import signature
@@ -83,8 +84,10 @@ class TestRunner:
             return 0, 0
 
         async def run_one(test_func: Callable[..., Any]) -> bool:
-            async with semaphore, TestExecutionContext(resolver, suite_name) as ctx:
-                return await self._run_test(test_func, ctx)
+            async with semaphore:
+                with CaptureCurrentTest() as buffer:
+                    async with TestExecutionContext(resolver, suite_name) as ctx:
+                        return await self._run_test(test_func, ctx, buffer)
 
         tasks = [asyncio.create_task(run_one(test)) for test in tests]
         results = await asyncio.gather(*tasks)
@@ -97,6 +100,7 @@ class TestRunner:
         self,
         test_func: Callable[..., Any],
         ctx: TestExecutionContext,
+        buffer: io.StringIO,
     ) -> bool:
         func_signature = signature(test_func)
         kwargs: dict[str, Any] = {}
@@ -108,22 +112,21 @@ class TestRunner:
         test_name = getattr(test_func, "__name__", "<unnamed>")
         start = time.perf_counter()
 
-        with CaptureCurrentTest() as buffer:
-            try:
-                await ensure_async(test_func, **kwargs)
-                duration = time.perf_counter() - start
-                result = TestResult(
-                    name=test_name, duration=duration, output=buffer.getvalue()
-                )
-                await self._session.events.emit(Event.TEST_PASS, result)
-                return True
-            except Exception as exc:
-                duration = time.perf_counter() - start
-                result = TestResult(
-                    name=test_name,
-                    error=exc,
-                    duration=duration,
-                    output=buffer.getvalue(),
-                )
-                await self._session.events.emit(Event.TEST_FAIL, result)
-                return False
+        try:
+            await ensure_async(test_func, **kwargs)
+            duration = time.perf_counter() - start
+            result = TestResult(
+                name=test_name, duration=duration, output=buffer.getvalue()
+            )
+            await self._session.events.emit(Event.TEST_PASS, result)
+            return True
+        except Exception as exc:
+            duration = time.perf_counter() - start
+            result = TestResult(
+                name=test_name,
+                error=exc,
+                duration=duration,
+                output=buffer.getvalue(),
+            )
+            await self._session.events.emit(Event.TEST_FAIL, result)
+            return False
