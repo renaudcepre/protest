@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo-term.svg" alt="ProTest">
+  <img src="assets/logo-term.svg" alt="ProTest" width="400">
 </p>
 <p align="center">
   <em>Modern, async-first testing framework for Python 3.10+</em>
