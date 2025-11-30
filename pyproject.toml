@@ -83,8 +83,9 @@ log_cli_format = "[%(levelname)7s] %(name)20s - %(message)s"
 [project.scripts]
 protest = "protest.cli.main:main"
 
-[tool.setuptools]
-packages = ["protest"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["protest*"]
 
 [dependency-groups]
 dev = [
