@@ -2,11 +2,13 @@ import inspect
 from collections.abc import Callable
 from typing import Any, TypeAlias
 
+from protest.utils import get_callable_name
+
 FixtureCallable: TypeAlias = Callable[..., Any]
 
 
-def get_callable_name(func: FixtureCallable) -> str:
-    return getattr(func, "__name__", repr(func))
+def get_fixture_name(func: FixtureCallable) -> str:
+    return get_callable_name(func, fallback=repr(func))
 
 
 def is_generator_like(func: FixtureCallable) -> bool:

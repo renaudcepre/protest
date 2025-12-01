@@ -30,12 +30,18 @@ def cache_file(temp_cache_dir: Path) -> Path:
 
 
 def make_test_item(node_id: str) -> TestItem:
-    """Create a TestItem with a dummy function."""
+    """Create a TestItem with a specific node_id for testing."""
+    parts = node_id.split("::")
+    module = parts[0]
+    func_name = parts[-1]
 
     def dummy() -> None:
         pass
 
-    return TestItem(node_id=node_id, func=dummy, suite=None)
+    dummy.__module__ = module
+    dummy.__name__ = func_name
+
+    return TestItem(func=dummy, suite=None)
 
 
 def write_cache(cache_file: Path, data: dict[str, Any]) -> None:

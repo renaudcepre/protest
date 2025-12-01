@@ -8,6 +8,7 @@ from typing import Any
 
 from protest.events.types import Event
 from protest.execution.async_bridge import run_in_threadpool
+from protest.utils import get_callable_name
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +44,10 @@ class EventBus:
                 else:
                     await run_in_threadpool(handler)
             except Exception:
-                handler_name = getattr(handler, "__name__", "<unknown>")
                 logger.exception(
-                    "Handler %s failed for event %s", handler_name, event.value
+                    "Handler %s failed for event %s",
+                    get_callable_name(handler),
+                    event.value,
                 )
 
     async def _run_async_handler(self, handler: Callable[..., Any], data: Any) -> None:
@@ -56,8 +58,7 @@ class EventBus:
             else:
                 await handler()
         except Exception:
-            handler_name = getattr(handler, "__name__", "<unknown>")
-            logger.exception("Async handler %s failed", handler_name)
+            logger.exception("Async handler %s failed", get_callable_name(handler))
 
     async def wait_pending(self) -> None:
         """Wait for all fire-and-forget async tasks to complete."""
@@ -75,8 +76,9 @@ class EventBus:
                 if result is not None:
                     data = result
             except Exception:
-                handler_name = getattr(handler, "__name__", "<unknown>")
                 logger.exception(
-                    "Handler %s failed for event %s", handler_name, event.value
+                    "Handler %s failed for event %s",
+                    get_callable_name(handler),
+                    event.value,
                 )
         return data

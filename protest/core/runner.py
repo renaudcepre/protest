@@ -18,6 +18,7 @@ from protest.exceptions import FixtureError
 from protest.execution.async_bridge import ensure_async
 from protest.execution.capture import CaptureCurrentTest, GlobalCapturePatch
 from protest.execution.context import TestExecutionContext
+from protest.utils import get_callable_name
 
 
 class TestRunner:
@@ -136,15 +137,19 @@ class TestRunner:
     ) -> TestCounts:
         """Run a single test."""
         test_func = item.func
-        test_name = getattr(test_func, "__name__", "<unnamed>")
+        test_name = get_callable_name(test_func)
         node_id = item.node_id
         start = time.perf_counter()
 
         func_signature = signature(test_func)
         kwargs: dict[str, Any] = {}
 
+        kwargs.update(item.case_kwargs)
+
         try:
             for param_name, param in func_signature.parameters.items():
+                if param_name in kwargs:
+                    continue
                 if dependency := Resolver._extract_dependency_from_parameter(param):
                     kwargs[param_name] = await ctx.resolve(dependency)
         except Exception as exc:

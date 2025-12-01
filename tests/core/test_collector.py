@@ -5,14 +5,13 @@ from protest.core.collector import (
     TestItem,
     chunk_by_suite,
     get_last_chunk_index_per_suite,
-    get_node_id,
 )
 from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
 
 
-class TestGetNodeId:
-    """Tests for node_id generation."""
+class TestTestItemNodeId:
+    """Tests for TestItem.node_id property."""
 
     def test_node_id_without_suite(self) -> None:
         """Node ID for standalone test: module.path::test"""
@@ -20,19 +19,30 @@ class TestGetNodeId:
         def my_test() -> None:
             pass
 
-        node_id = get_node_id(my_test, None)
+        item = TestItem(func=my_test, suite=None)
 
-        assert node_id == f"{my_test.__module__}::my_test"
+        assert item.node_id == f"{my_test.__module__}::my_test"
 
     def test_node_id_with_suite(self) -> None:
         """Node ID for suite test: module.path::Suite::test"""
+        suite = ProTestSuite("MySuite")
 
         def my_test() -> None:
             pass
 
-        node_id = get_node_id(my_test, "MySuite")
+        item = TestItem(func=my_test, suite=suite)
 
-        assert node_id == f"{my_test.__module__}::MySuite::my_test"
+        assert item.node_id == f"{my_test.__module__}::MySuite::my_test"
+
+    def test_node_id_with_case_ids(self) -> None:
+        """Node ID with parameterized case IDs."""
+
+        def my_test() -> None:
+            pass
+
+        item = TestItem(func=my_test, suite=None, case_ids=["alice", "admin"])
+
+        assert item.node_id == f"{my_test.__module__}::my_test[alice-admin]"
 
 
 class TestCollector:
@@ -152,8 +162,8 @@ class TestChunkBySuite:
             pass
 
         items = [
-            TestItem(node_id="mod::Suite::test_a", func=test_a, suite=suite),
-            TestItem(node_id="mod::Suite::test_b", func=test_b, suite=suite),
+            TestItem(func=test_a, suite=suite),
+            TestItem(func=test_b, suite=suite),
         ]
 
         chunks = chunk_by_suite(items)
@@ -173,8 +183,8 @@ class TestChunkBySuite:
             pass
 
         items = [
-            TestItem(node_id="mod::test_a", func=test_a, suite=None),
-            TestItem(node_id="mod::test_b", func=test_b, suite=None),
+            TestItem(func=test_a, suite=None),
+            TestItem(func=test_b, suite=None),
         ]
 
         chunks = chunk_by_suite(items)
@@ -199,9 +209,9 @@ class TestChunkBySuite:
             pass
 
         items = [
-            TestItem(node_id="mod::A::test_a", func=test_a, suite=suite_a),
-            TestItem(node_id="mod::B::test_b", func=test_b, suite=suite_b),
-            TestItem(node_id="mod::A::test_c", func=test_c, suite=suite_a),
+            TestItem(func=test_a, suite=suite_a),
+            TestItem(func=test_b, suite=suite_b),
+            TestItem(func=test_c, suite=suite_a),
         ]
 
         chunks = chunk_by_suite(items)
@@ -223,8 +233,8 @@ class TestChunkBySuite:
             pass
 
         items = [
-            TestItem(node_id="mod::test_a", func=test_a, suite=None),
-            TestItem(node_id="mod::S::test_b", func=test_b, suite=suite_s),
+            TestItem(func=test_a, suite=None),
+            TestItem(func=test_b, suite=suite_s),
         ]
 
         chunks = chunk_by_suite(items)
@@ -252,7 +262,7 @@ class TestGetLastChunkIndexPerSuite:
             pass
 
         chunks = [
-            [TestItem(node_id="mod::S::test_a", func=test_a, suite=suite_s)],
+            [TestItem(func=test_a, suite=suite_s)],
         ]
 
         result = get_last_chunk_index_per_suite(chunks)
@@ -274,9 +284,9 @@ class TestGetLastChunkIndexPerSuite:
             pass
 
         chunks = [
-            [TestItem(node_id="mod::A::test_a", func=test_a, suite=suite_a)],
-            [TestItem(node_id="mod::B::test_b", func=test_b, suite=suite_b)],
-            [TestItem(node_id="mod::A::test_c", func=test_c, suite=suite_a)],
+            [TestItem(func=test_a, suite=suite_a)],
+            [TestItem(func=test_b, suite=suite_b)],
+            [TestItem(func=test_c, suite=suite_a)],
         ]
 
         result = get_last_chunk_index_per_suite(chunks)
@@ -290,7 +300,7 @@ class TestGetLastChunkIndexPerSuite:
             pass
 
         chunks = [
-            [TestItem(node_id="mod::test_a", func=test_a, suite=None)],
+            [TestItem(func=test_a, suite=None)],
         ]
 
         result = get_last_chunk_index_per_suite(chunks)
@@ -308,8 +318,8 @@ class TestGetLastChunkIndexPerSuite:
             pass
 
         chunks = [
-            [TestItem(node_id="mod::test_a", func=test_a, suite=None)],
-            [TestItem(node_id="mod::S::test_b", func=test_b, suite=suite_s)],
+            [TestItem(func=test_a, suite=None)],
+            [TestItem(func=test_b, suite=suite_s)],
         ]
 
         result = get_last_chunk_index_per_suite(chunks)
@@ -340,24 +350,10 @@ class TestGetLastChunkIndexPerSuite:
             pass
 
         chunks = [
-            [TestItem(node_id="mod::API::test_a", func=test_a, suite=api_suite)],
-            [
-                TestItem(
-                    node_id="mod::API::Users::test_b", func=test_b, suite=users_suite
-                )
-            ],
-            [
-                TestItem(
-                    node_id="mod::API::Users::Perms::test_c",
-                    func=test_c,
-                    suite=perms_suite,
-                )
-            ],
-            [
-                TestItem(
-                    node_id="mod::API::Orders::test_d", func=test_d, suite=orders_suite
-                )
-            ],
+            [TestItem(func=test_a, suite=api_suite)],
+            [TestItem(func=test_b, suite=users_suite)],
+            [TestItem(func=test_c, suite=perms_suite)],
+            [TestItem(func=test_d, suite=orders_suite)],
         ]
 
         result = get_last_chunk_index_per_suite(chunks)
