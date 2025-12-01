@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from protest.reporting.console import ConsoleReporter
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from types import TracebackType
@@ -29,12 +31,14 @@ class ProTestSession:
     Args:
         concurrency: Number of parallel test workers (default: 1).
         autouse: Fixtures to auto-resolve at session start before any test runs.
+        default_reporter: If True (default), CLI adds ConsoleReporter. Set False to use custom reporter.
     """
 
     def __init__(
         self,
         concurrency: int = 1,
         autouse: list[FixtureCallable] | None = None,
+        default_reporter: bool = True,
     ) -> None:
         self._resolver = Resolver()
         self._events = EventBus()
@@ -43,6 +47,9 @@ class ProTestSession:
         self._fixtures: list[FixtureCallable] = []
         self._concurrency = max(1, concurrency)
         self._autouse = autouse or []
+
+        if default_reporter:
+            self.use(ConsoleReporter())
 
     @property
     def autouse(self) -> list[FixtureCallable]:

@@ -12,7 +12,7 @@ from protest.core.collector import (
 )
 from protest.core.session import ProTestSession
 from protest.di.resolver import Resolver
-from protest.events.data import SessionResult, TestCounts, TestResult
+from protest.events.data import SessionResult, TestCounts, TestResult, TestStartInfo
 from protest.events.types import Event
 from protest.exceptions import FixtureError
 from protest.execution.async_bridge import ensure_async
@@ -100,6 +100,10 @@ class TestRunner:
             duration=session_duration,
         )
         await self._session.events.emit(Event.SESSION_END, session_result)
+        if self._session.events.pending_count > 0:
+            await self._session.events.emit(
+                Event.WAITING_HANDLERS, self._session.events.pending_count
+            )
         await self._session.events.wait_pending()
         await self._session.events.emit(Event.SESSION_COMPLETE, session_result)
         return total_counts.failed == 0 and total_counts.errored == 0
@@ -139,6 +143,10 @@ class TestRunner:
         test_func = item.func
         test_name = get_callable_name(test_func)
         node_id = item.node_id
+
+        start_info = TestStartInfo(name=test_name, node_id=node_id)
+        await self._session.events.emit(Event.TEST_START, start_info)
+
         start = time.perf_counter()
 
         func_signature = signature(test_func)
@@ -164,6 +172,8 @@ class TestRunner:
             )
             await self._session.events.emit(Event.TEST_FAIL, result)
             return TestCounts(errored=1)
+
+        await self._session.events.emit(Event.TEST_SETUP_DONE, start_info)
 
         try:
             await ensure_async(test_func, **kwargs)
