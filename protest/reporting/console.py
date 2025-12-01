@@ -1,6 +1,6 @@
 """Default console reporter implementation."""
 
-from protest.events.data import SessionResult, TestResult
+from protest.events.data import HandlerInfo, SessionResult, TestResult
 from protest.plugin import PluginBase
 from protest.reporting.colors import Fg, Style, colorize
 
@@ -43,9 +43,18 @@ class ConsoleReporter(PluginBase):
                 print(colorize(f"    │ {line}", Fg.GRAY, Style.DIM))
 
     def on_waiting_handlers(self, pending_count: int) -> None:
-        print(
-            colorize(f"\n⏳ Waiting for {pending_count} async handler(s)...", Fg.GRAY)
-        )
+        print(colorize(f"\n⏳ Async handlers ({pending_count})", Fg.CYAN))
+
+    def on_handler_end(self, info: HandlerInfo) -> None:
+        if not info.is_async:
+            return
+        if info.error:
+            symbol = colorize("✗", Fg.RED)
+            print(f"  {symbol} {info.name}: {info.error}")
+        else:
+            symbol = colorize("✓", Fg.GREEN)
+            duration = colorize(f"({info.duration:.1f}s)", Fg.GRAY)
+            print(f"  {symbol} {info.name} {duration}")
 
     def on_session_complete(self, result: SessionResult) -> None:
         total = result.passed + result.failed + result.errors
