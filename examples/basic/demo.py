@@ -4,7 +4,6 @@ from collections.abc import Generator
 from typing import Annotated
 
 from examples.basic.slack_notifier import FakeSlackNotifier
-
 from protest import ProTestSession, ProTestSuite, Use
 
 session = ProTestSession()

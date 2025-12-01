@@ -9,9 +9,10 @@
 #
 # ============================================================
 
-from typing import Annotated, Callable
-from protest import ProTestSession, ProTestSuite, Use
+from collections.abc import Callable
+from typing import Annotated
 
+from protest import ProTestSession, ProTestSuite, Use
 
 # ============================================================
 # Example 1: Simple project (flat)
@@ -35,8 +36,8 @@ def fresh_user():
 
 @session.test()
 def test_create(
-    db: Annotated[DB, Use(database)],       # Shared (session)
-    user: Annotated[User, Use(fresh_user)]  # Fresh per test
+    db: Annotated[DB, Use(database)],  # Shared (session)
+    user: Annotated[User, Use(fresh_user)],  # Fresh per test
 ):
     db.save(user)
     assert db.get(user.id) == user
@@ -84,8 +85,8 @@ def user_payload():
 @users_suite.test()
 def test_create_user(
     client: Annotated[APIClient, Use(api_client)],  # From grandparent
-    admin: Annotated[User, Use(admin_user)],        # From parent
-    payload: Annotated[dict, Use(user_payload)]     # Fresh per test
+    admin: Annotated[User, Use(admin_user)],  # From parent
+    payload: Annotated[dict, Use(user_payload)],  # Fresh per test
 ):
     response = client.post("/users", payload)
     assert response.status == 201
@@ -94,7 +95,7 @@ def test_create_user(
 @users_suite.test()
 def test_get_user(
     client: Annotated[APIClient, Use(api_client)],  # Same instance as above
-    admin: Annotated[User, Use(admin_user)],        # Same instance as above
+    admin: Annotated[User, Use(admin_user)],  # Same instance as above
 ):
     response = client.get(f"/users/{admin.id}")
     assert response.status == 200
@@ -142,10 +143,13 @@ unit_suite.add_suite(payments_unit)
 
 # --- tests/unit/users/test_create.py ---
 
+
 def user_factory():
     """Fresh factory per test."""
+
     def create(name: str, **kwargs) -> User:
         return User(name=name, **kwargs)
+
     return create
 
 
@@ -157,7 +161,7 @@ def mock_email_service():
 @users_unit.test()
 def test_create_user_sends_email(
     factory: Annotated[Callable, Use(user_factory)],
-    email: Annotated[Mock, Use(mock_email_service)]
+    email: Annotated[Mock, Use(mock_email_service)],
 ):
     user = factory(name="bob")
     send_welcome_email(user, email)
@@ -165,14 +169,13 @@ def test_create_user_sends_email(
 
 
 @users_unit.test()
-def test_create_user_validates_email(
-    factory: Annotated[Callable, Use(user_factory)]
-):
+def test_create_user_validates_email(factory: Annotated[Callable, Use(user_factory)]):
     with pytest.raises(ValidationError):
         factory(name="bob", email="invalid")
 
 
 # --- tests/integration/test_api.py ---
+
 
 @integration_suite.fixture()
 def seeded_db(db: Annotated[DB, Use(database)]):
@@ -195,6 +198,7 @@ def test_order_total(db: Annotated[DB, Use(seeded_db)]):
 
 
 # --- tests/e2e/test_checkout.py ---
+
 
 @e2e_suite.fixture()
 def browser():
@@ -289,8 +293,7 @@ async def async_user():
 
 @session.test()
 async def test_async_create(
-    db: Annotated[AsyncDB, Use(async_database)],
-    user: Annotated[User, Use(async_user)]
+    db: Annotated[AsyncDB, Use(async_database)], user: Annotated[User, Use(async_user)]
 ):
     await db.save(user)
     found = await db.get(user.id)

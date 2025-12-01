@@ -86,7 +86,9 @@ def test_assertion_failure() -> None:
     """This is a real TEST FAIL - bug in the test/code."""
     expected_value = 42
     actual_value = 41
-    assert actual_value == expected_value, f"Got {actual_value}, expected {expected_value}"
+    assert actual_value == expected_value, (
+        f"Got {actual_value}, expected {expected_value}"
+    )
 
 
 @session.test()

@@ -7,7 +7,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from protest.core.collector import TestItem
     from protest.core.session import ProTestSession
-    from protest.events.data import SessionResult, TestResult
+    from protest.events.data import (
+        HandlerInfo,
+        SessionResult,
+        TestResult,
+        TestStartInfo,
+    )
 
 
 class PluginBase:
@@ -26,6 +31,9 @@ class PluginBase:
     def on_session_end(self, result: SessionResult) -> None:
         """Tests done. Async handlers (Slack, etc.) start here."""
 
+    def on_waiting_handlers(self, pending_count: int) -> None:
+        """Called when waiting for async handlers to complete."""
+
     def on_session_complete(self, result: SessionResult) -> None:
         """After wait_pending(). All async handlers finished."""
 
@@ -35,8 +43,20 @@ class PluginBase:
     def on_suite_end(self, name: str) -> None:
         """Called after a suite's tests and SUITE teardown."""
 
+    def on_test_start(self, info: TestStartInfo) -> None:
+        """Called when a test begins (before fixtures)."""
+
+    def on_test_setup_done(self, info: TestStartInfo) -> None:
+        """Called after fixtures resolved, before test execution."""
+
     def on_test_pass(self, result: TestResult) -> None:
         """Called when a test passes."""
 
     def on_test_fail(self, result: TestResult) -> None:
         """Called when a test fails."""
+
+    def on_handler_start(self, info: HandlerInfo) -> None:
+        """Called when an event handler starts executing."""
+
+    def on_handler_end(self, info: HandlerInfo) -> None:
+        """Called when an event handler completes."""

@@ -101,7 +101,6 @@ def run_tests(
     from protest.core.collector import Collector
     from protest.core.runner import TestRunner
     from protest.core.session import ProTestSession
-    from protest.reporting.console import ConsoleReporter
 
     if not isinstance(session, ProTestSession):
         print(f"Error: '{session_name}' is not a ProTestSession")
@@ -123,8 +122,6 @@ def run_tests(
         for item in items:
             print(f"  {item.node_id}")
         sys.exit(0)
-
-    protest_session.use(ConsoleReporter())
 
     runner = TestRunner(protest_session)
     success = runner.run()

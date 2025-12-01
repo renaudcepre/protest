@@ -1,6 +1,12 @@
 """Dataclasses for event payloads. Extensible without breaking signatures."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from protest.events.types import Event
 
 
 @dataclass
@@ -11,7 +17,7 @@ class TestCounts:
     failed: int = 0
     errored: int = 0
 
-    def __add__(self, other: "TestCounts") -> "TestCounts":
+    def __add__(self, other: TestCounts) -> TestCounts:
         return TestCounts(
             passed=self.passed + other.passed,
             failed=self.failed + other.failed,
@@ -39,3 +45,22 @@ class SessionResult:
     failed: int
     errors: int = 0
     duration: float | None = None
+
+
+@dataclass
+class TestStartInfo:
+    """Info emitted when a test begins execution."""
+
+    name: str
+    node_id: str
+
+
+@dataclass
+class HandlerInfo:
+    """Info about a handler execution."""
+
+    name: str
+    event: Event
+    is_async: bool
+    duration: float | None = None
+    error: Exception | None = None
