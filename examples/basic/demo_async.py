@@ -1,14 +1,14 @@
+"""Async fixtures demo - showcasing mixed sync/async fixtures and tests."""
+
 import asyncio
 from typing import Annotated
 
-from protest import Scope, fixture
-from protest.core.session import ProTestSession
-from protest.di.markers import Use
+from protest import ProTestSession, Use
 
 session = ProTestSession()
 
 
-@fixture(scope=Scope.SESSION)
+@session.fixture()
 async def async_db():
     print("    [ASYNC FIXTURE] waiting for db...")
     await asyncio.sleep(0.01)
@@ -16,7 +16,7 @@ async def async_db():
     return "DB Connection"
 
 
-@fixture(scope=Scope.SESSION)
+@session.fixture()
 def sync_service(db: Annotated[str, Use(async_db)]):
     print(f"    [SYNC FIXTURE] creating service with '{db}'")
     return f"Service({db})"

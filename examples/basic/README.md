@@ -17,6 +17,9 @@ uv sync
 # Run demo.py tests
 uv run protest demo:session
 
+# Run nested suites demo
+uv run protest nested_suites:session
+
 # Run async demo
 uv run protest demo_async:session
 
@@ -88,14 +91,15 @@ uv run protest demo:session -n 4           # Final full run
 
 ## Demo Files
 
-| File | Description |
-|------|-------------|
-| `demo.py` | Full feature showcase: fixtures, suites, scopes |
-| `demo_async.py` | Async tests and fixtures |
-| `demo_capture.py` | stdout/stderr capture during tests |
-| `factory_demo.py` | Factory fixtures for dynamic instances |
-| `caplog_demo.py` | Log capture fixture |
-| `slack_notifier.py` | Example plugin (fake Slack notifications) |
+| File               | Description                                   |
+|--------------------|-----------------------------------------------|
+| `demo.py`          | Full feature showcase: fixtures, suites       |
+| `nested_suites.py` | Nested suites with fixture inheritance        |
+| `demo_async.py`    | Async tests and fixtures                      |
+| `demo_capture.py`  | stdout/stderr capture during tests            |
+| `factory_demo.py`  | Factory fixtures for dynamic instances        |
+| `caplog_demo.py`   | Log capture fixture                           |
+| `slack_notifier.py`| Example plugin (fake Slack notifications)     |
 
 ## Cache Location
 

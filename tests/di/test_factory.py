@@ -2,25 +2,22 @@
 
 import pytest
 
-from protest.core.scope import Scope
-from protest.di.decorators import fixture, is_factory_fixture
-from protest.di.resolver import _wrap_factory
+from protest.di.resolver import FIXTURE_FACTORY_ATTR, _wrap_factory, is_factory_fixture
 from protest.exceptions import FixtureError
 
 
 class TestIsFactoryFixture:
     def test_regular_fixture_is_not_factory(self) -> None:
-        @fixture(scope=Scope.FUNCTION)
         def regular() -> str:
             return "value"
 
         assert is_factory_fixture(regular) is False
 
     def test_factory_fixture_is_factory(self) -> None:
-        @fixture(scope=Scope.FUNCTION, factory=True)
         def factory_fixture() -> str:
             return "value"
 
+        setattr(factory_fixture, FIXTURE_FACTORY_ATTR, True)
         assert is_factory_fixture(factory_fixture) is True
 
     def test_undecorated_function_is_not_factory(self) -> None:

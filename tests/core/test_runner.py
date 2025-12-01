@@ -4,12 +4,9 @@ import asyncio
 import time
 from typing import Annotated
 
-from protest import Scope, fixture
+from protest import ProTestSession, ProTestSuite, Use
 from protest.core.collector import TestItem
 from protest.core.runner import TestRunner
-from protest.core.session import ProTestSession
-from protest.core.suite import ProTestSuite
-from protest.di.markers import Use
 from protest.events.data import SessionResult, TestResult
 from protest.plugin import PluginBase
 
@@ -153,7 +150,7 @@ class TestRunnerWithFixtures:
         session = ProTestSession()
         received_value: list[str] = []
 
-        @fixture(scope=Scope.SESSION)
+        @session.fixture()
         def my_fixture() -> str:
             return "fixture_value"
 
@@ -171,7 +168,7 @@ class TestRunnerWithFixtures:
         session = ProTestSession()
         teardown_called = False
 
-        @fixture(scope=Scope.SESSION)
+        @session.fixture()
         def generator_fixture():
             yield "gen_value"
             nonlocal teardown_called
@@ -194,7 +191,7 @@ class TestRunnerWithSuites:
         """Runner executes tests in suites."""
         session = ProTestSession()
         suite = ProTestSuite("test_suite")
-        session.include_suite(suite)
+        session.add_suite(suite)
 
         executed: list[str] = []
 
@@ -211,7 +208,7 @@ class TestRunnerWithSuites:
         """Runner emits SUITE_START and SUITE_END."""
         session = ProTestSession()
         suite = ProTestSuite("my_suite")
-        session.include_suite(suite)
+        session.add_suite(suite)
         events_received: list[tuple[str, str]] = []
 
         class SuiteEventCollector(PluginBase):
@@ -237,7 +234,7 @@ class TestRunnerWithSuites:
         """Suite concurrency overrides session concurrency."""
         session = ProTestSession(concurrency=10)
         suite = ProTestSuite("sequential_suite", concurrency=1)
-        session.include_suite(suite)
+        session.add_suite(suite)
 
         execution_order: list[int] = []
 
@@ -392,9 +389,9 @@ class TestRunnerSmartTeardown:
         """Suite-scoped fixture remains available for all suite tests."""
         session = ProTestSession()
         suite = ProTestSuite("my_suite")
-        session.include_suite(suite)
+        session.add_suite(suite)
 
-        @fixture(scope=Scope.SUITE)
+        @suite.fixture()
         def suite_resource() -> str:
             return "resource_value"
 
@@ -419,12 +416,12 @@ class TestRunnerSmartTeardown:
         """Suite generator fixture teardown runs after all suite tests complete."""
         session = ProTestSession()
         suite = ProTestSuite("my_suite")
-        session.include_suite(suite)
+        session.add_suite(suite)
 
         teardown_at_test_count = -1
         test_execution_count = 0
 
-        @fixture(scope=Scope.SUITE)
+        @suite.fixture()
         def tracked_fixture():
             yield "tracked"
             nonlocal teardown_at_test_count, test_execution_count
@@ -446,3 +443,54 @@ class TestRunnerSmartTeardown:
         expected_test_count = 2
         assert test_execution_count == expected_test_count
         assert teardown_at_test_count == expected_test_count
+
+
+class TestRunnerNestedSuites:
+    """Tests for nested suite execution."""
+
+    def test_runner_executes_nested_suite_tests(self) -> None:
+        """Runner executes tests in nested suites."""
+        session = ProTestSession()
+        parent = ProTestSuite("Parent")
+        child = ProTestSuite("Child")
+        parent.add_suite(child)
+        session.add_suite(parent)
+
+        executed: list[str] = []
+
+        @parent.test()
+        def parent_test() -> None:
+            executed.append("parent")
+
+        @child.test()
+        def child_test() -> None:
+            executed.append("child")
+
+        runner = TestRunner(session)
+        runner.run()
+
+        assert "parent" in executed
+        assert "child" in executed
+
+    def test_nested_suite_uses_parent_fixture(self) -> None:
+        """Nested suite tests can use parent suite's fixtures."""
+        session = ProTestSession()
+        parent = ProTestSuite("Parent")
+        child = ProTestSuite("Child")
+        parent.add_suite(child)
+        session.add_suite(parent)
+
+        @parent.fixture()
+        def parent_resource() -> str:
+            return "parent_data"
+
+        results: list[str] = []
+
+        @child.test()
+        def child_test(res: Annotated[str, Use(parent_resource)]) -> None:
+            results.append(res)
+
+        runner = TestRunner(session)
+        runner.run()
+
+        assert results == ["parent_data"]

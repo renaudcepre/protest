@@ -306,3 +306,50 @@ class TestGetLastChunkIndexPerSuite:
         result = get_last_chunk_index_per_suite(chunks)
 
         assert result == {"S": 1}
+
+    def test_nested_suites_updates_parent_indices(self) -> None:
+        """Parent suite index is updated when child chunks appear."""
+
+        def test_a() -> None:
+            pass
+
+        def test_b() -> None:
+            pass
+
+        def test_c() -> None:
+            pass
+
+        def test_d() -> None:
+            pass
+
+        chunks = [
+            [TestItem(node_id="mod::API::test_a", func=test_a, suite_name="API")],
+            [
+                TestItem(
+                    node_id="mod::API::Users::test_b",
+                    func=test_b,
+                    suite_name="API::Users",
+                )
+            ],
+            [
+                TestItem(
+                    node_id="mod::API::Users::Perms::test_c",
+                    func=test_c,
+                    suite_name="API::Users::Perms",
+                )
+            ],
+            [
+                TestItem(
+                    node_id="mod::API::Orders::test_d",
+                    func=test_d,
+                    suite_name="API::Orders",
+                )
+            ],
+        ]
+
+        result = get_last_chunk_index_per_suite(chunks)
+
+        assert result["API"] == 3
+        assert result["API::Users"] == 2
+        assert result["API::Users::Perms"] == 2
+        assert result["API::Orders"] == 3
