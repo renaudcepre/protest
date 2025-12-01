@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from typing import Annotated
 
-from protest import ProTestSession, Scope, Use, fixture
+from protest import ProTestSession, Use
 from protest.core.runner import TestRunner
 from protest.events.data import SessionResult, TestResult
 from protest.plugin import PluginBase
@@ -26,7 +26,7 @@ class TestFactoryErrorDistinction:
 
         session.use(Collector())
 
-        @fixture(scope=Scope.FUNCTION, factory=True)
+        @session.fixture(factory=True)
         def failing_factory() -> Callable[[], None]:
             def create() -> None:
                 raise RuntimeError("DB unavailable")
@@ -87,7 +87,6 @@ class TestFactoryErrorDistinction:
 
         session.use(Collector())
 
-        @fixture(scope=Scope.FUNCTION)
         def broken_fixture() -> str:
             raise RuntimeError("Setup failed")
 
@@ -117,7 +116,7 @@ class TestFactoryErrorDistinction:
 
         session.use(Collector())
 
-        @fixture(scope=Scope.FUNCTION, factory=True)
+        @session.fixture(factory=True)
         def user_factory() -> Callable[..., dict[str, str]]:
             def create(fail: bool = False) -> dict[str, str]:
                 if fail:
@@ -164,7 +163,7 @@ class TestFactoryErrorPreservesOriginal:
 
         session.use(Collector())
 
-        @fixture(scope=Scope.FUNCTION, factory=True)
+        @session.fixture(factory=True)
         def factory_with_custom_error() -> Callable[[], None]:
             def create() -> None:
                 raise ValueError("Custom message with details")
@@ -202,7 +201,7 @@ class TestAsyncFactoryErrors:
 
         session.use(Collector())
 
-        @fixture(scope=Scope.FUNCTION, factory=True)
+        @session.fixture(factory=True)
         def async_factory() -> Callable[[], None]:
             async def create() -> None:
                 raise ConnectionError("API timeout")

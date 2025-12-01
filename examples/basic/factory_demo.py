@@ -10,7 +10,7 @@ This demo shows how ProTest distinguishes:
 from collections.abc import Callable
 from typing import Annotated
 
-from protest import ProTestSession, Scope, Use, fixture
+from protest import ProTestSession, Use
 
 session = ProTestSession()
 
@@ -20,7 +20,7 @@ session = ProTestSession()
 # =============================================================================
 
 
-@fixture(scope=Scope.SESSION, factory=True)
+@session.fixture(factory=True)
 def user_factory() -> Callable[..., dict[str, str]]:
     """Returns a factory that creates users. Marked as factory=True."""
     print("  [setup] Connecting to user database...")
@@ -33,9 +33,8 @@ def user_factory() -> Callable[..., dict[str, str]]:
     return create_user
 
 
-@fixture(scope=Scope.FUNCTION, factory=True)
-def api_client() -> Callable[..., dict[str, str]]:
-    """Returns an API client factory."""
+def api_client_factory() -> Callable[..., dict[str, str]]:
+    """Returns an API client factory. Plain function = function scope."""
 
     def make_request(endpoint: str) -> dict[str, str]:
         if endpoint == "/unstable":
@@ -76,7 +75,7 @@ def test_factory_crashes(
 
 @session.test()
 def test_api_timeout(
-    client: Annotated[Callable[..., dict[str, str]], Use(api_client)],
+    client: Annotated[Callable[..., dict[str, str]], Use(api_client_factory)],
 ) -> None:
     """This triggers a SETUP ERROR - API times out."""
     client("/unstable")  # API "times out" -> SETUP ERROR

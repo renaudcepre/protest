@@ -1,14 +1,11 @@
-"""ProTest Demo - Showcasing all implemented features."""
+"""ProTest Demo - Showcasing tree-based scoping architecture."""
 
 from collections.abc import Generator
 from typing import Annotated
 
 from slack_notifier import FakeSlackNotifier
 
-from protest import Scope, fixture
-from protest.core.session import ProTestSession
-from protest.core.suite import ProTestSuite
-from protest.di.markers import Use
+from protest import ProTestSession, ProTestSuite, Use
 
 session = ProTestSession()
 api_suite = ProTestSuite("API Tests")
@@ -22,19 +19,19 @@ session.use(FakeSlackNotifier(delay=0.5))
 # =============================================================================
 
 
-@fixture(scope=Scope.SESSION)
+@session.fixture()
 def database() -> Generator[str, None, None]:
     print("    [SESSION setup] database connection")
     yield "db_connection"
     print("    [SESSION teardown] database disconnected")
 
 
-@fixture(scope=Scope.SESSION)
+@session.fixture()
 def config() -> dict[str, str]:
     return {"env": "test", "debug": "true"}
 
 
-@fixture(scope=Scope.SESSION)
+@session.fixture()
 def cache(cfg: Annotated[dict[str, str], Use(config)]) -> str:
     return f"redis://{cfg['env']}.cache.local"
 
@@ -43,8 +40,8 @@ def cache(cfg: Annotated[dict[str, str], Use(config)]) -> str:
 # INCLUDE SUITES
 # =============================================================================
 
-session.include_suite(api_suite)
-session.include_suite(unit_suite)
+session.add_suite(api_suite)
+session.add_suite(unit_suite)
 
 
 # =============================================================================
@@ -52,14 +49,14 @@ session.include_suite(unit_suite)
 # =============================================================================
 
 
-@fixture(scope=Scope.SUITE)
+@api_suite.fixture()
 def api_client(db: Annotated[str, Use(database)]) -> Generator[str, None, None]:
     print("    [SUITE setup] api_client created")
     yield f"APIClient({db})"
     print("    [SUITE teardown] api_client closed")
 
 
-@fixture(scope=Scope.SUITE)
+@api_suite.fixture()
 def auth_token(
     client: Annotated[str, Use(api_client)],
     cache_url: Annotated[str, Use(cache)],
@@ -68,11 +65,10 @@ def auth_token(
 
 
 # =============================================================================
-# API SUITE - FUNCTION-SCOPED FIXTURES (created fresh for each test)
+# API SUITE - FUNCTION-SCOPED FIXTURES (plain functions, fresh for each test)
 # =============================================================================
 
 
-@fixture(scope=Scope.FUNCTION)
 def request_id() -> Generator[str, None, None]:
     import random
 
@@ -114,11 +110,10 @@ def test_api_broken() -> None:
 
 
 # =============================================================================
-# UNIT SUITE - FUNCTION-SCOPED FIXTURES
+# UNIT SUITE - FUNCTION-SCOPED FIXTURES (plain functions)
 # =============================================================================
 
 
-@fixture(scope=Scope.FUNCTION)
 def temp_file() -> Generator[str, None, None]:
     print("    [FUNCTION setup] temp file created")
     yield "/tmp/test_file.txt"

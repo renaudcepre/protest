@@ -10,14 +10,15 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from protest.core.session import ProTestSession
+    from protest.core.suite import ProTestSuite
 
 
-def get_node_id(func: Callable[..., Any], suite_name: str | None) -> str:
-    """Build the node_id: module.path::Suite::test or module.path::test"""
+def get_node_id(func: Callable[..., Any], suite_path: str | None) -> str:
+    """Build the node_id: module.path::Parent::Child::test or module.path::test"""
     module_path: str = func.__module__  # type: ignore[attr-defined]
     func_name: str = func.__name__  # type: ignore[attr-defined]
-    if suite_name:
-        return f"{module_path}::{suite_name}::{func_name}"
+    if suite_path:
+        return f"{module_path}::{suite_path}::{func_name}"
     return f"{module_path}::{func_name}"
 
 
@@ -27,12 +28,12 @@ class TestItem:
 
     node_id: str
     func: Callable[..., Any]
-    suite_name: str | None
+    suite_name: str | None  # Full hierarchical path: "Parent::Child"
     tags: set[str] = field(default_factory=set)
 
 
 class Collector:
-    """Collects tests from a session and produces a flat list of TestItem."""
+    """Collects tests from a session, recursively traversing nested suites."""
 
     def collect(self, session: ProTestSession) -> list[TestItem]:
         items: list[TestItem] = []
@@ -42,11 +43,23 @@ class Collector:
             items.append(TestItem(node_id=node_id, func=test_func, suite_name=None))
 
         for suite in session.suites:
-            for test_func in suite.tests:
-                node_id = get_node_id(test_func, suite.name)
-                items.append(
-                    TestItem(node_id=node_id, func=test_func, suite_name=suite.name)
-                )
+            items.extend(self._collect_from_suite(suite))
+
+        return items
+
+    def _collect_from_suite(self, suite: ProTestSuite) -> list[TestItem]:
+        """Recursively collect tests from suite and its children."""
+        items: list[TestItem] = []
+        full_path = suite.full_path
+
+        for test_func in suite.tests:
+            node_id = get_node_id(test_func, full_path)
+            items.append(
+                TestItem(node_id=node_id, func=test_func, suite_name=full_path)
+            )
+
+        for child in suite.suites:
+            items.extend(self._collect_from_suite(child))
 
         return items
 
@@ -61,10 +74,21 @@ def chunk_by_suite(items: list[TestItem]) -> list[list[TestItem]]:
 
 
 def get_last_chunk_index_per_suite(chunks: list[list[TestItem]]) -> dict[str, int]:
-    """For each suite, return the index of its last chunk."""
+    """For each suite, return the index of its last chunk (including descendants)."""
     last_indices: dict[str, int] = {}
     for chunk_idx, chunk in enumerate(chunks):
         suite_name = chunk[0].suite_name
         if suite_name:
             last_indices[suite_name] = chunk_idx
+            _update_parent_indices(last_indices, suite_name, chunk_idx)
     return last_indices
+
+
+def _update_parent_indices(
+    last_indices: dict[str, int], suite_name: str, chunk_idx: int
+) -> None:
+    """Update parent suite indices when a child chunk is seen."""
+    parts = suite_name.split("::")
+    for depth in range(1, len(parts)):
+        parent_path = "::".join(parts[:depth])
+        last_indices[parent_path] = chunk_idx

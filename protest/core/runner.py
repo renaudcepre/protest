@@ -71,7 +71,7 @@ class TestRunner:
                                 Event.SUITE_START, current_suite
                             )
 
-                    suite = self._get_suite_by_name(suite_name)
+                    suite = self._get_suite_by_path(suite_name)
                     concurrency = (
                         suite.concurrency
                         if suite and suite.concurrency
@@ -103,13 +103,20 @@ class TestRunner:
         await self._session.events.emit(Event.SESSION_COMPLETE, session_result)
         return total_counts.failed == 0 and total_counts.errored == 0
 
-    def _get_suite_by_name(self, suite_name: str | None) -> Any:
-        """Get a suite by name from the session."""
-        if suite_name is None:
+    def _get_suite_by_path(self, suite_path: str | None) -> Any:
+        """Get a suite by its full path (e.g., 'Parent::Child')."""
+        if suite_path is None:
             return None
-        for suite in self._session.suites:
-            if suite.name == suite_name:
+        return self._find_suite_recursive(self._session.suites, suite_path)
+
+    def _find_suite_recursive(self, suites: list[Any], target_path: str) -> Any:
+        """Recursively search for a suite by full path."""
+        for suite in suites:
+            if suite.full_path == target_path:
                 return suite
+            found = self._find_suite_recursive(suite.suites, target_path)
+            if found:
+                return found
         return None
 
     async def _run_chunk_parallel(

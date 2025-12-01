@@ -2,8 +2,6 @@ import inspect
 from collections.abc import Callable
 from typing import Any, TypeAlias
 
-from protest.core.scope import Scope
-
 FixtureCallable: TypeAlias = Callable[..., Any]
 
 
@@ -17,9 +15,10 @@ def is_generator_like(func: FixtureCallable) -> bool:
 
 
 class Fixture:
-    def __init__(self, func: FixtureCallable, scope: Scope, is_factory: bool = False):
+    """Wraps a fixture callable with caching and factory metadata."""
+
+    def __init__(self, func: FixtureCallable, is_factory: bool = False):
         self.func = func
-        self.scope = scope
         self.is_factory = is_factory
         self.cached_value: Any = None
         self.is_cached: bool = False

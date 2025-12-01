@@ -4,7 +4,6 @@ from typing import Annotated
 
 import pytest
 
-from protest.core.scope import Scope
 from protest.di.markers import Use
 from protest.di.resolver import Resolver
 from protest.execution.context import TestExecutionContext
@@ -30,7 +29,7 @@ class TestFunctionScopeIsolation:
             call_count += 1
             return call_count
 
-        resolver.register(counter_fixture, Scope.FUNCTION)
+        resolver.register(counter_fixture, scope_path=Resolver.FUNCTION_SCOPE)
 
         async with TestExecutionContext(resolver) as ctx1:
             value1 = await ctx1.resolve(counter_fixture)
@@ -54,7 +53,7 @@ class TestFunctionScopeIsolation:
             call_count += 1
             return call_count
 
-        resolver.register(counter_fixture, Scope.FUNCTION)
+        resolver.register(counter_fixture, scope_path=Resolver.FUNCTION_SCOPE)
 
         async with TestExecutionContext(resolver) as ctx:
             value1 = await ctx.resolve(counter_fixture)
@@ -80,7 +79,7 @@ class TestSessionScopeDelegation:
             call_count += 1
             return call_count
 
-        resolver.register(session_fixture, Scope.SESSION)
+        resolver.register(session_fixture, scope_path=None)
 
         async with resolver:
             async with TestExecutionContext(resolver) as ctx1:
@@ -109,7 +108,7 @@ class TestTeardown:
             nonlocal teardown_called
             teardown_called = True
 
-        resolver.register(generator_fixture, Scope.FUNCTION)
+        resolver.register(generator_fixture, scope_path=Resolver.FUNCTION_SCOPE)
 
         async with TestExecutionContext(resolver) as ctx:
             value = await ctx.resolve(generator_fixture)
@@ -128,7 +127,7 @@ class TestTeardown:
             nonlocal teardown_called
             teardown_called = True
 
-        resolver.register(async_generator_fixture, Scope.FUNCTION)
+        resolver.register(async_generator_fixture, scope_path=Resolver.FUNCTION_SCOPE)
 
         async with TestExecutionContext(resolver) as ctx:
             value = await ctx.resolve(async_generator_fixture)
@@ -152,8 +151,8 @@ class TestTeardown:
             yield "b"
             teardown_order.append("b")
 
-        resolver.register(fixture_a, Scope.FUNCTION)
-        resolver.register(fixture_b, Scope.FUNCTION)
+        resolver.register(fixture_a, scope_path=Resolver.FUNCTION_SCOPE)
+        resolver.register(fixture_b, scope_path=Resolver.FUNCTION_SCOPE)
 
         async with TestExecutionContext(resolver) as ctx:
             await ctx.resolve(fixture_a)
@@ -177,14 +176,14 @@ class TestDependencyResolution:
         def dependent_fixture(base: str) -> str:
             return f"dependent_{base}"
 
-        resolver.register(base_fixture, Scope.FUNCTION)
+        resolver.register(base_fixture, scope_path=Resolver.FUNCTION_SCOPE)
 
         def dependent_with_annotation(
             base: Annotated[str, Use(base_fixture)],
         ) -> str:
             return f"dependent_{base}"
 
-        resolver.register(dependent_with_annotation, Scope.FUNCTION)
+        resolver.register(dependent_with_annotation, scope_path=Resolver.FUNCTION_SCOPE)
 
         async with TestExecutionContext(resolver) as ctx:
             value = await ctx.resolve(dependent_with_annotation)
@@ -200,16 +199,43 @@ class TestDependencyResolution:
         def session_fixture() -> str:
             return "session_value"
 
-        resolver.register(session_fixture, Scope.SESSION)
+        resolver.register(session_fixture, scope_path=None)
 
         def function_fixture(
             session: Annotated[str, Use(session_fixture)],
         ) -> str:
             return f"function_{session}"
 
-        resolver.register(function_fixture, Scope.FUNCTION)
+        resolver.register(function_fixture, scope_path=Resolver.FUNCTION_SCOPE)
 
         async with resolver, TestExecutionContext(resolver) as ctx:
             value = await ctx.resolve(function_fixture)
 
         assert value == "function_session_value"
+
+
+class TestSuiteScopeDelegation:
+    """SUITE-scoped fixtures should delegate to parent resolver."""
+
+    @pytest.mark.asyncio
+    async def test_suite_fixture_shared_within_suite(self, resolver: Resolver) -> None:
+        """SUITE fixtures are resolved by parent and shared within suite."""
+        call_count = 0
+
+        def suite_fixture() -> int:
+            nonlocal call_count
+            call_count += 1
+            return call_count
+
+        resolver.register(suite_fixture, scope_path="MySuite")
+
+        async with resolver:
+            async with TestExecutionContext(resolver, suite_path="MySuite") as ctx1:
+                value1 = await ctx1.resolve(suite_fixture)
+
+            async with TestExecutionContext(resolver, suite_path="MySuite") as ctx2:
+                value2 = await ctx2.resolve(suite_fixture)
+
+        assert value1 == 1
+        assert value2 == 1
+        assert call_count == 1

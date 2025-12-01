@@ -2,7 +2,7 @@ import asyncio
 import functools
 import inspect
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
-from inspect import signature
+from inspect import Parameter, signature
 from types import TracebackType
 from typing import Annotated, Any, get_args, get_origin
 
@@ -12,11 +12,15 @@ from protest.core.fixture import (
     get_callable_name,
     is_generator_like,
 )
-from protest.core.scope import Scope
-from protest.di.decorators import get_fixture_scope, is_factory_fixture
 from protest.di.markers import Use
 from protest.exceptions import FixtureError, ProTestError
 from protest.execution.async_bridge import ensure_async
+
+FIXTURE_FACTORY_ATTR = "_protest_fixture_factory"
+
+
+def is_factory_fixture(func: FixtureCallable) -> bool:
+    return getattr(func, FIXTURE_FACTORY_ATTR, False)
 
 
 def _wrap_factory(result: Any, fixture_name: str) -> Any:
@@ -54,8 +58,8 @@ class ScopeMismatchError(ProTestError):
         dependency_scope: str,
     ):
         super().__init__(
-            f"Fixture '{requester_name}' with scope {requester_scope} "
-            f"cannot depend on '{dependency_name}' with scope {dependency_scope}."
+            f"Fixture '{requester_name}' at scope '{requester_scope}' "
+            f"cannot depend on '{dependency_name}' at scope '{dependency_scope}'."
         )
 
 
@@ -79,81 +83,104 @@ class FixtureNotFoundError(ProTestError):
 
 
 class Resolver:
-    """Manages fixture registration, dependency analysis, and resolution."""
+    """Manages fixture registration, dependency analysis, and resolution.
+
+    Scope is determined by the scope_path where a fixture is registered:
+    - None: Session scope (lives entire session)
+    - "SuiteName": Suite scope (lives while suite runs)
+    - "Parent::Child": Nested suite scope
+
+    Fixtures not explicitly registered are auto-registered with scope_path=FUNCTION_SCOPE
+    (a special marker meaning fresh instance per test).
+    """
+
+    FUNCTION_SCOPE = "__function__"
 
     def __init__(self) -> None:
         self._registry: dict[FixtureCallable, Fixture] = {}
         self._dependencies: dict[FixtureCallable, dict[str, FixtureCallable]] = {}
+        self._scope_paths: dict[FixtureCallable, str | None] = {}
         self._exit_stack: AsyncExitStack = AsyncExitStack()
         self._resolve_locks: dict[FixtureCallable, asyncio.Lock] = {}
-        self._suite_cache: dict[tuple[FixtureCallable, str], object] = {}
-        self._suite_exit_stacks: dict[str, AsyncExitStack] = {}
+        self._path_caches: dict[str, dict[FixtureCallable, Any]] = {}
+        self._path_exit_stacks: dict[str, AsyncExitStack] = {}
 
-    def register(self, func: FixtureCallable, scope: Scope) -> None:
-        """Analyzes a function's dependencies and registers it as a Fixture."""
+    def register(
+        self,
+        func: FixtureCallable,
+        scope_path: str | None = None,
+        is_factory: bool = False,
+    ) -> None:
+        """Register a fixture at a specific scope path.
+
+        Args:
+            func: The fixture function.
+            scope_path: Where this fixture lives:
+                - None: Session scope (global)
+                - "SuiteName": Suite scope
+                - "Parent::Child": Nested suite scope
+                - FUNCTION_SCOPE: Function scope (fresh per test)
+            is_factory: Whether this fixture returns a factory callable.
+        """
         if func in self._registry:
             raise AlreadyRegisteredError(get_callable_name(func))
 
-        is_factory = is_factory_fixture(func)
-        fixture = Fixture(func, scope, is_factory=is_factory)
-        self._analyze_and_store_dependencies(fixture)
+        fixture = Fixture(func, is_factory=is_factory)
+        self._scope_paths[func] = scope_path
+        self._analyze_and_store_dependencies(func, scope_path)
         self._registry[func] = fixture
         self._resolve_locks[func] = asyncio.Lock()
 
     def has_fixture(self, func: FixtureCallable) -> bool:
-        """Check if a fixture is registered."""
         return func in self._registry
 
     def get_fixture(self, func: FixtureCallable) -> Fixture | None:
-        """Get a fixture by its function, or None if not registered."""
         return self._registry.get(func)
 
+    def get_scope_path(self, func: FixtureCallable) -> str | None:
+        return self._scope_paths.get(func)
+
     def get_dependencies(self, func: FixtureCallable) -> dict[str, FixtureCallable]:
-        """Get dependencies for a fixture function."""
         return self._dependencies.get(func, {})
 
     def _ensure_registered(self, func: FixtureCallable) -> Fixture:
-        """Auto-register a fixture if not yet registered and return it.
+        """Auto-register a fixture if not yet registered.
 
-        Decorated functions use their declared scope.
-        Undecorated functions default to FUNCTION scope.
+        Unregistered functions are registered as FUNCTION scope (fresh per test).
         """
         if func not in self._registry:
-            scope = get_fixture_scope(func) or Scope.FUNCTION
-            self.register(func, scope)
+            is_factory = is_factory_fixture(func)
+            self.register(func, scope_path=self.FUNCTION_SCOPE, is_factory=is_factory)
         return self._registry[func]
 
     async def resolve(
-        self, target_func: FixtureCallable, suite_name: str | None = None
+        self,
+        target_func: FixtureCallable,
+        current_path: str | None = None,
     ) -> Any:
-        """Resolve a fixture recursively, handling generators for setup/teardown.
+        """Resolve a fixture recursively.
 
-        Generator fixtures (with yield) are wrapped as context managers and pushed
-        onto the exit stack. Teardown runs when exiting the resolver context.
-        Regular fixtures are called via ensure_async.
+        Args:
+            target_func: The fixture function to resolve.
+            current_path: Current execution context path (suite path for tests).
 
-        Uses per-fixture locks to prevent race conditions in parallel execution.
-
-        For SUITE-scoped fixtures, suite_name must be provided and caching is per-suite.
+        Returns:
+            The resolved fixture value.
         """
         self._ensure_registered(target_func)
         target_fixture = self._registry[target_func]
+        scope_path = self._scope_paths[target_func]
 
-        if target_fixture.scope == Scope.SUITE:
-            if suite_name is None:
-                msg = (
-                    f"SUITE-scoped fixture '{get_callable_name(target_func)}'"
-                    f" requires suite context"
-                )
-                raise RuntimeError(msg)
-            return await self._resolve_suite_scoped(target_fixture, suite_name)
-
-        return await self._resolve_session_scoped(target_fixture, suite_name)
+        if scope_path is None:
+            return await self._resolve_session_scoped(target_fixture, current_path)
+        if scope_path == self.FUNCTION_SCOPE:
+            return await self._resolve_function_scoped(target_fixture, current_path)
+        return await self._resolve_path_scoped(target_fixture, scope_path, current_path)
 
     async def _resolve_session_scoped(
-        self, target_fixture: Fixture, suite_name: str | None
+        self, target_fixture: Fixture, current_path: str | None
     ) -> Any:
-        """Resolve a SESSION-scoped fixture with global caching."""
+        """Resolve a session-scoped fixture with global caching."""
         if target_fixture.is_cached:
             return target_fixture.cached_value
 
@@ -161,7 +188,7 @@ class Resolver:
             if target_fixture.is_cached:
                 return target_fixture.cached_value
 
-            kwargs = await self._resolve_dependencies(target_fixture.func, suite_name)
+            kwargs = await self._resolve_dependencies(target_fixture.func, current_path)
             result = await self._execute_fixture(
                 target_fixture, kwargs, self._exit_stack
             )
@@ -170,36 +197,50 @@ class Resolver:
             target_fixture.is_cached = True
             return result
 
-    async def _resolve_suite_scoped(
-        self, target_fixture: Fixture, suite_name: str
+    async def _resolve_path_scoped(
+        self, target_fixture: Fixture, scope_path: str, current_path: str | None
     ) -> Any:
-        """Resolve a SUITE-scoped fixture with per-suite caching."""
-        cache_key = (target_fixture.func, suite_name)
-        if cache_key in self._suite_cache:
-            return self._suite_cache[cache_key]
+        """Resolve a path-scoped (suite) fixture with per-path caching."""
+        if scope_path not in self._path_caches:
+            self._path_caches[scope_path] = {}
+
+        cache = self._path_caches[scope_path]
+        if target_fixture.func in cache:
+            return cache[target_fixture.func]
 
         async with self._resolve_locks[target_fixture.func]:
-            if cache_key in self._suite_cache:
-                return self._suite_cache[cache_key]
+            if target_fixture.func in cache:
+                return cache[target_fixture.func]
 
-            if suite_name not in self._suite_exit_stacks:
-                self._suite_exit_stacks[suite_name] = AsyncExitStack()
+            if scope_path not in self._path_exit_stacks:
+                self._path_exit_stacks[scope_path] = AsyncExitStack()
 
-            kwargs = await self._resolve_dependencies(target_fixture.func, suite_name)
+            kwargs = await self._resolve_dependencies(target_fixture.func, current_path)
             result = await self._execute_fixture(
-                target_fixture, kwargs, self._suite_exit_stacks[suite_name]
+                target_fixture, kwargs, self._path_exit_stacks[scope_path]
             )
 
-            self._suite_cache[cache_key] = result
+            cache[target_fixture.func] = result
             return result
 
+    async def _resolve_function_scoped(
+        self, target_fixture: Fixture, current_path: str | None
+    ) -> Any:
+        """Resolve a function-scoped fixture (no caching at this level).
+
+        Note: In practice, function-scoped fixtures are handled by TestExecutionContext
+        which maintains its own cache per test. This method is a fallback.
+        """
+        kwargs = await self._resolve_dependencies(target_fixture.func, current_path)
+        return await self._execute_fixture(target_fixture, kwargs, AsyncExitStack())
+
     async def _resolve_dependencies(
-        self, target_func: FixtureCallable, suite_name: str | None
+        self, target_func: FixtureCallable, current_path: str | None
     ) -> dict[str, Any]:
         """Resolve all dependencies for a fixture."""
         kwargs: dict[str, Any] = {}
         for param_name, dep_func in self._dependencies.get(target_func, {}).items():
-            kwargs[param_name] = await self.resolve(dep_func, suite_name)
+            kwargs[param_name] = await self.resolve(dep_func, current_path)
         return kwargs
 
     async def _execute_fixture(
@@ -220,17 +261,19 @@ class Resolver:
             return _wrap_factory(result, get_callable_name(fixture.func))
         return result
 
+    async def teardown_path(self, scope_path: str) -> None:
+        """Teardown all fixtures for a given scope path."""
+        if scope_path in self._path_exit_stacks:
+            await self._path_exit_stacks[scope_path].aclose()
+            del self._path_exit_stacks[scope_path]
+        if scope_path in self._path_caches:
+            del self._path_caches[scope_path]
+
     async def teardown_suite(self, suite_name: str) -> None:
-        """Teardown all SUITE-scoped fixtures for a given suite."""
-        if suite_name in self._suite_exit_stacks:
-            await self._suite_exit_stacks[suite_name].aclose()
-            del self._suite_exit_stacks[suite_name]
-        keys_to_remove = [key for key in self._suite_cache if key[1] == suite_name]
-        for key in keys_to_remove:
-            del self._suite_cache[key]
+        """Alias for teardown_path (backward compatibility)."""
+        await self.teardown_path(suite_name)
 
     async def __aenter__(self) -> "Resolver":
-        """Enter resolver context. Use 'async with resolver:' for teardown."""
         return self
 
     async def __aexit__(
@@ -239,47 +282,94 @@ class Resolver:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:
-        """Exit resolver context, triggering teardown for generator fixtures."""
-        for suite_name in list(self._suite_exit_stacks.keys()):
-            await self._suite_exit_stacks[suite_name].aclose()
-            del self._suite_exit_stacks[suite_name]
-        self._suite_cache.clear()
+        for path in list(self._path_exit_stacks.keys()):
+            await self._path_exit_stacks[path].aclose()
+        self._path_exit_stacks.clear()
+        self._path_caches.clear()
         result = await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
         return result or False
 
-    def clear_cache(self, scope: Scope) -> None:
-        """Clears the cache for all fixtures within a specific scope."""
-        for fixture in self._registry.values():
-            if fixture.scope == scope:
-                fixture.clear_cache()
-
-    def _analyze_and_store_dependencies(self, fixture: Fixture) -> None:
-        """Analyzes a fixture's function signature and populates its dependencies."""
-        func_signature = signature(fixture.func)
+    def _analyze_and_store_dependencies(
+        self, func: FixtureCallable, scope_path: str | None
+    ) -> None:
+        """Analyze function signature and store dependencies."""
+        func_signature = signature(func)
         dependencies: dict[str, FixtureCallable] = {}
         for param_name, param in func_signature.parameters.items():
             if dependency := self._extract_dependency_from_parameter(param):
                 self._ensure_registered(dependency)
-                self._validate_scope(fixture, dependency)
+                self._validate_scope(func, scope_path, dependency)
                 dependencies[param_name] = dependency
-        self._dependencies[fixture.func] = dependencies
+        self._dependencies[func] = dependencies
 
     def _validate_scope(
-        self, requester: Fixture, dependency_func: FixtureCallable
+        self,
+        requester_func: FixtureCallable,
+        requester_path: str | None,
+        dependency_func: FixtureCallable,
     ) -> None:
-        """Ensures a dependency has a wider or equal scope than its requester."""
-        dependency_fixture = self._registry[dependency_func]
-        if dependency_fixture.scope.value > requester.scope.value:
+        """Validate that dependency has equal or wider scope.
+
+        Rules:
+        - Session (None) can only depend on session fixtures
+        - Suite can depend on session or parent/same suite fixtures
+        - Function can depend on anything
+        """
+        dep_path = self._scope_paths[dependency_func]
+
+        if dep_path == self.FUNCTION_SCOPE:
+            if requester_path != self.FUNCTION_SCOPE:
+                raise ScopeMismatchError(
+                    get_callable_name(requester_func),
+                    self._format_scope(requester_path),
+                    get_callable_name(dependency_func),
+                    "function",
+                )
+            return
+
+        if dep_path is None:
+            return
+
+        if requester_path is None:
             raise ScopeMismatchError(
-                get_callable_name(requester.func),
-                requester.scope.name,
-                get_callable_name(dependency_fixture.func),
-                dependency_fixture.scope.name,
+                get_callable_name(requester_func),
+                "session",
+                get_callable_name(dependency_func),
+                self._format_scope(dep_path),
             )
+
+        if requester_path == self.FUNCTION_SCOPE:
+            return
+
+        if not self._is_parent_or_same_path(dep_path, requester_path):
+            raise ScopeMismatchError(
+                get_callable_name(requester_func),
+                self._format_scope(requester_path),
+                get_callable_name(dependency_func),
+                self._format_scope(dep_path),
+            )
+
+    def _is_parent_or_same_path(self, potential_parent: str, child: str) -> bool:
+        """Check if potential_parent is a parent path or same as child.
+
+        "Parent" is parent of "Parent::Child"
+        "Parent::Child" is same as "Parent::Child"
+        "Other" is NOT parent of "Parent::Child"
+        """
+        if potential_parent == child:
+            return True
+        return child.startswith(potential_parent + "::")
+
+    def _format_scope(self, scope_path: str | None) -> str:
+        if scope_path is None:
+            return "session"
+        if scope_path == self.FUNCTION_SCOPE:
+            return "function"
+        return f"suite '{scope_path}'"
 
     @staticmethod
     def _extract_dependency_from_parameter(
-        param: inspect.Parameter,
+        param: Parameter,
     ) -> FixtureCallable | None:
         """Extract dependency from Annotated[Type, Use(fixture)] or return None."""
         if get_origin(param.annotation) is Annotated:

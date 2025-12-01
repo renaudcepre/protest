@@ -12,7 +12,6 @@ from protest.core.fixture import (
     get_callable_name,
     is_generator_like,
 )
-from protest.core.scope import Scope
 from protest.di.resolver import Resolver, _wrap_factory
 from protest.execution.async_bridge import ensure_async
 
@@ -21,12 +20,12 @@ class TestExecutionContext:
     """Isolated context for a single test execution.
 
     Manages FUNCTION-scoped fixtures independently per test, allowing parallel
-    execution. SUITE and SESSION scoped fixtures are delegated to the parent resolver.
+    execution. Suite and session scoped fixtures are delegated to the parent resolver.
     """
 
-    def __init__(self, parent: Resolver, suite_name: str | None = None) -> None:
+    def __init__(self, parent: Resolver, suite_path: str | None = None) -> None:
         self._parent = parent
-        self._suite_name = suite_name
+        self._suite_path = suite_path
         self._cache: dict[FixtureCallable, Any] = {}
         self._exit_stack = AsyncExitStack()
 
@@ -46,10 +45,11 @@ class TestExecutionContext:
     async def resolve(self, target_func: FixtureCallable) -> Any:
         """Resolve a fixture, isolating FUNCTION scope to this context."""
         fixture = self._parent._ensure_registered(target_func)
+        scope_path = self._parent.get_scope_path(target_func)
 
-        if fixture.scope == Scope.FUNCTION:
+        if scope_path == Resolver.FUNCTION_SCOPE:
             return await self._resolve_function_scoped(target_func, fixture)
-        return await self._parent.resolve(target_func, suite_name=self._suite_name)
+        return await self._parent.resolve(target_func, current_path=self._suite_path)
 
     async def _resolve_function_scoped(
         self, target_func: FixtureCallable, fixture: Fixture
