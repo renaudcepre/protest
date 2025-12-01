@@ -29,13 +29,13 @@ def cache_file(temp_cache_dir: Path) -> Path:
     return temp_cache_dir / "cache.json"
 
 
-def make_test_item(node_id: str, suite_name: str | None = None) -> TestItem:
+def make_test_item(node_id: str) -> TestItem:
     """Create a TestItem with a dummy function."""
 
     def dummy() -> None:
         pass
 
-    return TestItem(node_id=node_id, func=dummy, suite_name=suite_name)
+    return TestItem(node_id=node_id, func=dummy, suite=None)
 
 
 def write_cache(cache_file: Path, data: dict[str, Any]) -> None:

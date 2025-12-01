@@ -426,3 +426,34 @@ async def test_suite_teardown(resolver: Resolver) -> None:
 
         await resolver.teardown_path("MySuite")
         assert teardown_counts["suite_gen"] == 1
+
+
+@pytest.mark.asyncio
+async def test_teardown_order_is_lifo(resolver: Resolver) -> None:
+    """Teardown happens in LIFO order: children before parents."""
+    teardown_order: list[str] = []
+
+    def parent_fixture() -> Generator[str, None, None]:
+        yield "parent"
+        teardown_order.append("parent")
+
+    def child_fixture() -> Generator[str, None, None]:
+        yield "child"
+        teardown_order.append("child")
+
+    def grandchild_fixture() -> Generator[str, None, None]:
+        yield "grandchild"
+        teardown_order.append("grandchild")
+
+    resolver.register(parent_fixture, scope_path="Parent")
+    resolver.register(child_fixture, scope_path="Parent::Child")
+    resolver.register(grandchild_fixture, scope_path="Parent::Child::GrandChild")
+
+    async with resolver:
+        await resolver.resolve(parent_fixture, current_path="Parent")
+        await resolver.resolve(child_fixture, current_path="Parent::Child")
+        await resolver.resolve(
+            grandchild_fixture, current_path="Parent::Child::GrandChild"
+        )
+
+    assert teardown_order == ["grandchild", "child", "parent"]

@@ -65,9 +65,9 @@ class TestCollector:
         expected_count = 2
         assert len(items) == expected_count
         assert items[0].func == test_one
-        assert items[0].suite_name is None
+        assert items[0].suite is None
         assert items[1].func == test_two
-        assert items[1].suite_name is None
+        assert items[1].suite is None
 
     def test_collect_suite_tests(self) -> None:
         """Collects tests from suites."""
@@ -85,7 +85,8 @@ class TestCollector:
         expected_count = 1
         assert len(items) == expected_count
         assert items[0].func == suite_test
-        assert items[0].suite_name == "my_suite"
+        assert items[0].suite is suite
+        assert items[0].suite_path == "my_suite"
 
     def test_collect_mixed_tests(self) -> None:
         """Collects both standalone and suite tests."""
@@ -106,8 +107,8 @@ class TestCollector:
 
         expected_count = 2
         assert len(items) == expected_count
-        assert items[0].suite_name is None
-        assert items[1].suite_name == "my_suite"
+        assert items[0].suite is None
+        assert items[1].suite_path == "my_suite"
 
     def test_collect_generates_correct_node_ids(self) -> None:
         """Collected items have correct node_ids."""
@@ -142,6 +143,7 @@ class TestChunkBySuite:
 
     def test_chunk_single_suite(self) -> None:
         """All tests from same suite in one chunk."""
+        suite = ProTestSuite("Suite")
 
         def test_a() -> None:
             pass
@@ -150,8 +152,8 @@ class TestChunkBySuite:
             pass
 
         items = [
-            TestItem(node_id="mod::Suite::test_a", func=test_a, suite_name="Suite"),
-            TestItem(node_id="mod::Suite::test_b", func=test_b, suite_name="Suite"),
+            TestItem(node_id="mod::Suite::test_a", func=test_a, suite=suite),
+            TestItem(node_id="mod::Suite::test_b", func=test_b, suite=suite),
         ]
 
         chunks = chunk_by_suite(items)
@@ -171,8 +173,8 @@ class TestChunkBySuite:
             pass
 
         items = [
-            TestItem(node_id="mod::test_a", func=test_a, suite_name=None),
-            TestItem(node_id="mod::test_b", func=test_b, suite_name=None),
+            TestItem(node_id="mod::test_a", func=test_a, suite=None),
+            TestItem(node_id="mod::test_b", func=test_b, suite=None),
         ]
 
         chunks = chunk_by_suite(items)
@@ -184,6 +186,8 @@ class TestChunkBySuite:
 
     def test_chunk_alternating_suites(self) -> None:
         """Contiguous tests by suite, not merged if interleaved."""
+        suite_a = ProTestSuite("A")
+        suite_b = ProTestSuite("B")
 
         def test_a() -> None:
             pass
@@ -195,21 +199,22 @@ class TestChunkBySuite:
             pass
 
         items = [
-            TestItem(node_id="mod::A::test_a", func=test_a, suite_name="A"),
-            TestItem(node_id="mod::B::test_b", func=test_b, suite_name="B"),
-            TestItem(node_id="mod::A::test_c", func=test_c, suite_name="A"),
+            TestItem(node_id="mod::A::test_a", func=test_a, suite=suite_a),
+            TestItem(node_id="mod::B::test_b", func=test_b, suite=suite_b),
+            TestItem(node_id="mod::A::test_c", func=test_c, suite=suite_a),
         ]
 
         chunks = chunk_by_suite(items)
 
         expected_chunk_count = 3
         assert len(chunks) == expected_chunk_count
-        assert chunks[0][0].suite_name == "A"
-        assert chunks[1][0].suite_name == "B"
-        assert chunks[2][0].suite_name == "A"
+        assert chunks[0][0].suite_path == "A"
+        assert chunks[1][0].suite_path == "B"
+        assert chunks[2][0].suite_path == "A"
 
     def test_chunk_standalone_then_suite(self) -> None:
         """Standalone tests followed by suite tests create separate chunks."""
+        suite_s = ProTestSuite("S")
 
         def test_a() -> None:
             pass
@@ -218,16 +223,16 @@ class TestChunkBySuite:
             pass
 
         items = [
-            TestItem(node_id="mod::test_a", func=test_a, suite_name=None),
-            TestItem(node_id="mod::S::test_b", func=test_b, suite_name="S"),
+            TestItem(node_id="mod::test_a", func=test_a, suite=None),
+            TestItem(node_id="mod::S::test_b", func=test_b, suite=suite_s),
         ]
 
         chunks = chunk_by_suite(items)
 
         expected_chunk_count = 2
         assert len(chunks) == expected_chunk_count
-        assert chunks[0][0].suite_name is None
-        assert chunks[1][0].suite_name == "S"
+        assert chunks[0][0].suite is None
+        assert chunks[1][0].suite_path == "S"
 
 
 class TestGetLastChunkIndexPerSuite:
@@ -241,12 +246,13 @@ class TestGetLastChunkIndexPerSuite:
 
     def test_single_suite_single_chunk(self) -> None:
         """Single suite in one chunk."""
+        suite_s = ProTestSuite("S")
 
         def test_a() -> None:
             pass
 
         chunks = [
-            [TestItem(node_id="mod::S::test_a", func=test_a, suite_name="S")],
+            [TestItem(node_id="mod::S::test_a", func=test_a, suite=suite_s)],
         ]
 
         result = get_last_chunk_index_per_suite(chunks)
@@ -255,6 +261,8 @@ class TestGetLastChunkIndexPerSuite:
 
     def test_suite_split_across_chunks(self) -> None:
         """Suite appearing in multiple chunks tracks last occurrence."""
+        suite_a = ProTestSuite("A")
+        suite_b = ProTestSuite("B")
 
         def test_a() -> None:
             pass
@@ -266,9 +274,9 @@ class TestGetLastChunkIndexPerSuite:
             pass
 
         chunks = [
-            [TestItem(node_id="mod::A::test_a", func=test_a, suite_name="A")],
-            [TestItem(node_id="mod::B::test_b", func=test_b, suite_name="B")],
-            [TestItem(node_id="mod::A::test_c", func=test_c, suite_name="A")],
+            [TestItem(node_id="mod::A::test_a", func=test_a, suite=suite_a)],
+            [TestItem(node_id="mod::B::test_b", func=test_b, suite=suite_b)],
+            [TestItem(node_id="mod::A::test_c", func=test_c, suite=suite_a)],
         ]
 
         result = get_last_chunk_index_per_suite(chunks)
@@ -276,13 +284,13 @@ class TestGetLastChunkIndexPerSuite:
         assert result == {"A": 2, "B": 1}
 
     def test_standalone_tests_not_tracked(self) -> None:
-        """Standalone tests (suite_name=None) are not tracked."""
+        """Standalone tests (suite=None) are not tracked."""
 
         def test_a() -> None:
             pass
 
         chunks = [
-            [TestItem(node_id="mod::test_a", func=test_a, suite_name=None)],
+            [TestItem(node_id="mod::test_a", func=test_a, suite=None)],
         ]
 
         result = get_last_chunk_index_per_suite(chunks)
@@ -291,6 +299,7 @@ class TestGetLastChunkIndexPerSuite:
 
     def test_mixed_standalone_and_suite(self) -> None:
         """Only tracks suites, not standalone tests."""
+        suite_s = ProTestSuite("S")
 
         def test_a() -> None:
             pass
@@ -299,8 +308,8 @@ class TestGetLastChunkIndexPerSuite:
             pass
 
         chunks = [
-            [TestItem(node_id="mod::test_a", func=test_a, suite_name=None)],
-            [TestItem(node_id="mod::S::test_b", func=test_b, suite_name="S")],
+            [TestItem(node_id="mod::test_a", func=test_a, suite=None)],
+            [TestItem(node_id="mod::S::test_b", func=test_b, suite=suite_s)],
         ]
 
         result = get_last_chunk_index_per_suite(chunks)
@@ -309,6 +318,14 @@ class TestGetLastChunkIndexPerSuite:
 
     def test_nested_suites_updates_parent_indices(self) -> None:
         """Parent suite index is updated when child chunks appear."""
+        api_suite = ProTestSuite("API")
+        users_suite = ProTestSuite("Users")
+        perms_suite = ProTestSuite("Perms")
+        orders_suite = ProTestSuite("Orders")
+
+        api_suite.add_suite(users_suite)
+        users_suite.add_suite(perms_suite)
+        api_suite.add_suite(orders_suite)
 
         def test_a() -> None:
             pass
@@ -323,26 +340,22 @@ class TestGetLastChunkIndexPerSuite:
             pass
 
         chunks = [
-            [TestItem(node_id="mod::API::test_a", func=test_a, suite_name="API")],
+            [TestItem(node_id="mod::API::test_a", func=test_a, suite=api_suite)],
             [
                 TestItem(
-                    node_id="mod::API::Users::test_b",
-                    func=test_b,
-                    suite_name="API::Users",
+                    node_id="mod::API::Users::test_b", func=test_b, suite=users_suite
                 )
             ],
             [
                 TestItem(
                     node_id="mod::API::Users::Perms::test_c",
                     func=test_c,
-                    suite_name="API::Users::Perms",
+                    suite=perms_suite,
                 )
             ],
             [
                 TestItem(
-                    node_id="mod::API::Orders::test_d",
-                    func=test_d,
-                    suite_name="API::Orders",
+                    node_id="mod::API::Orders::test_d", func=test_d, suite=orders_suite
                 )
             ],
         ]

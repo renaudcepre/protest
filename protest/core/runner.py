@@ -55,23 +55,23 @@ class TestRunner:
             async with self._session:
                 await self._session.resolve_autouse()
 
-                current_suite: str | None = None
+                current_suite_path: str | None = None
 
                 for chunk_idx, chunk in enumerate(chunks):
-                    suite_name = chunk[0].suite_name
+                    suite = chunk[0].suite
+                    suite_path = suite.full_path if suite else None
 
-                    if suite_name != current_suite:
-                        if current_suite is not None:
+                    if suite_path != current_suite_path:
+                        if current_suite_path is not None:
                             await self._session.events.emit(
-                                Event.SUITE_END, current_suite
+                                Event.SUITE_END, current_suite_path
                             )
-                        current_suite = suite_name
-                        if current_suite is not None:
+                        current_suite_path = suite_path
+                        if current_suite_path is not None:
                             await self._session.events.emit(
-                                Event.SUITE_START, current_suite
+                                Event.SUITE_START, current_suite_path
                             )
 
-                    suite = self._get_suite_by_path(suite_name)
                     concurrency = (
                         suite.concurrency
                         if suite and suite.concurrency
@@ -83,13 +83,13 @@ class TestRunner:
                     total_counts = total_counts + chunk_counts
 
                     if (
-                        suite_name is not None
-                        and last_chunk_per_suite.get(suite_name) == chunk_idx
+                        suite_path is not None
+                        and last_chunk_per_suite.get(suite_path) == chunk_idx
                     ):
-                        await self._session.resolver.teardown_suite(suite_name)
+                        await self._session.resolver.teardown_suite(suite_path)
 
-                if current_suite is not None:
-                    await self._session.events.emit(Event.SUITE_END, current_suite)
+                if current_suite_path is not None:
+                    await self._session.events.emit(Event.SUITE_END, current_suite_path)
 
         session_duration = time.perf_counter() - session_start
         session_result = SessionResult(
@@ -102,22 +102,6 @@ class TestRunner:
         await self._session.events.wait_pending()
         await self._session.events.emit(Event.SESSION_COMPLETE, session_result)
         return total_counts.failed == 0 and total_counts.errored == 0
-
-    def _get_suite_by_path(self, suite_path: str | None) -> Any:
-        """Get a suite by its full path (e.g., 'Parent::Child')."""
-        if suite_path is None:
-            return None
-        return self._find_suite_recursive(self._session.suites, suite_path)
-
-    def _find_suite_recursive(self, suites: list[Any], target_path: str) -> Any:
-        """Recursively search for a suite by full path."""
-        for suite in suites:
-            if suite.full_path == target_path:
-                return suite
-            found = self._find_suite_recursive(suite.suites, target_path)
-            if found:
-                return found
-        return None
 
     async def _run_chunk_parallel(
         self,
@@ -132,7 +116,7 @@ class TestRunner:
             async with semaphore:
                 with CaptureCurrentTest() as buffer:
                     async with TestExecutionContext(
-                        self._session.resolver, item.suite_name
+                        self._session.resolver, item.suite_path
                     ) as ctx:
                         return await self._run_test(item, ctx, buffer)
 
