@@ -282,7 +282,7 @@ class Resolver:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:
-        for path in list(self._path_exit_stacks.keys()):
+        for path in reversed(list(self._path_exit_stacks.keys())):
             await self._path_exit_stacks[path].aclose()
         self._path_exit_stacks.clear()
         self._path_caches.clear()
