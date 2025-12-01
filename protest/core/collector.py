@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from itertools import groupby
-from typing import TYPE_CHECKING, Any
+from inspect import signature
+from itertools import groupby, product
+from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
+
+from protest.di.markers import ForEach, From
+from protest.utils import get_callable_name
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -13,27 +17,78 @@ if TYPE_CHECKING:
     from protest.core.suite import ProTestSuite
 
 
-def get_node_id(func: Callable[..., Any], suite_path: str | None) -> str:
-    """Build the node_id: module.path::Parent::Child::test or module.path::test"""
-    module_path: str = func.__module__  # type: ignore[attr-defined]
-    func_name: str = func.__name__  # type: ignore[attr-defined]
-    if suite_path:
-        return f"{module_path}::{suite_path}::{func_name}"
-    return f"{module_path}::{func_name}"
-
-
 @dataclass
 class TestItem:
     """Atomic unit representing a test with its metadata."""
 
-    node_id: str
     func: Callable[..., Any]
     suite: ProTestSuite | None
     tags: set[str] = field(default_factory=set)
+    case_kwargs: dict[str, Any] = field(default_factory=dict)
+    case_ids: list[str] = field(default_factory=list)
+
+    @property
+    def test_name(self) -> str:
+        return get_callable_name(self.func)
+
+    @property
+    def module_path(self) -> str:
+        return getattr(self.func, "__module__", "<unknown>")
 
     @property
     def suite_path(self) -> str | None:
         return self.suite.full_path if self.suite else None
+
+    @property
+    def node_id(self) -> str:
+        if self.suite_path:
+            base = f"{self.module_path}::{self.suite_path}::{self.test_name}"
+        else:
+            base = f"{self.module_path}::{self.test_name}"
+        if self.case_ids:
+            return f"{base}[{'-'.join(self.case_ids)}]"
+        return base
+
+
+def _extract_from_params(func: Callable[..., Any]) -> dict[str, ForEach[Any]]:
+    """Extract parameters annotated with From(source)."""
+    result: dict[str, ForEach[Any]] = {}
+    for param_name, param in signature(func).parameters.items():
+        if get_origin(param.annotation) is Annotated:
+            for metadata in get_args(param.annotation)[1:]:
+                if isinstance(metadata, From):
+                    result[param_name] = metadata.source
+                    break
+    return result
+
+
+def _expand_test(
+    func: Callable[..., Any], suite: ProTestSuite | None
+) -> list[TestItem]:
+    """Expand a test function into multiple TestItems based on From() params."""
+    from_params = _extract_from_params(func)
+
+    if not from_params:
+        return [TestItem(func=func, suite=suite)]
+
+    param_names = list(from_params.keys())
+    sources = [from_params[name] for name in param_names]
+
+    items: list[TestItem] = []
+    for combination in product(*sources):
+        case_kwargs = dict(zip(param_names, combination, strict=True))
+        case_ids = [sources[idx].get_id(val) for idx, val in enumerate(combination)]
+
+        items.append(
+            TestItem(
+                func=func,
+                suite=suite,
+                case_kwargs=case_kwargs,
+                case_ids=case_ids,
+            )
+        )
+
+    return items
 
 
 class Collector:
@@ -43,8 +98,7 @@ class Collector:
         items: list[TestItem] = []
 
         for test_func in session.tests:
-            node_id = get_node_id(test_func, None)
-            items.append(TestItem(node_id=node_id, func=test_func, suite=None))
+            items.extend(_expand_test(test_func, suite=None))
 
         for suite in session.suites:
             items.extend(self._collect_from_suite(suite))
@@ -56,8 +110,7 @@ class Collector:
         items: list[TestItem] = []
 
         for test_func in suite.tests:
-            node_id = get_node_id(test_func, suite.full_path)
-            items.append(TestItem(node_id=node_id, func=test_func, suite=suite))
+            items.extend(_expand_test(test_func, suite))
 
         for child in suite.suites:
             items.extend(self._collect_from_suite(child))
