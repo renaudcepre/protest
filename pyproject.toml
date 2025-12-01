@@ -27,6 +27,11 @@ dependencies = [
     "typing-extensions>=4.15.0",
 ]
 
+[project.optional-dependencies]
+rich = [
+    "rich>=13.0",
+]
+
 
 [tool.ruff]
 output-format = "concise"
@@ -67,7 +72,7 @@ ignore = [
     "T201",    # print allowed in CLI
     "PLC0415", # lazy imports for fast --help
 ]
-"protest/reporting/console.py" = [
+"protest/reporting/ascii.py" = [
     "T201", # print is the purpose of this module
 ]
 

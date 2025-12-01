@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, TypeVar
 
-from protest.reporting.console import ConsoleReporter
-
 if TYPE_CHECKING:
     from collections.abc import Callable
     from types import TracebackType
@@ -18,6 +16,18 @@ from protest.events.bus import EventBus
 from protest.events.types import Event
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
+
+
+def _get_default_reporter() -> PluginBase:
+    """Get the best available reporter (Rich if installed, else Ascii)."""
+    try:
+        from protest.reporting.rich_reporter import RichReporter
+
+        return RichReporter()
+    except ImportError:
+        from protest.reporting.ascii import AsciiReporter
+
+        return AsciiReporter()
 
 
 class ProTestSession:
@@ -49,7 +59,7 @@ class ProTestSession:
         self._autouse = autouse or []
 
         if default_reporter:
-            self.use(ConsoleReporter())
+            self.use(_get_default_reporter())
 
     @property
     def autouse(self) -> list[FixtureCallable]:

@@ -32,7 +32,7 @@ class TestResult:
     name: str
     node_id: str = ""
     error: Exception | None = None
-    duration: float | None = None
+    duration: float = -1
     output: str = ""
     is_fixture_error: bool = False
 

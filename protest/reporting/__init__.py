@@ -1,3 +1,10 @@
-from protest.reporting.console import ConsoleReporter
+import importlib.util
 
-__all__ = ["ConsoleReporter"]
+from protest.reporting.ascii import AsciiReporter
+
+__all__ = ["AsciiReporter"]
+
+if importlib.util.find_spec("rich"):
+    from protest.reporting.rich_reporter import RichReporter
+
+    __all__ += ["RichReporter"]
