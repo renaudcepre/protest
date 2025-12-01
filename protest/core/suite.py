@@ -10,8 +10,6 @@ if TYPE_CHECKING:
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
 
-FIXTURE_FACTORY_ATTR = "_protest_fixture_factory"
-
 
 class ProTestSuite:
     """Groups related tests with optional concurrency override and nested suites.
@@ -32,7 +30,7 @@ class ProTestSuite:
         self._parent_suite: ProTestSuite | None = None
         self._tests: list[Callable[..., Any]] = []
         self._suites: list[ProTestSuite] = []
-        self._fixtures: list[FixtureCallable] = []
+        self._fixtures: list[tuple[FixtureCallable, bool]] = []
         self._concurrency = concurrency
 
     @property
@@ -59,7 +57,7 @@ class ProTestSuite:
         return self._suites
 
     @property
-    def fixtures(self) -> list[FixtureCallable]:
+    def fixtures(self) -> list[tuple[FixtureCallable, bool]]:
         return self._fixtures
 
     def test(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
@@ -73,9 +71,7 @@ class ProTestSuite:
         """Register a fixture scoped to this suite."""
 
         def decorator(func: FuncT) -> FuncT:
-            if factory:
-                setattr(func, FIXTURE_FACTORY_ATTR, True)
-            self._fixtures.append(func)
+            self._fixtures.append((func, factory))
             return func
 
         return decorator

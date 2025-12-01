@@ -16,12 +16,6 @@ from protest.di.markers import Use
 from protest.exceptions import FixtureError, ProTestError
 from protest.execution.async_bridge import ensure_async
 
-FIXTURE_FACTORY_ATTR = "_protest_fixture_factory"
-
-
-def is_factory_fixture(func: FixtureCallable) -> bool:
-    return getattr(func, FIXTURE_FACTORY_ATTR, False)
-
 
 def _wrap_factory(result: Any, fixture_name: str) -> Any:
     """Wrap a factory to convert its exceptions to FixtureError."""
@@ -147,10 +141,10 @@ class Resolver:
         """Auto-register a fixture if not yet registered.
 
         Unregistered functions are registered as FUNCTION scope (fresh per test).
+        Auto-registered fixtures are never factories (factory=True requires explicit decorator).
         """
         if func not in self._registry:
-            is_factory = is_factory_fixture(func)
-            self.register(func, scope_path=self.FUNCTION_SCOPE, is_factory=is_factory)
+            self.register(func, scope_path=self.FUNCTION_SCOPE, is_factory=False)
         return self._registry[func]
 
     async def resolve(

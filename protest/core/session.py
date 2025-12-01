@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from protest.core.suite import ProTestSuite
     from protest.plugin import PluginBase
 
-from protest.di.resolver import FIXTURE_FACTORY_ATTR, Resolver, is_factory_fixture
+from protest.di.resolver import Resolver
 from protest.events.bus import EventBus
 from protest.events.types import Event
 
@@ -54,7 +54,7 @@ class ProTestSession:
         self._events = EventBus()
         self._suites: list[ProTestSuite] = []
         self._tests: list[Callable[..., Any]] = []
-        self._fixtures: list[FixtureCallable] = []
+        self._fixtures: list[tuple[FixtureCallable, bool]] = []
         self._concurrency = max(1, concurrency)
         self._autouse = autouse or []
 
@@ -95,7 +95,7 @@ class ProTestSession:
         return self._tests
 
     @property
-    def fixtures(self) -> list[FixtureCallable]:
+    def fixtures(self) -> list[tuple[FixtureCallable, bool]]:
         return self._fixtures
 
     def test(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
@@ -109,9 +109,7 @@ class ProTestSession:
         """Register a fixture scoped to the session (lives entire session)."""
 
         def decorator(func: FuncT) -> FuncT:
-            if factory:
-                setattr(func, FIXTURE_FACTORY_ATTR, True)
-            self._fixtures.append(func)
+            self._fixtures.append((func, factory))
             return func
 
         return decorator
@@ -143,18 +141,16 @@ class ProTestSession:
 
     def _register_fixtures(self) -> None:
         """Register all fixtures from session and suites into resolver."""
-        for func in self._fixtures:
-            factory = is_factory_fixture(func)
-            self._resolver.register(func, scope_path=None, is_factory=factory)
+        for func, is_factory in self._fixtures:
+            self._resolver.register(func, scope_path=None, is_factory=is_factory)
         self._register_suite_fixtures(self._suites)
 
     def _register_suite_fixtures(self, suites: list[ProTestSuite]) -> None:
         """Recursively register fixtures from suites."""
         for suite in suites:
-            for func in suite.fixtures:
-                factory = is_factory_fixture(func)
+            for func, is_factory in suite.fixtures:
                 self._resolver.register(
-                    func, scope_path=suite.full_path, is_factory=factory
+                    func, scope_path=suite.full_path, is_factory=is_factory
                 )
             self._register_suite_fixtures(suite.suites)
 
