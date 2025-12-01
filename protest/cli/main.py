@@ -10,7 +10,6 @@ Examples:
   protest demo:session -n 4         Run with 4 concurrent workers
   protest demo:session --lf         Re-run only failed tests
   protest demo:session --collect-only   List tests without running
-  protest demo:session --lf --collect-only  List failed tests
 """
 
 
