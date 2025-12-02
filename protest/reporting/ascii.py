@@ -59,7 +59,7 @@ class AsciiReporter(PluginBase):
         if info.error:
             print(f"  XX {info.name}: {info.error}")
         else:
-            duration = _format_duration(info.duration or 0)
+            duration = _format_duration(info.duration)
             print(f"  OK {info.name} ({duration})")
 
     def on_session_complete(self, result: SessionResult) -> None:
