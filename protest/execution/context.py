@@ -1,5 +1,3 @@
-"""Per-test execution context for isolated FUNCTION-scoped fixtures."""
-
 import inspect
 import time
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
@@ -7,9 +5,9 @@ from types import TracebackType
 from typing import Any
 
 from protest.compat import Self
-from protest.core.fixture import Fixture, FixtureCallable, is_generator_like
+from protest.core.fixture import is_generator_like
 from protest.di.resolver import Resolver, _wrap_factory
-from protest.events.data import FixtureInfo
+from protest.entities import Fixture, FixtureCallable, FixtureInfo
 from protest.events.types import Event
 from protest.execution.async_bridge import ensure_async
 from protest.utils import get_callable_name

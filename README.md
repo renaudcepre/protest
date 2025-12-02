@@ -202,7 +202,7 @@ def test_with_deps(
 
 ```python
 from protest import caplog
-from protest.execution.log_capture import LogCapture
+from protest.entities import LogCapture
 
 @session.test()
 def test_logging(logs: Annotated[LogCapture, Use(caplog)]):
@@ -219,7 +219,7 @@ Extend ProTest by subclassing `PluginBase`:
 
 ```python
 from protest import PluginBase
-from protest.events.data import SessionResult, TestResult
+from protest.entities import SessionResult, TestResult
 
 class SlackNotifier(PluginBase):
     def setup(self, session):

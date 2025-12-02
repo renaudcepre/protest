@@ -8,11 +8,15 @@ from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from inspect import Parameter, signature
 from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
-from protest.core.fixture import Fixture, FixtureCallable, is_generator_like
+from protest.core.fixture import is_generator_like
 from protest.di.markers import Use
-from protest.events.data import FixtureInfo
+from protest.entities import Fixture, FixtureCallable, FixtureInfo
 from protest.events.types import Event
-from protest.exceptions import FixtureError, ProTestError
+from protest.exceptions import (
+    AlreadyRegisteredError,
+    FixtureError,
+    ScopeMismatchError,
+)
 from protest.execution.async_bridge import ensure_async
 from protest.utils import get_callable_name
 
@@ -24,7 +28,6 @@ if TYPE_CHECKING:
 
 
 def _wrap_factory(result: Any, fixture_name: str) -> Any:
-    """Wrap a factory to convert its exceptions to FixtureError."""
     if not callable(result):
         return result
 
@@ -47,39 +50,6 @@ def _wrap_factory(result: Any, fixture_name: str) -> Any:
             raise FixtureError(fixture_name, exc) from exc
 
     return sync_wrapper
-
-
-class ScopeMismatchError(ProTestError):
-    def __init__(
-        self,
-        requester_name: str,
-        requester_scope: str,
-        dependency_name: str,
-        dependency_scope: str,
-    ):
-        super().__init__(
-            f"Fixture '{requester_name}' at scope '{requester_scope}' "
-            f"cannot depend on '{dependency_name}' at scope '{dependency_scope}'."
-        )
-
-
-class AlreadyRegisteredError(ProTestError):
-    def __init__(self, function_name: str):
-        super().__init__(f"Function '{function_name}' is already registered.")
-
-
-class UnregisteredDependencyError(ProTestError):
-    def __init__(self, fixture_name: str, dependency_name: str):
-        super().__init__(
-            f"Fixture '{fixture_name}' depends on unregistered "
-            f"function '{dependency_name}'. "
-            f"Register '{dependency_name}' first."
-        )
-
-
-class FixtureNotFoundError(ProTestError):
-    def __init__(self, fixture_name: str):
-        super().__init__(f"Fixture '{fixture_name}' is not registered.")
 
 
 class Resolver:
@@ -128,7 +98,7 @@ class Resolver:
         if func in self._registry:
             raise AlreadyRegisteredError(get_callable_name(func))
 
-        fixture = Fixture(func, is_factory=is_factory, tags=tags)
+        fixture = Fixture(func, is_factory=is_factory, tags=tags or set())
         self._scope_paths[func] = scope_path
         self._analyze_and_store_dependencies(func, scope_path)
         self._registry[func] = fixture

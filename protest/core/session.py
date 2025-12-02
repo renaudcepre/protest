@@ -7,8 +7,8 @@ if TYPE_CHECKING:
     from types import TracebackType
 
     from protest.compat import Self
-    from protest.core.fixture import FixtureCallable
     from protest.core.suite import ProTestSuite
+    from protest.entities import FixtureCallable
     from protest.plugin import PluginBase
 
 from protest.cache.plugin import CachePlugin

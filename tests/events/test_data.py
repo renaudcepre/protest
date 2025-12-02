@@ -1,6 +1,4 @@
-"""Tests for event data classes - TestCounts, TestResult, SessionResult."""
-
-from protest.events.data import SessionResult, TestCounts, TestResult
+from protest.entities import SessionResult, TestCounts, TestResult
 
 
 class TestTestCounts:

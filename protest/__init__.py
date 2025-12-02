@@ -1,7 +1,7 @@
-from protest.core.fixture import FixtureCallable
 from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
 from protest.di.markers import ForEach, From, Use
+from protest.entities import FixtureCallable
 from protest.exceptions import FixtureError, ProTestError
 from protest.fixtures.builtins import caplog
 from protest.plugin import PluginBase

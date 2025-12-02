@@ -7,8 +7,8 @@ import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from protest.core.collector import TestItem
     from protest.core.suite import ProTestSuite
+    from protest.entities import TestItem
 
 HELP_EPILOG = """
 Examples:

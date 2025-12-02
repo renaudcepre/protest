@@ -2,34 +2,30 @@ import asyncio
 import contextlib
 import io
 import time
-from dataclasses import dataclass
 from inspect import signature
 from typing import Any
 
 from protest.core.collector import (
     Collector,
-    TestItem,
     chunk_by_suite,
     get_last_chunk_index_per_suite,
 )
 from protest.core.session import ProTestSession
 from protest.di.resolver import Resolver
-from protest.events.data import SessionResult, TestCounts, TestResult, TestStartInfo
+from protest.entities import (
+    SessionResult,
+    TestCounts,
+    TestItem,
+    TestOutcome,
+    TestResult,
+    TestStartInfo,
+)
 from protest.events.types import Event
 from protest.exceptions import FixtureError
 from protest.execution.async_bridge import ensure_async
 from protest.execution.capture import CaptureCurrentTest, GlobalCapturePatch
 from protest.execution.context import TestExecutionContext
 from protest.utils import get_callable_name
-
-
-@dataclass
-class TestOutcome:
-    """Result of a single test execution, before event emission."""
-
-    result: TestResult
-    counts: TestCounts
-    event: Event
 
 
 class TestRunner:

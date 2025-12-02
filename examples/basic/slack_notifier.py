@@ -1,8 +1,6 @@
-"""Fake Slack notifier to test async fire-and-forget handlers."""
-
 import asyncio
 
-from protest.events.data import SessionResult, TestResult
+from protest.entities import SessionResult, TestResult
 
 
 class FakeSlackNotifier:

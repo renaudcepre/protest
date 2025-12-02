@@ -1,5 +1,3 @@
-"""Tests for CachePlugin - --lf and --cache-clear functionality."""
-
 import json
 from pathlib import Path
 from typing import Any
@@ -8,9 +6,8 @@ import pytest
 
 from protest.cache import plugin as cache_plugin_module
 from protest.cache.plugin import CachePlugin
-from protest.core.collector import TestItem
 from protest.core.session import ProTestSession
-from protest.events.data import SessionResult, TestResult
+from protest.entities import SessionResult, TestItem, TestResult
 
 
 @pytest.fixture

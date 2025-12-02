@@ -1,11 +1,9 @@
-"""Tests for the caplog fixture - log capture during test execution."""
-
 import logging
 from typing import Annotated
 
 from protest import ProTestSession, Use, caplog
 from protest.core.runner import TestRunner
-from protest.execution.log_capture import LogCapture
+from protest.entities import LogCapture
 from protest.plugin import PluginBase
 from tests.conftest import CollectedEvents
 

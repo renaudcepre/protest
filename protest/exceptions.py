@@ -9,3 +9,36 @@ class FixtureError(ProTestError):
         self.fixture_name = fixture_name
         self.original = original
         super().__init__(f"Factory '{fixture_name}' failed: {original}")
+
+
+class ScopeMismatchError(ProTestError):
+    def __init__(
+        self,
+        requester_name: str,
+        requester_scope: str,
+        dependency_name: str,
+        dependency_scope: str,
+    ):
+        super().__init__(
+            f"Fixture '{requester_name}' at scope '{requester_scope}' "
+            f"cannot depend on '{dependency_name}' at scope '{dependency_scope}'."
+        )
+
+
+class AlreadyRegisteredError(ProTestError):
+    def __init__(self, function_name: str):
+        super().__init__(f"Function '{function_name}' is already registered.")
+
+
+class UnregisteredDependencyError(ProTestError):
+    def __init__(self, fixture_name: str, dependency_name: str):
+        super().__init__(
+            f"Fixture '{fixture_name}' depends on unregistered "
+            f"function '{dependency_name}'. "
+            f"Register '{dependency_name}' first."
+        )
+
+
+class FixtureNotFoundError(ProTestError):
+    def __init__(self, fixture_name: str):
+        super().__init__(f"Fixture '{fixture_name}' is not registered.")
