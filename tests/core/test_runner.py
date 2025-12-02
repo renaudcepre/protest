@@ -550,3 +550,127 @@ class TestRunnerNestedSuites:
         runner.run()
 
         assert results == ["parent_data"]
+
+
+class TestRunnerExitFirst:
+    """Tests for -x / --exitfirst behavior."""
+
+    def test_exitfirst_stops_after_first_failure(self) -> None:
+        """With exitfirst=True, remaining tests are cancelled after first failure."""
+        session = ProTestSession(concurrency=4)
+        session.exitfirst = True
+
+        executed: list[str] = []
+
+        @session.test()
+        async def test_slow_pass() -> None:
+            await asyncio.sleep(0.1)
+            executed.append("slow_pass")
+
+        @session.test()
+        async def test_fast_fail() -> None:
+            await asyncio.sleep(0.01)
+            executed.append("fast_fail")
+            raise ValueError("intentional failure")
+
+        @session.test()
+        async def test_slow_pass_2() -> None:
+            await asyncio.sleep(0.1)
+            executed.append("slow_pass_2")
+
+        @session.test()
+        async def test_slow_pass_3() -> None:
+            await asyncio.sleep(0.1)
+            executed.append("slow_pass_3")
+
+        runner = TestRunner(session)
+        result = runner.run()
+
+        assert result is False
+        assert "fast_fail" in executed
+        executed_count = len(executed)
+        total_tests = 4
+        assert executed_count < total_tests
+
+    def test_exitfirst_false_runs_all_tests(self) -> None:
+        """With exitfirst=False (default), all tests run even after failure."""
+        session = ProTestSession(concurrency=4)
+        session.exitfirst = False
+
+        executed: list[str] = []
+
+        @session.test()
+        async def test_pass_1() -> None:
+            await asyncio.sleep(0.01)
+            executed.append("pass_1")
+
+        @session.test()
+        async def test_fail() -> None:
+            await asyncio.sleep(0.01)
+            executed.append("fail")
+            raise ValueError("intentional failure")
+
+        @session.test()
+        async def test_pass_2() -> None:
+            await asyncio.sleep(0.01)
+            executed.append("pass_2")
+
+        runner = TestRunner(session)
+        runner.run()
+
+        expected_count = 3
+        assert len(executed) == expected_count
+
+    def test_exitfirst_stops_on_error(self) -> None:
+        """exitfirst also stops on fixture errors."""
+        session = ProTestSession(concurrency=4)
+        session.exitfirst = True
+
+        executed: list[str] = []
+
+        @session.fixture()
+        def broken_fixture() -> str:
+            raise RuntimeError("fixture error")
+
+        @session.test()
+        async def test_fast_error(val: Annotated[str, Use(broken_fixture)]) -> None:
+            await asyncio.sleep(0.01)
+            executed.append("fast_error")
+
+        @session.test()
+        async def test_slow_pass() -> None:
+            await asyncio.sleep(0.1)
+            executed.append("slow_pass")
+
+        runner = TestRunner(session)
+        result = runner.run()
+
+        assert result is False
+        assert "fast_error" not in executed
+
+    def test_exitfirst_across_chunks(self) -> None:
+        """exitfirst stops processing subsequent chunks."""
+        session = ProTestSession(concurrency=1)
+        session.exitfirst = True
+
+        suite1 = ProTestSuite("Suite1")
+        suite2 = ProTestSuite("Suite2")
+        session.add_suite(suite1)
+        session.add_suite(suite2)
+
+        executed: list[str] = []
+
+        @suite1.test()
+        def test_suite1_fail() -> None:
+            executed.append("suite1_fail")
+            raise ValueError("fail")
+
+        @suite2.test()
+        def test_suite2_should_not_run() -> None:
+            executed.append("suite2")
+
+        runner = TestRunner(session)
+        runner.run()
+
+        assert "suite1_fail" in executed
+        assert "suite2" not in executed

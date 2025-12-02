@@ -8,7 +8,6 @@ import pytest
 from protest.execution.capture import (
     CaptureCurrentTest,
     GlobalCapturePatch,
-    LogCaptureContext,
     TaskAwareLogHandler,
     TaskAwareStream,
     _capture_buffer,
@@ -207,7 +206,7 @@ class TestTaskAwareLogHandler:
         assert records[0].getMessage() == "captured message"
 
 
-class TestLogCaptureContext:
+class TestCaptureCurrentTestLogs:
     def test_captures_logs_in_context(self) -> None:
         handler = TaskAwareLogHandler()
         handler.setLevel(logging.DEBUG)
@@ -216,7 +215,9 @@ class TestLogCaptureContext:
         logging.root.setLevel(logging.NOTSET)
 
         try:
-            with LogCaptureContext() as records:
+            with CaptureCurrentTest():
+                records = _log_records.get()
+                assert records is not None
                 logging.info("test log message")
 
             assert len(records) == 1
@@ -236,8 +237,8 @@ class TestLogCaptureContext:
         finally:
             logging.root.removeHandler(handler)
 
-    def test_resets_context_var_on_exit(self) -> None:
-        with LogCaptureContext():
+    def test_resets_log_records_on_exit(self) -> None:
+        with CaptureCurrentTest():
             assert _log_records.get() is not None
 
         assert _log_records.get() is None
@@ -267,7 +268,9 @@ class TestLogCaptureIntegration:
             logging.root.setLevel(logging.WARNING)
 
     def test_full_log_capture_flow(self) -> None:
-        with GlobalCapturePatch(), LogCaptureContext() as records:
+        with GlobalCapturePatch(), CaptureCurrentTest():
+            records = _log_records.get()
+            assert records is not None
             logging.debug("debug msg")
             logging.info("info msg")
             logging.warning("warning msg")
@@ -282,7 +285,9 @@ class TestLogCaptureIntegration:
         results: dict[str, list[logging.LogRecord]] = {}
 
         async def task_with_logs(name: str, delay: float) -> None:
-            with LogCaptureContext() as records:
+            with CaptureCurrentTest():
+                records = _log_records.get()
+                assert records is not None
                 logging.info(f"[{name}] start")
                 await asyncio.sleep(delay)
                 logging.info(f"[{name}] end")
@@ -307,7 +312,9 @@ class TestLogCaptureIntegration:
         results: dict[str, list[logging.LogRecord]] = {}
 
         async def interleaved_task(name: str) -> None:
-            with LogCaptureContext() as records:
+            with CaptureCurrentTest():
+                records = _log_records.get()
+                assert records is not None
                 for step in range(3):
                     logging.info(f"[{name}] step {step}")
                     await asyncio.sleep(0.005)

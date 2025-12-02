@@ -41,20 +41,6 @@ class TaskAwareLogHandler(logging.Handler):
             records.append(record)
 
 
-class LogCaptureContext:
-    def __init__(self) -> None:
-        self._records: list[LogRecord] = []
-        self._token: Token[list[LogRecord] | None] | None = None
-
-    def __enter__(self) -> list[LogRecord]:
-        self._token = _log_records.set(self._records)
-        return self._records
-
-    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
-        if self._token is not None:
-            _log_records.reset(self._token)
-
-
 class GlobalCapturePatch:
     def __init__(self) -> None:
         self._orig_stdout: TextIO | None = None
@@ -86,16 +72,30 @@ class GlobalCapturePatch:
             logging.root.setLevel(self._orig_log_level)
 
 
+def get_current_log_records() -> list[LogRecord]:
+    """Get the current test's log records list."""
+    records = _log_records.get()
+    if records is None:
+        return []
+    return records
+
+
 class CaptureCurrentTest:
     def __init__(self) -> None:
         self._buffer: io.StringIO | None = None
         self._token: Token[io.StringIO | None] | None = None
+        self._log_records: list[LogRecord] | None = None
+        self._log_token: Token[list[LogRecord] | None] | None = None
 
     def __enter__(self) -> io.StringIO:
         self._buffer = io.StringIO()
         self._token = _capture_buffer.set(self._buffer)
+        self._log_records = []
+        self._log_token = _log_records.set(self._log_records)
         return self._buffer
 
     def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
         if self._token is not None:
             _capture_buffer.reset(self._token)
+        if self._log_token is not None:
+            _log_records.reset(self._log_token)

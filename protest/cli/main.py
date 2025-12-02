@@ -218,6 +218,12 @@ def _handle_run_command() -> None:
         default=[],
         help="Exclude tests with this tag (can be used multiple times)",
     )
+    parser.add_argument(
+        "-x",
+        "--exitfirst",
+        action="store_true",
+        help="Exit after first failed test",
+    )
 
     args = parser.parse_args(sys.argv[2:])
 
@@ -230,6 +236,7 @@ def _handle_run_command() -> None:
         collect_only=args.collect_only,
         include_tags=set(args.tags),
         exclude_tags=set(args.exclude_tags),
+        exitfirst=args.exitfirst,
     )
 
 
@@ -241,6 +248,7 @@ def run_tests(  # noqa: PLR0913
     collect_only: bool = False,
     include_tags: set[str] | None = None,
     exclude_tags: set[str] | None = None,
+    exitfirst: bool = False,
 ) -> None:
     if ":" not in target:
         print(f"Error: Invalid format '{target}'. Use 'module:session'")
@@ -268,6 +276,7 @@ def run_tests(  # noqa: PLR0913
         sys.exit(1)
 
     session.concurrency = concurrency
+    session.exitfirst = exitfirst
     session.configure_cache(last_failed=last_failed, cache_clear=cache_clear)
 
     session.configure_tags(include_tags=include_tags, exclude_tags=exclude_tags)
