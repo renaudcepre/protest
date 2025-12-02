@@ -1,5 +1,17 @@
+"""Utilities for tracking fixture calls and teardowns in DI tests."""
+
 from collections import defaultdict
 from collections.abc import Generator
+from dataclasses import dataclass, field
+
+
+@dataclass
+class FixtureCounters:
+    """Container for tracking fixture setup and teardown calls."""
+
+    calls: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    teardowns: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+
 
 call_counts: dict[str, int] = defaultdict(int)
 teardown_counts: dict[str, int] = defaultdict(int)

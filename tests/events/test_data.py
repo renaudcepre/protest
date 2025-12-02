@@ -1,10 +1,10 @@
-"""Tests for event data classes."""
+"""Tests for event data classes - TestCounts, TestResult, SessionResult."""
 
 from protest.events.data import SessionResult, TestCounts, TestResult
 
 
 class TestTestCounts:
-    """Tests for TestCounts dataclass."""
+    """Tests for TestCounts dataclass - aggregating test statistics."""
 
     def test_default_values(self) -> None:
         """TestCounts defaults to all zeros."""

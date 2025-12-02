@@ -5,26 +5,19 @@ from typing import Annotated
 
 from protest import ProTestSession, Use
 from protest.core.runner import TestRunner
-from protest.events.data import SessionResult, TestResult
 from protest.plugin import PluginBase
+from tests.conftest import CollectedEvents
 
 
 class TestFactoryErrorDistinction:
     """Test that factory errors are reported as 'errors' not 'failed'."""
 
-    def test_factory_error_counted_as_error_not_failed(self) -> None:
+    def test_factory_error_counted_as_error_not_failed(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
+        plugin, collected = event_collector
         session = ProTestSession()
-        results: list[TestResult] = []
-        session_results: list[SessionResult] = []
-
-        class Collector(PluginBase):
-            def on_test_fail(self, result: TestResult) -> None:
-                results.append(result)
-
-            def on_session_end(self, result: SessionResult) -> None:
-                session_results.append(result)
-
-        session.use(Collector())
+        session.use(plugin)
 
         @session.fixture(factory=True)
         def failing_factory() -> Callable[[], None]:
@@ -43,22 +36,21 @@ class TestFactoryErrorDistinction:
         success = runner.run()
 
         assert success is False
-        assert len(results) == 1
-        assert results[0].is_fixture_error is True
-        assert len(session_results) == 1
-        assert session_results[0].passed == 0
-        assert session_results[0].failed == 0
-        assert session_results[0].errors == 1
+        expected_fail_count = 1
+        assert len(collected.test_fails) == expected_fail_count
+        assert collected.test_fails[0].is_fixture_error is True
+        expected_session_result_count = 1
+        assert len(collected.session_results) == expected_session_result_count
+        assert collected.session_results[0].passed == 0
+        assert collected.session_results[0].failed == 0
+        assert collected.session_results[0].errors == 1
 
-    def test_regular_test_failure_counted_as_failed(self) -> None:
+    def test_regular_test_failure_counted_as_failed(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
+        plugin, collected = event_collector
         session = ProTestSession()
-        session_results: list[SessionResult] = []
-
-        class Collector(PluginBase):
-            def on_session_end(self, result: SessionResult) -> None:
-                session_results.append(result)
-
-        session.use(Collector())
+        session.use(plugin)
 
         @session.test()
         def test_that_fails() -> None:
@@ -68,24 +60,18 @@ class TestFactoryErrorDistinction:
         success = runner.run()
 
         assert success is False
-        assert len(session_results) == 1
-        assert session_results[0].passed == 0
-        assert session_results[0].failed == 1
-        assert session_results[0].errors == 0
+        expected_session_result_count = 1
+        assert len(collected.session_results) == expected_session_result_count
+        assert collected.session_results[0].passed == 0
+        assert collected.session_results[0].failed == 1
+        assert collected.session_results[0].errors == 0
 
-    def test_setup_error_during_fixture_resolution(self) -> None:
+    def test_setup_error_during_fixture_resolution(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
+        plugin, collected = event_collector
         session = ProTestSession()
-        results: list[TestResult] = []
-        session_results: list[SessionResult] = []
-
-        class Collector(PluginBase):
-            def on_test_fail(self, result: TestResult) -> None:
-                results.append(result)
-
-            def on_session_end(self, result: SessionResult) -> None:
-                session_results.append(result)
-
-        session.use(Collector())
+        session.use(plugin)
 
         def broken_fixture() -> str:
             raise RuntimeError("Setup failed")
@@ -100,21 +86,20 @@ class TestFactoryErrorDistinction:
         success = runner.run()
 
         assert success is False
-        assert len(results) == 1
-        assert results[0].is_fixture_error is True
-        assert len(session_results) == 1
-        assert session_results[0].errors == 1
-        assert session_results[0].failed == 0
+        expected_fail_count = 1
+        assert len(collected.test_fails) == expected_fail_count
+        assert collected.test_fails[0].is_fixture_error is True
+        expected_session_result_count = 1
+        assert len(collected.session_results) == expected_session_result_count
+        assert collected.session_results[0].errors == 1
+        assert collected.session_results[0].failed == 0
 
-    def test_mixed_results_counted_correctly(self) -> None:
+    def test_mixed_results_counted_correctly(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
+        plugin, collected = event_collector
         session = ProTestSession()
-        session_results: list[SessionResult] = []
-
-        class Collector(PluginBase):
-            def on_session_end(self, result: SessionResult) -> None:
-                session_results.append(result)
-
-        session.use(Collector())
+        session.use(plugin)
 
         @session.fixture(factory=True)
         def user_factory() -> Callable[..., dict[str, str]]:
@@ -143,8 +128,9 @@ class TestFactoryErrorDistinction:
         success = runner.run()
 
         assert success is False
-        assert len(session_results) == 1
-        result = session_results[0]
+        expected_session_result_count = 1
+        assert len(collected.session_results) == expected_session_result_count
+        result = collected.session_results[0]
         assert result.passed == 1
         assert result.failed == 1
         assert result.errors == 1
@@ -153,15 +139,12 @@ class TestFactoryErrorDistinction:
 class TestFactoryErrorPreservesOriginal:
     """Test that the original exception is properly preserved."""
 
-    def test_original_exception_available_in_result(self) -> None:
+    def test_original_exception_available_in_result(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
+        plugin, collected = event_collector
         session = ProTestSession()
-        results: list[TestResult] = []
-
-        class Collector(PluginBase):
-            def on_test_fail(self, result: TestResult) -> None:
-                results.append(result)
-
-        session.use(Collector())
+        session.use(plugin)
 
         @session.fixture(factory=True)
         def factory_with_custom_error() -> Callable[[], None]:
@@ -179,27 +162,21 @@ class TestFactoryErrorPreservesOriginal:
         runner = TestRunner(session)
         runner.run()
 
-        assert len(results) == 1
-        assert isinstance(results[0].error, ValueError)
-        assert "Custom message with details" in str(results[0].error)
+        expected_fail_count = 1
+        assert len(collected.test_fails) == expected_fail_count
+        assert isinstance(collected.test_fails[0].error, ValueError)
+        assert "Custom message with details" in str(collected.test_fails[0].error)
 
 
 class TestAsyncFactoryErrors:
     """Test factory errors with async factories."""
 
-    def test_async_factory_error_handled(self) -> None:
+    def test_async_factory_error_handled(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
+        plugin, collected = event_collector
         session = ProTestSession()
-        results: list[TestResult] = []
-        session_results: list[SessionResult] = []
-
-        class Collector(PluginBase):
-            def on_test_fail(self, result: TestResult) -> None:
-                results.append(result)
-
-            def on_session_end(self, result: SessionResult) -> None:
-                session_results.append(result)
-
-        session.use(Collector())
+        session.use(plugin)
 
         @session.fixture(factory=True)
         def async_factory() -> Callable[[], None]:
@@ -218,6 +195,7 @@ class TestAsyncFactoryErrors:
         success = runner.run()
 
         assert success is False
-        assert len(results) == 1
-        assert results[0].is_fixture_error is True
-        assert session_results[0].errors == 1
+        expected_fail_count = 1
+        assert len(collected.test_fails) == expected_fail_count
+        assert collected.test_fails[0].is_fixture_error is True
+        assert collected.session_results[0].errors == 1

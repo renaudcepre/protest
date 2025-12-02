@@ -1,23 +1,24 @@
+"""Tests for the caplog fixture - log capture during test execution."""
+
 import logging
 from typing import Annotated
 
 from protest import ProTestSession, Use, caplog
 from protest.core.runner import TestRunner
-from protest.events.data import SessionResult, TestResult
 from protest.execution.log_capture import LogCapture
 from protest.plugin import PluginBase
+from tests.conftest import CollectedEvents
 
 
 class TestCaplogFixture:
-    def test_caplog_captures_test_logs(self) -> None:
+    """Tests for caplog built-in fixture providing log capture functionality."""
+
+    def test_caplog_captures_test_logs(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
+        plugin, collected = event_collector
         session = ProTestSession()
-        results: list[TestResult] = []
-
-        class Collector(PluginBase):
-            def on_test_pass(self, result: TestResult) -> None:
-                results.append(result)
-
-        session.use(Collector())
+        session.use(plugin)
 
         @session.test()
         def test_with_logs(logs: Annotated[LogCapture, Use(caplog)]) -> None:
@@ -29,7 +30,8 @@ class TestCaplogFixture:
         success = runner.run()
 
         assert success is True
-        assert len(results) == 1
+        expected_pass_count = 1
+        assert len(collected.test_passes) == expected_pass_count
 
     def test_caplog_captures_different_levels(self) -> None:
         session = ProTestSession()
@@ -141,15 +143,12 @@ class TestCaplogFixture:
 
         assert success is True
 
-    def test_caplog_parallel_isolation(self) -> None:
+    def test_caplog_parallel_isolation(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
+        plugin, collected = event_collector
         session = ProTestSession(concurrency=3)
-        session_results: list[SessionResult] = []
-
-        class Collector(PluginBase):
-            def on_session_end(self, result: SessionResult) -> None:
-                session_results.append(result)
-
-        session.use(Collector())
+        session.use(plugin)
 
         @session.test()
         def test_a(logs: Annotated[LogCapture, Use(caplog)]) -> None:
@@ -173,5 +172,6 @@ class TestCaplogFixture:
         success = runner.run()
 
         assert success is True
-        assert len(session_results) == 1
-        assert session_results[0].passed == 3
+        expected_session_result_count = 1
+        assert len(collected.session_results) == expected_session_result_count
+        assert collected.session_results[0].passed == 3

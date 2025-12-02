@@ -33,8 +33,9 @@ def user_factory() -> Callable[..., dict[str, str]]:
     return create_user
 
 
+@session.fixture(factory=True)
 def api_client_factory() -> Callable[..., dict[str, str]]:
-    """Returns an API client factory. Plain function = function scope."""
+    """Returns an API client factory. Marked as factory=True."""
 
     def make_request(endpoint: str) -> dict[str, str]:
         if endpoint == "/unstable":
@@ -101,19 +102,18 @@ def test_another_passing() -> None:
 # =============================================================================
 # Expected output:
 #
-#  --- Starting session ---
+#   🚀 Starting session
 #
-#   [setup] Connecting to user database...
 #   ✓ test_passing
 #   ✓ test_user_creation
-#   ⚠ test_factory_crashes: [SETUP ERROR] Database connection lost!
-#   ⚠ test_api_timeout: [SETUP ERROR] API request timed out after 30s
+#   ⚠ test_factory_crashes: [FIXTURE] Database connection lost!
+#   ⚠ test_api_timeout: [FIXTURE] API request timed out after 30s
 #   ✗ test_assertion_failure: Got 41, expected 42
 #   ✓ test_another_passing
 #
-# Results: 4/6 passed, 1 failed, 2 errors
+#   ✗ FAILURES │ 3/6 passed │ 1 failed │ 2 errors
 #
 # Notice:
-# - ⚠ SETUP ERROR = Infrastructure problem (not your fault)
+# - ⚠ FIXTURE ERROR = Infrastructure problem (not your fault)
 # - ✗ TEST FAIL = Bug in your code (your fault)
 # =============================================================================

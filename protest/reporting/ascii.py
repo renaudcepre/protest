@@ -42,7 +42,7 @@ class AsciiReporter(PluginBase):
     def on_test_fail(self, result: TestResult) -> None:
         name = _format_test_name(result)
         if result.is_fixture_error:
-            print(f"  !! {name}: [FIXTURE] {result.error}")
+            print(f"  !! {name}:  {result.error}")
         else:
             print(f"  XX {name}: {result.error}")
 

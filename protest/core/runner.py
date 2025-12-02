@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import io
 import time
+from dataclasses import dataclass
 from inspect import signature
 from typing import Any
 
@@ -20,6 +21,15 @@ from protest.execution.async_bridge import ensure_async
 from protest.execution.capture import CaptureCurrentTest, GlobalCapturePatch
 from protest.execution.context import TestExecutionContext
 from protest.utils import get_callable_name
+
+
+@dataclass
+class TestOutcome:
+    """Result of a single test execution, before event emission."""
+
+    result: TestResult
+    counts: TestCounts
+    event: Event
 
 
 class TestRunner:
@@ -121,28 +131,35 @@ class TestRunner:
         if not chunk:
             return TestCounts()
 
-        async def run_one(item: TestItem) -> TestCounts:
+        async def run_one(item: TestItem) -> TestOutcome:
+            test_name = get_callable_name(item.func)
+            node_id = item.node_id
+            start_info = TestStartInfo(name=test_name, node_id=node_id)
+            await self._session.events.emit(Event.TEST_START, start_info)
+
             async with semaphore:
                 with CaptureCurrentTest() as buffer:
                     async with TestExecutionContext(
                         self._session.resolver, item.suite_path
                     ) as ctx:
-                        counts = await self._run_test(item, ctx, buffer)
-            return counts
+                        outcome = await self._run_test(item, ctx, buffer)
+
+            await self._session.events.emit(outcome.event, outcome.result)
+            return outcome
 
         tasks = [asyncio.create_task(run_one(item)) for item in chunk]
 
         if self._session.exitfirst:
             return await self._run_with_exitfirst(tasks)
 
-        results = await asyncio.gather(*tasks)
+        outcomes = await asyncio.gather(*tasks)
         total = TestCounts()
-        for result in results:
-            total = total + result
+        for outcome in outcomes:
+            total = total + outcome.counts
         return total
 
     async def _run_with_exitfirst(
-        self, tasks: list[asyncio.Task[TestCounts]]
+        self, tasks: list[asyncio.Task[TestOutcome]]
     ) -> TestCounts:
         """Run tasks and cancel remaining on first failure."""
         total = TestCounts()
@@ -153,10 +170,10 @@ class TestRunner:
                 pending, return_when=asyncio.FIRST_COMPLETED
             )
             for task in done:
-                result = task.result()
-                total = total + result
+                outcome = task.result()
+                total = total + outcome.counts
 
-                if result.failed or result.errored:
+                if outcome.counts.failed or outcome.counts.errored:
                     for remaining in pending:
                         remaining.cancel()
                     for remaining in pending:
@@ -171,8 +188,8 @@ class TestRunner:
         item: TestItem,
         ctx: TestExecutionContext,
         buffer: io.StringIO,
-    ) -> TestCounts:
-        """Run a single test."""
+    ) -> TestOutcome:
+        """Run a single test and return outcome (event emitted by caller)."""
         test_func = item.func
         test_name = get_callable_name(test_func)
         node_id = item.node_id
@@ -203,8 +220,7 @@ class TestRunner:
                 output=buffer.getvalue(),
                 is_fixture_error=True,
             )
-            await self._session.events.emit(Event.TEST_FAIL, result)
-            return TestCounts(errored=1)
+            return TestOutcome(result, TestCounts(errored=1), Event.TEST_FAIL)
 
         await self._session.events.emit(Event.TEST_SETUP_DONE, start_info)
 
@@ -217,8 +233,7 @@ class TestRunner:
                 duration=duration,
                 output=buffer.getvalue(),
             )
-            await self._session.events.emit(Event.TEST_PASS, result)
-            return TestCounts(passed=1)
+            return TestOutcome(result, TestCounts(passed=1), Event.TEST_PASS)
         except FixtureError as exc:
             duration = time.perf_counter() - start
             result = TestResult(
@@ -229,8 +244,7 @@ class TestRunner:
                 output=buffer.getvalue(),
                 is_fixture_error=True,
             )
-            await self._session.events.emit(Event.TEST_FAIL, result)
-            return TestCounts(errored=1)
+            return TestOutcome(result, TestCounts(errored=1), Event.TEST_FAIL)
         except Exception as exc:
             duration = time.perf_counter() - start
             result = TestResult(
@@ -240,5 +254,4 @@ class TestRunner:
                 duration=duration,
                 output=buffer.getvalue(),
             )
-            await self._session.events.emit(Event.TEST_FAIL, result)
-            return TestCounts(failed=1)
+            return TestOutcome(result, TestCounts(failed=1), Event.TEST_FAIL)

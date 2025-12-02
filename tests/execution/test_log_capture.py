@@ -1,9 +1,13 @@
+"""Tests for LogCapture - the log capture wrapper interface."""
+
 import logging
 
 from protest.execution.log_capture import LogCapture
 
 
 class TestLogCapture:
+    """Tests for LogCapture wrapper providing filtered access to log records."""
+
     def test_records_property_returns_list(self) -> None:
         records: list[logging.LogRecord] = []
         capture = LogCapture(records)

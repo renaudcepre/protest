@@ -15,49 +15,49 @@ class TestHandlerRegistration:
     async def test_sync_handler_called_on_emit(self) -> None:
         """Sync handlers are called when event is emitted."""
         bus = EventBus()
-        received: list[str] = []
+        received_data: list[str] = []
 
         def handler(data: str) -> None:
-            received.append(data)
+            received_data.append(data)
 
         bus.on(Event.TEST_PASS, handler)
         await bus.emit(Event.TEST_PASS, "test_data")
 
-        assert received == ["test_data"]
+        assert received_data == ["test_data"]
 
     @pytest.mark.asyncio
     async def test_async_handler_called_on_emit(self) -> None:
         """Async handlers are called when event is emitted."""
         bus = EventBus()
-        received: list[str] = []
+        received_data: list[str] = []
 
         async def handler(data: str) -> None:
-            received.append(data)
+            received_data.append(data)
 
         bus.on(Event.TEST_PASS, handler)
         await bus.emit(Event.TEST_PASS, "test_data")
         await bus.wait_pending()
 
-        assert received == ["test_data"]
+        assert received_data == ["test_data"]
 
     @pytest.mark.asyncio
     async def test_multiple_handlers_same_event(self) -> None:
         """Multiple handlers can subscribe to the same event."""
         bus = EventBus()
-        received: list[str] = []
+        received_messages: list[str] = []
 
         def handler1(data: str) -> None:
-            received.append(f"h1_{data}")
+            received_messages.append(f"h1_{data}")
 
         def handler2(data: str) -> None:
-            received.append(f"h2_{data}")
+            received_messages.append(f"h2_{data}")
 
         bus.on(Event.TEST_PASS, handler1)
         bus.on(Event.TEST_PASS, handler2)
         await bus.emit(Event.TEST_PASS, "data")
 
-        assert "h1_data" in received
-        assert "h2_data" in received
+        assert "h1_data" in received_messages
+        assert "h2_data" in received_messages
 
     @pytest.mark.asyncio
     async def test_emit_without_data(self) -> None:

@@ -203,8 +203,10 @@ async def test_generator_fixture_with_dependency(resolver: Resolver) -> None:
 async def test_multiple_generator_fixtures_teardown_in_reverse_order(
     resolver: Resolver,
 ) -> None:
+    """Generators with dependencies should teardown in LIFO order."""
     teardown_order: list[str] = []
 
+    # Given: two generator fixtures with dependency chain
     def first_generator() -> Generator[str, None, None]:
         call_counts["first"] += 1
         yield "first_value"
@@ -220,10 +222,12 @@ async def test_multiple_generator_fixtures_teardown_in_reverse_order(
     resolver.register(first_generator, scope_path=None)
     resolver.register(second_generator, scope_path=None)
 
+    # When: resolving and exiting context
     async with resolver:
         result = await resolver.resolve(second_generator)
         assert result == "second_with_first_value"
 
+    # Then: teardown in reverse order (LIFO)
     assert teardown_order == ["second", "first"]
 
 
@@ -327,6 +331,7 @@ async def test_concurrent_resolution_only_executes_fixture_once(
     """Test that concurrent resolution of the same fixture only executes it once."""
     execution_count = 0
 
+    # Given: a slow async fixture
     async def slow_fixture() -> str:
         nonlocal execution_count
         execution_count += 1
@@ -335,6 +340,7 @@ async def test_concurrent_resolution_only_executes_fixture_once(
 
     resolver.register(slow_fixture, scope_path=None)
 
+    # When: resolving concurrently from multiple coroutines
     async with resolver:
         results = await asyncio.gather(
             resolver.resolve(slow_fixture),
@@ -342,6 +348,7 @@ async def test_concurrent_resolution_only_executes_fixture_once(
             resolver.resolve(slow_fixture),
         )
 
+    # Then: fixture executed only once, all get same value
     expected_execution_count = 1
     assert execution_count == expected_execution_count
     assert all(result == "slow_value" for result in results)
