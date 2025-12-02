@@ -12,7 +12,7 @@ FuncT = TypeVar("FuncT", bound="Callable[..., object]")
 
 
 class ProTestSuite:
-    """Groups related tests with optional concurrency override and nested suites.
+    """Groups related tests with optional max concurrency and nested suites.
 
     Suites provide scoped fixture context. Fixtures registered with @suite.fixture()
     are created once per suite and torn down when the suite completes.
@@ -21,17 +21,17 @@ class ProTestSuite:
 
     Args:
         name: Unique identifier for this suite.
-        concurrency: Override session's default concurrency for this suite's tests.
+        max_concurrency: Cap concurrency for this suite (takes min with session/CLI).
     """
 
-    def __init__(self, name: str, concurrency: int | None = None) -> None:
+    def __init__(self, name: str, max_concurrency: int | None = None) -> None:
         self._name = name
         self._session: ProTestSession | None = None
         self._parent_suite: ProTestSuite | None = None
         self._tests: list[Callable[..., Any]] = []
         self._suites: list[ProTestSuite] = []
         self._fixtures: list[tuple[FixtureCallable, bool]] = []
-        self._concurrency = concurrency
+        self._max_concurrency = max_concurrency
 
     @property
     def name(self) -> str:
@@ -45,8 +45,8 @@ class ProTestSuite:
         return self._name
 
     @property
-    def concurrency(self) -> int | None:
-        return self._concurrency
+    def max_concurrency(self) -> int | None:
+        return self._max_concurrency
 
     @property
     def tests(self) -> list[Callable[..., Any]]:

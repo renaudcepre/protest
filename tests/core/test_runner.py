@@ -230,10 +230,10 @@ class TestRunnerWithSuites:
         assert ("start", "my_suite") in events_received
         assert ("end", "my_suite") in events_received
 
-    def test_runner_uses_suite_concurrency_override(self) -> None:
-        """Suite concurrency overrides session concurrency."""
+    def test_runner_uses_suite_max_concurrency(self) -> None:
+        """Suite max_concurrency caps effective concurrency."""
         session = ProTestSession(concurrency=10)
-        suite = ProTestSuite("sequential_suite", concurrency=1)
+        suite = ProTestSuite("capped_suite", max_concurrency=1)
         session.add_suite(suite)
 
         execution_order: list[int] = []
@@ -251,6 +251,62 @@ class TestRunnerWithSuites:
 
         expected_test_count = 2
         assert len(execution_order) == expected_test_count
+
+    def test_suite_max_concurrency_takes_min_with_session(self) -> None:
+        """Effective concurrency is min(session, suite.max_concurrency)."""
+        session = ProTestSession(concurrency=2)
+        suite = ProTestSuite("high_cap_suite", max_concurrency=10)
+        session.add_suite(suite)
+
+        max_concurrent = 0
+        current_concurrent = 0
+        lock = asyncio.Lock()
+
+        @suite.test()
+        async def test_a() -> None:
+            nonlocal max_concurrent, current_concurrent
+            async with lock:
+                current_concurrent += 1
+                max_concurrent = max(max_concurrent, current_concurrent)
+            await asyncio.sleep(0.05)
+            async with lock:
+                current_concurrent -= 1
+
+        @suite.test()
+        async def test_b() -> None:
+            nonlocal max_concurrent, current_concurrent
+            async with lock:
+                current_concurrent += 1
+                max_concurrent = max(max_concurrent, current_concurrent)
+            await asyncio.sleep(0.05)
+            async with lock:
+                current_concurrent -= 1
+
+        @suite.test()
+        async def test_c() -> None:
+            nonlocal max_concurrent, current_concurrent
+            async with lock:
+                current_concurrent += 1
+                max_concurrent = max(max_concurrent, current_concurrent)
+            await asyncio.sleep(0.05)
+            async with lock:
+                current_concurrent -= 1
+
+        @suite.test()
+        async def test_d() -> None:
+            nonlocal max_concurrent, current_concurrent
+            async with lock:
+                current_concurrent += 1
+                max_concurrent = max(max_concurrent, current_concurrent)
+            await asyncio.sleep(0.05)
+            async with lock:
+                current_concurrent -= 1
+
+        runner = TestRunner(session)
+        runner.run()
+
+        expected_max = 2
+        assert max_concurrent <= expected_max
 
 
 class TestRunnerParallelExecution:

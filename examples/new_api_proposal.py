@@ -123,9 +123,9 @@ def redis_cache():
 
 
 # Suite architecture
-unit_suite = ProTestSuite("unit", concurrency=8)
-integration_suite = ProTestSuite("integration", concurrency=2)
-e2e_suite = ProTestSuite("e2e", concurrency=1)
+unit_suite = ProTestSuite("unit", max_concurrency=8)
+integration_suite = ProTestSuite("integration", max_concurrency=2)
+e2e_suite = ProTestSuite("e2e", max_concurrency=1)
 
 session.add_suite(unit_suite)
 session.add_suite(integration_suite)

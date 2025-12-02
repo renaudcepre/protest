@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from protest.core.collector import TestItem
     from protest.core.session import ProTestSession
     from protest.events.data import (
+        FixtureInfo,
         HandlerInfo,
         SessionResult,
         TestResult,
@@ -64,3 +65,9 @@ class PluginBase:
 
     def on_handler_end(self, info: HandlerInfo) -> None | Awaitable[None]:
         """Called when an event handler completes."""
+
+    def on_fixture_setup(self, info: FixtureInfo) -> None | Awaitable[None]:
+        """Called when a fixture starts setup."""
+
+    def on_fixture_teardown(self, info: FixtureInfo) -> None | Awaitable[None]:
+        """Called when a fixture is torn down."""

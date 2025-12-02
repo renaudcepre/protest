@@ -3,7 +3,7 @@
 import asyncio
 import functools
 from collections.abc import Awaitable, Callable
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from protest.compat import TypeIs
 
@@ -23,13 +23,12 @@ def is_async_callable(obj: object) -> TypeIs[Callable[..., Awaitable[Any]]]:
 async def run_in_threadpool(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
     """Run a sync function in the default executor to avoid blocking the loop."""
     loop = asyncio.get_running_loop()
-    if kwargs:
-        func = functools.partial(func, **kwargs)
-    return await loop.run_in_executor(None, func, *args)
+    bound_func = functools.partial(func, *args, **kwargs)
+    return cast("T", await loop.run_in_executor(None, bound_func))
 
 
 async def ensure_async(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
-    """Call func and return result. Async funcs are awaited, sync called directly."""
+    """Call func, awaiting async or offloading sync to threadpool."""
     if is_async_callable(func):
-        return await func(*args, **kwargs)
-    return func(*args, **kwargs)
+        return cast("T", await func(*args, **kwargs))
+    return await run_in_threadpool(func, *args, **kwargs)

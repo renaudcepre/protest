@@ -119,12 +119,12 @@ session.use(my_plugin)
 
 #### `ProTestSuite`
 
-Groups related tests with optional concurrency override.
+Groups related tests with optional max concurrency cap.
 
 ```python
 from protest import ProTestSuite
 
-api_suite = ProTestSuite(name="api", concurrency=8)
+api_suite = ProTestSuite(name="api", max_concurrency=8)
 
 @api_suite.test()
 async def test_endpoint(): ...

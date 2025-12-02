@@ -1,19 +1,18 @@
 """Per-test execution context for isolated FUNCTION-scoped fixtures."""
 
 import inspect
+import time
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from types import TracebackType
 from typing import Any
 
 from protest.compat import Self
-from protest.core.fixture import (
-    Fixture,
-    FixtureCallable,
-    get_callable_name,
-    is_generator_like,
-)
+from protest.core.fixture import Fixture, FixtureCallable, is_generator_like
 from protest.di.resolver import Resolver, _wrap_factory
+from protest.events.data import FixtureInfo
+from protest.events.types import Event
 from protest.execution.async_bridge import ensure_async
+from protest.utils import get_callable_name
 
 
 class TestExecutionContext:
@@ -58,6 +57,10 @@ class TestExecutionContext:
         if target_func in self._cache:
             return self._cache[target_func]
 
+        fixture_name = get_callable_name(fixture.func)
+        start_time = time.perf_counter()
+        await self._emit_fixture_setup_async(fixture_name)
+
         kwargs = await self._resolve_dependencies(target_func)
 
         if is_generator_like(fixture.func):
@@ -67,14 +70,36 @@ class TestExecutionContext:
             else:
                 sync_cm = contextmanager(fixture.func)(**kwargs)
                 result = self._exit_stack.enter_context(sync_cm)
+
+            self._exit_stack.push_async_callback(
+                self._emit_fixture_teardown_async, fixture_name, start_time
+            )
         else:
             result = await ensure_async(fixture.func, **kwargs)
 
         if fixture.is_factory:
-            result = _wrap_factory(result, get_callable_name(fixture.func))
+            result = _wrap_factory(result, fixture_name)
 
         self._cache[target_func] = result
         return result
+
+    async def _emit_fixture_setup_async(self, name: str) -> None:
+        if self._parent._event_bus is None:
+            return
+
+        await self._parent._event_bus.emit(
+            Event.FIXTURE_SETUP, FixtureInfo(name=name, scope="function")
+        )
+
+    async def _emit_fixture_teardown_async(self, name: str, start_time: float) -> None:
+        if self._parent._event_bus is None:
+            return
+
+        duration = time.perf_counter() - start_time
+        await self._parent._event_bus.emit(
+            Event.FIXTURE_TEARDOWN,
+            FixtureInfo(name=name, scope="function", duration=duration),
+        )
 
     async def _resolve_dependencies(
         self, target_func: FixtureCallable

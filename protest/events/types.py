@@ -19,3 +19,5 @@ class Event(Enum):
     WAITING_HANDLERS = "waiting_handlers"
     HANDLER_START = "handler_start"
     HANDLER_END = "handler_end"
+    FIXTURE_SETUP = "fixture_setup"
+    FIXTURE_TEARDOWN = "fixture_teardown"

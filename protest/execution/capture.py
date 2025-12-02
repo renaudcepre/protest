@@ -65,8 +65,8 @@ class GlobalCapturePatch:
     def __enter__(self) -> "GlobalCapturePatch":
         self._orig_stdout = sys.stdout
         self._orig_stderr = sys.stderr
-        sys.stdout = TaskAwareStream(sys.stdout)  # type: ignore[assignment]
-        sys.stderr = TaskAwareStream(sys.stderr)  # type: ignore[assignment]
+        sys.stdout = TaskAwareStream(sys.stdout)
+        sys.stderr = TaskAwareStream(sys.stderr)
 
         self._orig_log_level = logging.root.level
         logging.root.setLevel(logging.NOTSET)
