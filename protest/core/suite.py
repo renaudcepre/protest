@@ -18,20 +18,28 @@ class ProTestSuite:
     are created once per suite and torn down when the suite completes.
 
     Suites can be nested: child suites can access parent's fixtures but not vice-versa.
+    Tags are inherited from parent suites.
 
     Args:
         name: Unique identifier for this suite.
         max_concurrency: Cap concurrency for this suite (takes min with session/CLI).
+        tags: Tags for this suite (inherited by tests and child suites).
     """
 
-    def __init__(self, name: str, max_concurrency: int | None = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        max_concurrency: int | None = None,
+        tags: list[str] | None = None,
+    ) -> None:
         self._name = name
         self._session: ProTestSession | None = None
         self._parent_suite: ProTestSuite | None = None
         self._tests: list[Callable[..., Any]] = []
         self._suites: list[ProTestSuite] = []
-        self._fixtures: list[tuple[FixtureCallable, bool]] = []
+        self._fixtures: list[tuple[FixtureCallable, bool, set[str]]] = []
         self._max_concurrency = max_concurrency
+        self._tags: set[str] = set(tags) if tags else set()
 
     @property
     def name(self) -> str:
@@ -49,6 +57,18 @@ class ProTestSuite:
         return self._max_concurrency
 
     @property
+    def tags(self) -> set[str]:
+        """Tags declared directly on this suite."""
+        return self._tags
+
+    @property
+    def all_tags(self) -> set[str]:
+        """All tags including inherited from parent suites."""
+        if self._parent_suite:
+            return self._tags | self._parent_suite.all_tags
+        return self._tags.copy()
+
+    @property
     def tests(self) -> list[Callable[..., Any]]:
         return self._tests
 
@@ -57,21 +77,28 @@ class ProTestSuite:
         return self._suites
 
     @property
-    def fixtures(self) -> list[tuple[FixtureCallable, bool]]:
+    def fixtures(self) -> list[tuple[FixtureCallable, bool, set[str]]]:
         return self._fixtures
 
-    def test(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def test(
+        self, tags: list[str] | None = None
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+            if tags:
+                func._protest_tags = set(tags)  # type: ignore[attr-defined]
             self._tests.append(func)
             return func
 
         return decorator
 
-    def fixture(self, factory: bool = False) -> Callable[[FuncT], FuncT]:
+    def fixture(
+        self, factory: bool = False, tags: list[str] | None = None
+    ) -> Callable[[FuncT], FuncT]:
         """Register a fixture scoped to this suite."""
 
         def decorator(func: FuncT) -> FuncT:
-            self._fixtures.append((func, factory))
+            fixture_tags = set(tags) if tags else set()
+            self._fixtures.append((func, factory, fixture_tags))
             return func
 
         return decorator

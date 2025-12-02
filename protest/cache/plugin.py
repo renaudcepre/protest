@@ -77,10 +77,15 @@ class CachePlugin(PluginBase):
 
     def _save_cache(self) -> None:
         CACHE_DIR.mkdir(exist_ok=True)
+        existing_results = self._cache_data.get("results", {})
+        if isinstance(existing_results, dict):
+            existing_results.update(self._results)
+        else:
+            existing_results = self._results
         data = {
             "version": 1,
             "timestamp": time.time(),
-            "results": self._results,
+            "results": existing_results,
         }
         CACHE_FILE.write_text(json.dumps(data, indent=2))
 

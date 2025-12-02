@@ -15,6 +15,7 @@ from protest.cache.plugin import CachePlugin
 from protest.di.resolver import Resolver
 from protest.events.bus import EventBus
 from protest.events.types import Event
+from protest.tags.plugin import TagFilterPlugin
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
 
@@ -52,21 +53,27 @@ class ProTestSession:
         autouse: list[FixtureCallable] | None = None,
         default_reporter: bool = True,
         default_cache: bool = True,
+        include_tags: set[str] | None = None,
+        exclude_tags: set[str] | None = None,
     ) -> None:
         self._events = EventBus()
         self._resolver = Resolver(event_bus=self._events)
         self._suites: list[ProTestSuite] = []
         self._tests: list[Callable[..., Any]] = []
-        self._fixtures: list[tuple[FixtureCallable, bool]] = []
+        self._fixtures: list[tuple[FixtureCallable, bool, set[str]]] = []
         self._concurrency = max(1, concurrency)
         self._autouse = autouse or []
         self._cache_plugin: CachePlugin | None = None
+        self._tag_filter_plugin: TagFilterPlugin | None = None
 
         if default_reporter:
             self.use(_get_default_reporter())
         if default_cache:
             self._cache_plugin = CachePlugin()
             self.use(self._cache_plugin)
+        if include_tags or exclude_tags:
+            self._tag_filter_plugin = TagFilterPlugin(include_tags, exclude_tags)
+            self.use(self._tag_filter_plugin)
 
     @property
     def autouse(self) -> list[FixtureCallable]:
@@ -93,6 +100,21 @@ class ProTestSession:
             self._cache_plugin._last_failed = last_failed
             self._cache_plugin._cache_clear = cache_clear
 
+    def configure_tags(
+        self,
+        include_tags: set[str] | None = None,
+        exclude_tags: set[str] | None = None,
+    ) -> None:
+        """Configure tag filtering (-t/--tag, --no-tag)."""
+        if not include_tags and not exclude_tags:
+            return
+        if self._tag_filter_plugin is None:
+            self._tag_filter_plugin = TagFilterPlugin(include_tags, exclude_tags)
+            self.use(self._tag_filter_plugin)
+        else:
+            self._tag_filter_plugin._include_tags = include_tags or set()
+            self._tag_filter_plugin._exclude_tags = exclude_tags or set()
+
     @property
     def resolver(self) -> Resolver:
         return self._resolver
@@ -110,21 +132,28 @@ class ProTestSession:
         return self._tests
 
     @property
-    def fixtures(self) -> list[tuple[FixtureCallable, bool]]:
+    def fixtures(self) -> list[tuple[FixtureCallable, bool, set[str]]]:
         return self._fixtures
 
-    def test(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def test(
+        self, tags: list[str] | None = None
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+            if tags:
+                func._protest_tags = set(tags)  # type: ignore[attr-defined]
             self._tests.append(func)
             return func
 
         return decorator
 
-    def fixture(self, factory: bool = False) -> Callable[[FuncT], FuncT]:
+    def fixture(
+        self, factory: bool = False, tags: list[str] | None = None
+    ) -> Callable[[FuncT], FuncT]:
         """Register a fixture scoped to the session (lives entire session)."""
 
         def decorator(func: FuncT) -> FuncT:
-            self._fixtures.append((func, factory))
+            fixture_tags = set(tags) if tags else set()
+            self._fixtures.append((func, factory, fixture_tags))
             return func
 
         return decorator
@@ -156,16 +185,18 @@ class ProTestSession:
 
     def _register_fixtures(self) -> None:
         """Register all fixtures from session and suites into resolver."""
-        for func, is_factory in self._fixtures:
-            self._resolver.register(func, scope_path=None, is_factory=is_factory)
+        for func, is_factory, tags in self._fixtures:
+            self._resolver.register(
+                func, scope_path=None, is_factory=is_factory, tags=tags
+            )
         self._register_suite_fixtures(self._suites)
 
     def _register_suite_fixtures(self, suites: list[ProTestSuite]) -> None:
         """Recursively register fixtures from suites."""
         for suite in suites:
-            for func, is_factory in suite.fixtures:
+            for func, is_factory, tags in suite.fixtures:
                 self._resolver.register(
-                    func, scope_path=suite.full_path, is_factory=is_factory
+                    func, scope_path=suite.full_path, is_factory=is_factory, tags=tags
                 )
             self._register_suite_fixtures(suite.suites)
 
