@@ -17,7 +17,7 @@ def is_async_callable(obj: object) -> TypeIs[Callable[..., Awaitable[Any]]]:
         obj = obj.func
 
     return asyncio.iscoroutinefunction(obj) or (
-        callable(obj) and asyncio.iscoroutinefunction(obj.__call__)
+        callable(obj) and callable(obj) and asyncio.iscoroutinefunction(obj.__call__)
     )
 
 
