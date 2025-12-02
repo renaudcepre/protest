@@ -1,6 +1,7 @@
 """Utilities for bridging sync and async code. Pattern inspired by Starlette."""
 
 import asyncio
+import contextvars
 import functools
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar, cast
@@ -21,9 +22,10 @@ def is_async_callable(obj: object) -> TypeIs[Callable[..., Awaitable[Any]]]:
 
 
 async def run_in_threadpool(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
-    """Run a sync function in the default executor to avoid blocking the loop."""
+    """Run a sync function in the default executor, preserving contextvars."""
     loop = asyncio.get_running_loop()
-    bound_func = functools.partial(func, *args, **kwargs)
+    ctx = contextvars.copy_context()
+    bound_func = functools.partial(ctx.run, func, *args, **kwargs)
     return cast("T", await loop.run_in_executor(None, bound_func))
 
 

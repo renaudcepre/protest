@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import io
 import time
 from inspect import signature
@@ -81,6 +82,11 @@ class TestRunner:
                     chunk_counts = await self._run_chunk_parallel(chunk, semaphore)
                     total_counts = total_counts + chunk_counts
 
+                    if self._session.exitfirst and (
+                        chunk_counts.failed or chunk_counts.errored
+                    ):
+                        break
+
                     if (
                         suite_path is not None
                         and last_chunk_per_suite.get(suite_path) == chunk_idx
@@ -125,11 +131,39 @@ class TestRunner:
             return counts
 
         tasks = [asyncio.create_task(run_one(item)) for item in chunk]
-        results = await asyncio.gather(*tasks)
 
+        if self._session.exitfirst:
+            return await self._run_with_exitfirst(tasks)
+
+        results = await asyncio.gather(*tasks)
         total = TestCounts()
         for result in results:
             total = total + result
+        return total
+
+    async def _run_with_exitfirst(
+        self, tasks: list[asyncio.Task[TestCounts]]
+    ) -> TestCounts:
+        """Run tasks and cancel remaining on first failure."""
+        total = TestCounts()
+        pending = set(tasks)
+
+        while pending:
+            done, pending = await asyncio.wait(
+                pending, return_when=asyncio.FIRST_COMPLETED
+            )
+            for task in done:
+                result = task.result()
+                total = total + result
+
+                if result.failed or result.errored:
+                    for remaining in pending:
+                        remaining.cancel()
+                    for remaining in pending:
+                        with contextlib.suppress(asyncio.CancelledError):
+                            await remaining
+                    return total
+
         return total
 
     async def _run_test(

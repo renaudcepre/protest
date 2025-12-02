@@ -65,6 +65,7 @@ class ProTestSession:
         self._autouse = autouse or []
         self._cache_plugin: CachePlugin | None = None
         self._tag_filter_plugin: TagFilterPlugin | None = None
+        self._exitfirst: bool = False
 
         if default_reporter:
             self.use(_get_default_reporter())
@@ -91,6 +92,14 @@ class ProTestSession:
     @concurrency.setter
     def concurrency(self, value: int) -> None:
         self._concurrency = max(1, value)
+
+    @property
+    def exitfirst(self) -> bool:
+        return self._exitfirst
+
+    @exitfirst.setter
+    def exitfirst(self, value: bool) -> None:
+        self._exitfirst = value
 
     def configure_cache(
         self, last_failed: bool = False, cache_clear: bool = False

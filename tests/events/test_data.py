@@ -58,7 +58,7 @@ class TestTestResult:
         assert result.name == "my_test"
         assert result.node_id == ""
         assert result.error is None
-        assert result.duration is None
+        assert result.duration == 0
         assert result.output == ""
         assert result.is_fixture_error is False
 
@@ -92,7 +92,7 @@ class TestSessionResult:
         assert result.passed == 5
         assert result.failed == 2
         assert result.errors == 0
-        assert result.duration is None
+        assert result.duration == 0
 
     def test_full_session_result(self) -> None:
         """SessionResult with all fields."""
