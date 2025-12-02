@@ -73,11 +73,9 @@ class TestRunner:
                                 Event.SUITE_START, current_suite_path
                             )
 
-                    concurrency = (
-                        suite.concurrency
-                        if suite and suite.concurrency
-                        else self._session.concurrency
-                    )
+                    concurrency = self._session.concurrency
+                    if suite and suite.max_concurrency:
+                        concurrency = min(concurrency, suite.max_concurrency)
                     semaphore = asyncio.Semaphore(concurrency)
 
                     chunk_counts = await self._run_chunk_parallel(chunk, semaphore)
@@ -123,7 +121,8 @@ class TestRunner:
                     async with TestExecutionContext(
                         self._session.resolver, item.suite_path
                     ) as ctx:
-                        return await self._run_test(item, ctx, buffer)
+                        counts = await self._run_test(item, ctx, buffer)
+            return counts
 
         tasks = [asyncio.create_task(run_one(item)) for item in chunk]
         results = await asyncio.gather(*tasks)

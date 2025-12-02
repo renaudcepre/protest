@@ -151,34 +151,34 @@ class TestSessionConcurrency:
         assert session.concurrency == 1
 
 
-class TestSuiteConcurrency:
-    """ProTestSuite concurrency override configuration."""
+class TestSuiteMaxConcurrency:
+    """ProTestSuite max_concurrency configuration."""
 
-    def test_default_suite_concurrency_is_none(self) -> None:
-        """Default suite concurrency is None (inherits from session)."""
+    def test_default_suite_max_concurrency_is_none(self) -> None:
+        """Default suite max_concurrency is None (no cap)."""
 
         suite = ProTestSuite("test_suite")
-        assert suite.concurrency is None
+        assert suite.max_concurrency is None
 
-    def test_suite_concurrency_can_be_set_in_constructor(self) -> None:
-        """Suite concurrency can be set via constructor."""
+    def test_suite_max_concurrency_can_be_set_in_constructor(self) -> None:
+        """Suite max_concurrency can be set via constructor."""
 
-        suite = ProTestSuite("test_suite", concurrency=2)
-        assert suite.concurrency == 2
+        suite = ProTestSuite("test_suite", max_concurrency=2)
+        assert suite.max_concurrency == 2
 
-    def test_suite_concurrency_one_means_sequential(self) -> None:
-        """Suite with concurrency=1 forces sequential execution."""
+    def test_suite_max_concurrency_one_means_sequential(self) -> None:
+        """Suite with max_concurrency=1 forces sequential execution."""
 
-        suite = ProTestSuite("sequential_suite", concurrency=1)
-        assert suite.concurrency == 1
+        suite = ProTestSuite("sequential_suite", max_concurrency=1)
+        assert suite.max_concurrency == 1
 
-    def test_multiple_suites_different_concurrency(self) -> None:
-        """Different suites can have different concurrency settings."""
+    def test_multiple_suites_different_max_concurrency(self) -> None:
+        """Different suites can have different max_concurrency settings."""
 
-        fast_suite = ProTestSuite("fast_tests", concurrency=10)
-        slow_suite = ProTestSuite("db_tests", concurrency=1)
+        fast_suite = ProTestSuite("fast_tests", max_concurrency=10)
+        slow_suite = ProTestSuite("db_tests", max_concurrency=1)
         default_suite = ProTestSuite("normal_tests")
 
-        assert fast_suite.concurrency == 10
-        assert slow_suite.concurrency == 1
-        assert default_suite.concurrency is None
+        assert fast_suite.max_concurrency == 10
+        assert slow_suite.max_concurrency == 1
+        assert default_suite.max_concurrency is None

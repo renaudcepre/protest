@@ -1,20 +1,26 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 import inspect
+import time
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from inspect import Parameter, signature
-from types import TracebackType
-from typing import Annotated, Any, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
-from protest.core.fixture import (
-    Fixture,
-    FixtureCallable,
-    get_callable_name,
-    is_generator_like,
-)
+from protest.core.fixture import Fixture, FixtureCallable, is_generator_like
 from protest.di.markers import Use
+from protest.events.data import FixtureInfo
+from protest.events.types import Event
 from protest.exceptions import FixtureError, ProTestError
 from protest.execution.async_bridge import ensure_async
+from protest.utils import get_callable_name
+
+if TYPE_CHECKING:
+    from types import TracebackType
+
+    from protest.compat import Self
+    from protest.events.bus import EventBus
 
 
 def _wrap_factory(result: Any, fixture_name: str) -> Any:
@@ -90,7 +96,7 @@ class Resolver:
 
     FUNCTION_SCOPE = "__function__"
 
-    def __init__(self) -> None:
+    def __init__(self, event_bus: EventBus | None = None) -> None:
         self._registry: dict[FixtureCallable, Fixture] = {}
         self._dependencies: dict[FixtureCallable, dict[str, FixtureCallable]] = {}
         self._scope_paths: dict[FixtureCallable, str | None] = {}
@@ -98,6 +104,7 @@ class Resolver:
         self._resolve_locks: dict[FixtureCallable, asyncio.Lock] = {}
         self._path_caches: dict[str, dict[FixtureCallable, Any]] = {}
         self._path_exit_stacks: dict[str, AsyncExitStack] = {}
+        self._event_bus = event_bus
 
     def register(
         self,
@@ -241,6 +248,13 @@ class Resolver:
         self, fixture: Fixture, kwargs: dict[str, Any], exit_stack: AsyncExitStack
     ) -> Any:
         """Execute fixture function, handling generators for setup/teardown."""
+        fixture_name = get_callable_name(fixture.func)
+        scope_path = self._scope_paths.get(fixture.func)
+        scope = self._format_scope(scope_path)
+
+        start_time = time.perf_counter()
+        await self._emit_fixture_setup_async(fixture_name, scope)
+
         if is_generator_like(fixture.func):
             if inspect.isasyncgenfunction(fixture.func):
                 async_cm = asynccontextmanager(fixture.func)(**kwargs)
@@ -248,12 +262,36 @@ class Resolver:
             else:
                 sync_cm = contextmanager(fixture.func)(**kwargs)
                 result = exit_stack.enter_context(sync_cm)
+
+            exit_stack.push_async_callback(
+                self._emit_fixture_teardown_async, fixture_name, scope, start_time
+            )
         else:
             result = await ensure_async(fixture.func, **kwargs)
 
         if fixture.is_factory:
-            return _wrap_factory(result, get_callable_name(fixture.func))
+            return _wrap_factory(result, fixture_name)
         return result
+
+    async def _emit_fixture_setup_async(self, name: str, scope: str) -> None:
+        if self._event_bus is None:
+            return
+
+        await self._event_bus.emit(
+            Event.FIXTURE_SETUP, FixtureInfo(name=name, scope=scope)
+        )
+
+    async def _emit_fixture_teardown_async(
+        self, name: str, scope: str, start_time: float
+    ) -> None:
+        if self._event_bus is None:
+            return
+
+        duration = time.perf_counter() - start_time
+        await self._event_bus.emit(
+            Event.FIXTURE_TEARDOWN,
+            FixtureInfo(name=name, scope=scope, duration=duration),
+        )
 
     async def teardown_path(self, scope_path: str) -> None:
         """Teardown all fixtures for a given scope path."""
@@ -267,7 +305,7 @@ class Resolver:
         """Alias for teardown_path (backward compatibility)."""
         await self.teardown_path(suite_name)
 
-    async def __aenter__(self) -> "Resolver":
+    async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(

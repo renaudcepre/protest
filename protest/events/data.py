@@ -32,7 +32,7 @@ class TestResult:
     name: str
     node_id: str = ""
     error: Exception | None = None
-    duration: float | None = None
+    duration: float = 0
     output: str = ""
     is_fixture_error: bool = False
 
@@ -44,7 +44,7 @@ class SessionResult:
     passed: int
     failed: int
     errors: int = 0
-    duration: float | None = None
+    duration: float = 0
 
 
 @dataclass
@@ -62,5 +62,14 @@ class HandlerInfo:
     name: str
     event: Event
     is_async: bool
-    duration: float | None = None
+    duration: float = 0
     error: Exception | None = None
+
+
+@dataclass
+class FixtureInfo:
+    """Info about a fixture setup/teardown."""
+
+    name: str
+    scope: str
+    duration: float = 0

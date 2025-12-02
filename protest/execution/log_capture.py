@@ -19,9 +19,10 @@ class LogCapture:
         )
 
     def at_level(self, level: str | int) -> list[LogRecord]:
-        if isinstance(level, str):
-            level = getattr(logging, level.upper())
-        return [record for record in self._records if record.levelno >= level]
+        level_num: int = (
+            getattr(logging, level.upper()) if isinstance(level, str) else level
+        )
+        return [record for record in self._records if record.levelno >= level_num]
 
     def clear(self) -> None:
         self._records.clear()

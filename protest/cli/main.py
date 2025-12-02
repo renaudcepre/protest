@@ -2,7 +2,6 @@ import argparse
 import asyncio
 import importlib
 import sys
-from typing import cast
 
 HELP_EPILOG = """
 Examples:
@@ -96,7 +95,6 @@ def run_tests(
         print(f"Error: No '{session_name}' found in module '{module_path}'")
         sys.exit(1)
 
-    from protest.cache.plugin import CachePlugin
     from protest.core.collector import Collector
     from protest.core.runner import TestRunner
     from protest.core.session import ProTestSession
@@ -105,24 +103,23 @@ def run_tests(
         print(f"Error: '{session_name}' is not a ProTestSession")
         sys.exit(1)
 
-    protest_session = cast("ProTestSession", session)
-    protest_session.concurrency = concurrency
-    protest_session.use(CachePlugin(last_failed=last_failed, cache_clear=cache_clear))
+    session.concurrency = concurrency
+    session.configure_cache(last_failed=last_failed, cache_clear=cache_clear)
 
     if collect_only:
         from protest.events.types import Event
 
         collector = Collector()
-        items = collector.collect(protest_session)
+        items = collector.collect(session)
         items = asyncio.run(
-            protest_session.events.emit_and_collect(Event.COLLECTION_FINISH, items)
+            session.events.emit_and_collect(Event.COLLECTION_FINISH, items)
         )
         print(f"Collected {len(items)} test(s):\n")
         for item in items:
             print(f"  {item.node_id}")
         sys.exit(0)
 
-    runner = TestRunner(protest_session)
+    runner = TestRunner(session)
     success = runner.run()
     sys.exit(0 if success else 1)
 

@@ -53,7 +53,7 @@ jobs:
         run: uv sync --dev
 
       - name: Type check
-        run: uv run ty check protest tests
+        run: uv run mypy --strict protest
 
   test:
     runs-on: ubuntu-latest

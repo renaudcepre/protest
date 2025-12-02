@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from protest.core.suite import ProTestSuite
     from protest.plugin import PluginBase
 
+from protest.cache.plugin import CachePlugin
 from protest.di.resolver import Resolver
 from protest.events.bus import EventBus
 from protest.events.types import Event
@@ -41,7 +42,8 @@ class ProTestSession:
     Args:
         concurrency: Number of parallel test workers (default: 1).
         autouse: Fixtures to auto-resolve at session start before any test runs.
-        default_reporter: If True (default), CLI adds ConsoleReporter. Set False to use custom reporter.
+        default_reporter: If True (default), adds RichReporter (or AsciiReporter fallback).
+        default_cache: If True (default), adds CachePlugin for --lf support.
     """
 
     def __init__(
@@ -49,17 +51,22 @@ class ProTestSession:
         concurrency: int = 1,
         autouse: list[FixtureCallable] | None = None,
         default_reporter: bool = True,
+        default_cache: bool = True,
     ) -> None:
-        self._resolver = Resolver()
         self._events = EventBus()
+        self._resolver = Resolver(event_bus=self._events)
         self._suites: list[ProTestSuite] = []
         self._tests: list[Callable[..., Any]] = []
         self._fixtures: list[tuple[FixtureCallable, bool]] = []
         self._concurrency = max(1, concurrency)
         self._autouse = autouse or []
+        self._cache_plugin: CachePlugin | None = None
 
         if default_reporter:
             self.use(_get_default_reporter())
+        if default_cache:
+            self._cache_plugin = CachePlugin()
+            self.use(self._cache_plugin)
 
     @property
     def autouse(self) -> list[FixtureCallable]:
@@ -77,6 +84,14 @@ class ProTestSession:
     @concurrency.setter
     def concurrency(self, value: int) -> None:
         self._concurrency = max(1, value)
+
+    def configure_cache(
+        self, last_failed: bool = False, cache_clear: bool = False
+    ) -> None:
+        """Configure the cache plugin (--lf, --cache-clear)."""
+        if self._cache_plugin is not None:
+            self._cache_plugin._last_failed = last_failed
+            self._cache_plugin._cache_clear = cache_clear
 
     @property
     def resolver(self) -> Resolver:

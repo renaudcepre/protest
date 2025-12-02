@@ -7,12 +7,12 @@
 @lint:
     ruff format .
     ruff check --fix .
-    ty check protest tests
+    mypy --strict protest
 
 @fullcheck:
   ruff format --check . && ruff check .  # lint
-  uv run ty check protest tests          # types
-  uv run pytest -vv                      # t
+  mypy --strict protest                  # types
+  uv run pytest -vv                      # tests
 
 # Run tests with verbose output
 @test *options="":

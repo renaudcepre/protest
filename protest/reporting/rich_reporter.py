@@ -1,6 +1,6 @@
 """Rich console reporter with colors and emojis. Requires 'rich' package."""
 
-from rich.console import Console
+from rich.console import Console  # type: ignore[import-not-found]
 
 from protest.events.data import HandlerInfo, SessionResult, TestResult
 from protest.plugin import PluginBase
@@ -66,7 +66,7 @@ class RichReporter(PluginBase):
         if info.error:
             self.console.print(f"  [red]✗[/] {info.name}: {info.error}")
         else:
-            duration = _format_duration(info.duration or 0)
+            duration = _format_duration(info.duration)
             self.console.print(f"  [green]✓[/] {info.name} [dim]({duration})[/]")
 
     def on_session_complete(self, result: SessionResult) -> None:
