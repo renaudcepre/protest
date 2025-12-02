@@ -72,6 +72,9 @@ ignore = [
     "T201",    # print allowed in CLI
     "PLC0415", # lazy imports for fast --help
 ]
+"protest/core/session.py" = [
+    "PLC0415", # lazy import for optional rich dependency
+]
 "protest/reporting/ascii.py" = [
     "T201", # print is the purpose of this module
 ]
