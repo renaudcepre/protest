@@ -7,12 +7,13 @@ from inspect import signature
 from itertools import groupby, product
 from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
-from protest.di.markers import ForEach, From
+from protest.di.markers import ForEach, From, Use
 from protest.utils import get_callable_name
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from protest.core.fixture import FixtureCallable
     from protest.core.session import ProTestSession
     from protest.core.suite import ProTestSuite
 
@@ -62,6 +63,18 @@ def _extract_from_params(func: Callable[..., Any]) -> dict[str, ForEach[Any]]:
     return result
 
 
+def _extract_use_fixtures(func: Callable[..., Any]) -> list[FixtureCallable]:
+    """Extract fixtures referenced via Use() markers in function parameters."""
+    fixtures: list[FixtureCallable] = []
+    for param in signature(func).parameters.values():
+        if get_origin(param.annotation) is Annotated:
+            for metadata in get_args(param.annotation)[1:]:
+                if isinstance(metadata, Use):
+                    fixtures.append(metadata.dependency)
+                    break
+    return fixtures
+
+
 def _expand_test(
     func: Callable[..., Any], suite: ProTestSuite | None
 ) -> list[TestItem]:
@@ -94,14 +107,100 @@ def _expand_test(
 class Collector:
     """Collects tests from a session, recursively traversing nested suites."""
 
+    def __init__(self) -> None:
+        self._fixture_tags: dict[FixtureCallable, set[str]] = {}
+        self._fixture_deps: dict[FixtureCallable, list[FixtureCallable]] = {}
+
     def collect(self, session: ProTestSession) -> list[TestItem]:
+        self._build_fixture_index(session)
+
         items: list[TestItem] = []
 
         for test_func in session.tests:
-            items.extend(_expand_test(test_func, suite=None))
+            items.extend(self._expand_test_with_tags(test_func, suite=None))
 
         for suite in session.suites:
             items.extend(self._collect_from_suite(suite))
+
+        return items
+
+    def _build_fixture_index(self, session: ProTestSession) -> None:
+        """Build index of all fixtures with their tags and dependencies."""
+        for func, _is_factory, tags in session.fixtures:
+            self._fixture_tags[func] = tags
+            self._fixture_deps[func] = _extract_use_fixtures(func)
+
+        self._index_suite_fixtures(session.suites)
+
+    def _index_suite_fixtures(self, suites: list[ProTestSuite]) -> None:
+        """Recursively index fixtures from suites."""
+        for suite in suites:
+            for func, _is_factory, tags in suite.fixtures:
+                self._fixture_tags[func] = tags
+                self._fixture_deps[func] = _extract_use_fixtures(func)
+            self._index_suite_fixtures(suite.suites)
+
+    def _get_transitive_fixture_tags(
+        self, func: FixtureCallable, visited: set[FixtureCallable] | None = None
+    ) -> set[str]:
+        """Get all tags from a fixture and its dependencies (transitive)."""
+        if visited is None:
+            visited = set()
+        if func in visited:
+            return set()
+        visited.add(func)
+
+        tags = self._fixture_tags.get(func, set()).copy()
+        for dep_func in self._fixture_deps.get(func, []):
+            tags.update(self._get_transitive_fixture_tags(dep_func, visited))
+
+        return tags
+
+    def _compute_test_tags(
+        self, func: Callable[..., Any], suite: ProTestSuite | None
+    ) -> set[str]:
+        """Compute all tags for a test: explicit + suite + fixture (transitive)."""
+        tags: set[str] = set()
+
+        explicit_tags = getattr(func, "_protest_tags", None)
+        if explicit_tags:
+            tags.update(explicit_tags)
+
+        if suite:
+            tags.update(suite.all_tags)
+
+        for fixture_func in _extract_use_fixtures(func):
+            tags.update(self._get_transitive_fixture_tags(fixture_func))
+
+        return tags
+
+    def _expand_test_with_tags(
+        self, func: Callable[..., Any], suite: ProTestSuite | None
+    ) -> list[TestItem]:
+        """Expand a test function into TestItems with computed tags."""
+        tags = self._compute_test_tags(func, suite)
+        from_params = _extract_from_params(func)
+
+        if not from_params:
+            return [TestItem(func=func, suite=suite, tags=tags)]
+
+        param_names = list(from_params.keys())
+        sources = [from_params[name] for name in param_names]
+
+        items: list[TestItem] = []
+        for combination in product(*sources):
+            case_kwargs = dict(zip(param_names, combination, strict=True))
+            case_ids = [sources[idx].get_id(val) for idx, val in enumerate(combination)]
+
+            items.append(
+                TestItem(
+                    func=func,
+                    suite=suite,
+                    tags=tags.copy(),
+                    case_kwargs=case_kwargs,
+                    case_ids=case_ids,
+                )
+            )
 
         return items
 
@@ -110,7 +209,7 @@ class Collector:
         items: list[TestItem] = []
 
         for test_func in suite.tests:
-            items.extend(_expand_test(test_func, suite))
+            items.extend(self._expand_test_with_tags(test_func, suite))
 
         for child in suite.suites:
             items.extend(self._collect_from_suite(child))

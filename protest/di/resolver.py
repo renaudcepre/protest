@@ -111,6 +111,7 @@ class Resolver:
         func: FixtureCallable,
         scope_path: str | None = None,
         is_factory: bool = False,
+        tags: set[str] | None = None,
     ) -> None:
         """Register a fixture at a specific scope path.
 
@@ -122,11 +123,12 @@ class Resolver:
                 - "Parent::Child": Nested suite scope
                 - FUNCTION_SCOPE: Function scope (fresh per test)
             is_factory: Whether this fixture returns a factory callable.
+            tags: Tags for this fixture (propagated to tests using it).
         """
         if func in self._registry:
             raise AlreadyRegisteredError(get_callable_name(func))
 
-        fixture = Fixture(func, is_factory=is_factory)
+        fixture = Fixture(func, is_factory=is_factory, tags=tags)
         self._scope_paths[func] = scope_path
         self._analyze_and_store_dependencies(func, scope_path)
         self._registry[func] = fixture
@@ -143,6 +145,33 @@ class Resolver:
 
     def get_dependencies(self, func: FixtureCallable) -> dict[str, FixtureCallable]:
         return self._dependencies.get(func, {})
+
+    def get_fixture_tags(self, func: FixtureCallable) -> set[str]:
+        """Get tags declared on a fixture."""
+        fixture = self._registry.get(func)
+        return fixture.tags.copy() if fixture else set()
+
+    def get_transitive_tags(self, func: FixtureCallable) -> set[str]:
+        """Get all tags from a fixture and its dependencies (transitive)."""
+        return self._collect_transitive_tags(func, set())
+
+    def _collect_transitive_tags(
+        self, func: FixtureCallable, visited: set[FixtureCallable]
+    ) -> set[str]:
+        """Recursively collect tags from fixture and all its dependencies."""
+        if func in visited:
+            return set()
+        visited.add(func)
+
+        tags: set[str] = set()
+        fixture = self._registry.get(func)
+        if fixture:
+            tags.update(fixture.tags)
+
+        for dep_func in self._dependencies.get(func, {}).values():
+            tags.update(self._collect_transitive_tags(dep_func, visited))
+
+        return tags
 
     def _ensure_registered(self, func: FixtureCallable) -> Fixture:
         """Auto-register a fixture if not yet registered.

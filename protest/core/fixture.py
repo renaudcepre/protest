@@ -17,11 +17,17 @@ def is_generator_like(func: FixtureCallable) -> bool:
 
 
 class Fixture:
-    """Wraps a fixture callable with caching and factory metadata."""
+    """Wraps a fixture callable with caching, factory metadata, and tags."""
 
-    def __init__(self, func: FixtureCallable, is_factory: bool = False):
+    def __init__(
+        self,
+        func: FixtureCallable,
+        is_factory: bool = False,
+        tags: set[str] | None = None,
+    ):
         self.func = func
         self.is_factory = is_factory
+        self.tags: set[str] = tags or set()
         self.cached_value: Any = None
         self.is_cached: bool = False
 
