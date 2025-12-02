@@ -7,8 +7,12 @@ from typing import Annotated
 from protest import ProTestSession, ProTestSuite, Use
 from protest.core.collector import TestItem
 from protest.core.runner import TestRunner
-from protest.events.data import SessionResult, TestResult
 from protest.plugin import PluginBase
+from tests.conftest import (
+    CollectedEvents,
+    ConcurrencyTracker,
+    register_concurrent_tests,
+)
 
 
 class TestRunnerBasics:
@@ -69,22 +73,13 @@ class TestRunnerBasics:
 class TestRunnerEvents:
     """Event emission during test execution."""
 
-    def test_runner_emits_session_events(self) -> None:
+    def test_runner_emits_session_events(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
         """Runner emits SESSION_START, SESSION_END, SESSION_COMPLETE."""
+        plugin, collected = event_collector
         session = ProTestSession()
-        events_received: list[str] = []
-
-        class EventCollector(PluginBase):
-            def on_session_start(self) -> None:
-                events_received.append("session_start")
-
-            def on_session_end(self, result: SessionResult) -> None:
-                events_received.append("session_end")
-
-            def on_session_complete(self, result: SessionResult) -> None:
-                events_received.append("session_complete")
-
-        session.use(EventCollector())
+        session.use(plugin)
 
         @session.test()
         def simple_test() -> None:
@@ -93,20 +88,17 @@ class TestRunnerEvents:
         runner = TestRunner(session)
         runner.run()
 
-        assert "session_start" in events_received
-        assert "session_end" in events_received
-        assert "session_complete" in events_received
+        assert "session_start" in collected.events
+        assert "session_end" in collected.events
+        assert "session_complete" in collected.events
 
-    def test_runner_emits_test_pass_event(self) -> None:
+    def test_runner_emits_test_pass_event(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
         """Runner emits TEST_PASS for passing tests."""
+        plugin, collected = event_collector
         session = ProTestSession()
-        results: list[TestResult] = []
-
-        class ResultCollector(PluginBase):
-            def on_test_pass(self, result: TestResult) -> None:
-                results.append(result)
-
-        session.use(ResultCollector())
+        session.use(plugin)
 
         @session.test()
         def my_passing_test() -> None:
@@ -115,20 +107,18 @@ class TestRunnerEvents:
         runner = TestRunner(session)
         runner.run()
 
-        assert len(results) == 1
-        assert results[0].name == "my_passing_test"
-        assert results[0].error is None
+        expected_pass_count = 1
+        assert len(collected.test_passes) == expected_pass_count
+        assert collected.test_passes[0].name == "my_passing_test"
+        assert collected.test_passes[0].error is None
 
-    def test_runner_emits_test_fail_event(self) -> None:
+    def test_runner_emits_test_fail_event(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
         """Runner emits TEST_FAIL for failing tests."""
+        plugin, collected = event_collector
         session = ProTestSession()
-        results: list[TestResult] = []
-
-        class ResultCollector(PluginBase):
-            def on_test_fail(self, result: TestResult) -> None:
-                results.append(result)
-
-        session.use(ResultCollector())
+        session.use(plugin)
 
         @session.test()
         def my_failing_test() -> None:
@@ -137,9 +127,10 @@ class TestRunnerEvents:
         runner = TestRunner(session)
         runner.run()
 
-        assert len(results) == 1
-        assert results[0].name == "my_failing_test"
-        assert isinstance(results[0].error, ValueError)
+        expected_fail_count = 1
+        assert len(collected.test_fails) == expected_fail_count
+        assert collected.test_fails[0].name == "my_failing_test"
+        assert isinstance(collected.test_fails[0].error, ValueError)
 
 
 class TestRunnerWithFixtures:
@@ -204,21 +195,15 @@ class TestRunnerWithSuites:
 
         assert executed == ["suite_test"]
 
-    def test_runner_emits_suite_events(self) -> None:
+    def test_runner_emits_suite_events(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
         """Runner emits SUITE_START and SUITE_END."""
+        plugin, collected = event_collector
         session = ProTestSession()
         suite = ProTestSuite("my_suite")
         session.add_suite(suite)
-        events_received: list[tuple[str, str]] = []
-
-        class SuiteEventCollector(PluginBase):
-            def on_suite_start(self, name: str) -> None:
-                events_received.append(("start", name))
-
-            def on_suite_end(self, name: str) -> None:
-                events_received.append(("end", name))
-
-        session.use(SuiteEventCollector())
+        session.use(plugin)
 
         @suite.test()
         def suite_test() -> None:
@@ -227,8 +212,8 @@ class TestRunnerWithSuites:
         runner = TestRunner(session)
         runner.run()
 
-        assert ("start", "my_suite") in events_received
-        assert ("end", "my_suite") in events_received
+        assert ("start", "my_suite") in collected.suite_events
+        assert ("end", "my_suite") in collected.suite_events
 
     def test_runner_uses_suite_max_concurrency(self) -> None:
         """Suite max_concurrency caps effective concurrency."""
@@ -254,59 +239,21 @@ class TestRunnerWithSuites:
 
     def test_suite_max_concurrency_takes_min_with_session(self) -> None:
         """Effective concurrency is min(session, suite.max_concurrency)."""
+        # Given: session with concurrency=2, suite with higher max_concurrency=10
         session = ProTestSession(concurrency=2)
         suite = ProTestSuite("high_cap_suite", max_concurrency=10)
         session.add_suite(suite)
+        tracker = ConcurrencyTracker()
 
-        max_concurrent = 0
-        current_concurrent = 0
-        lock = asyncio.Lock()
+        register_concurrent_tests(suite, count=4, tracker=tracker)
 
-        @suite.test()
-        async def test_a() -> None:
-            nonlocal max_concurrent, current_concurrent
-            async with lock:
-                current_concurrent += 1
-                max_concurrent = max(max_concurrent, current_concurrent)
-            await asyncio.sleep(0.05)
-            async with lock:
-                current_concurrent -= 1
-
-        @suite.test()
-        async def test_b() -> None:
-            nonlocal max_concurrent, current_concurrent
-            async with lock:
-                current_concurrent += 1
-                max_concurrent = max(max_concurrent, current_concurrent)
-            await asyncio.sleep(0.05)
-            async with lock:
-                current_concurrent -= 1
-
-        @suite.test()
-        async def test_c() -> None:
-            nonlocal max_concurrent, current_concurrent
-            async with lock:
-                current_concurrent += 1
-                max_concurrent = max(max_concurrent, current_concurrent)
-            await asyncio.sleep(0.05)
-            async with lock:
-                current_concurrent -= 1
-
-        @suite.test()
-        async def test_d() -> None:
-            nonlocal max_concurrent, current_concurrent
-            async with lock:
-                current_concurrent += 1
-                max_concurrent = max(max_concurrent, current_concurrent)
-            await asyncio.sleep(0.05)
-            async with lock:
-                current_concurrent -= 1
-
+        # When: running tests
         runner = TestRunner(session)
         runner.run()
 
+        # Then: effective concurrency capped at session level (2)
         expected_max = 2
-        assert max_concurrent <= expected_max
+        assert tracker.max_seen <= expected_max
 
 
 class TestRunnerParallelExecution:
@@ -314,46 +261,21 @@ class TestRunnerParallelExecution:
 
     def test_runner_respects_concurrency_limit(self) -> None:
         """Runner limits concurrent tests to session.concurrency."""
+        # Given: session with concurrency=2 and 3 tests
         session = ProTestSession(concurrency=2)
-        max_concurrent = 0
-        current_concurrent = 0
-        lock = asyncio.Lock()
+        suite = ProTestSuite("test_suite")
+        session.add_suite(suite)
+        tracker = ConcurrencyTracker()
 
-        @session.test()
-        async def test_a() -> None:
-            nonlocal max_concurrent, current_concurrent
-            async with lock:
-                current_concurrent += 1
-                max_concurrent = max(max_concurrent, current_concurrent)
-            await asyncio.sleep(0.05)
-            async with lock:
-                current_concurrent -= 1
+        register_concurrent_tests(suite, count=3, tracker=tracker)
 
-        @session.test()
-        async def test_b() -> None:
-            nonlocal max_concurrent, current_concurrent
-            async with lock:
-                current_concurrent += 1
-                max_concurrent = max(max_concurrent, current_concurrent)
-            await asyncio.sleep(0.05)
-            async with lock:
-                current_concurrent -= 1
-
-        @session.test()
-        async def test_c() -> None:
-            nonlocal max_concurrent, current_concurrent
-            async with lock:
-                current_concurrent += 1
-                max_concurrent = max(max_concurrent, current_concurrent)
-            await asyncio.sleep(0.05)
-            async with lock:
-                current_concurrent -= 1
-
+        # When: running tests
         runner = TestRunner(session)
         runner.run()
 
+        # Then: max concurrent tests never exceeds session concurrency
         expected_max_concurrency = 2
-        assert max_concurrent <= expected_max_concurrency
+        assert tracker.max_seen <= expected_max_concurrency
 
     def test_parallel_execution_faster_than_sequential(self) -> None:
         """Parallel execution should be faster than sequential."""
@@ -383,17 +305,13 @@ class TestRunnerParallelExecution:
 class TestRunnerCollectionEvent:
     """COLLECTION_FINISH event allows filtering tests."""
 
-    def test_collection_finish_event_emitted(self) -> None:
+    def test_collection_finish_event_emitted(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
         """COLLECTION_FINISH event is emitted with collected items."""
+        plugin, collected = event_collector
         session = ProTestSession()
-        collected_items: list[TestItem] = []
-
-        class CollectionCollector(PluginBase):
-            def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
-                collected_items.extend(items)
-                return items
-
-        session.use(CollectionCollector())
+        session.use(plugin)
 
         @session.test()
         def test_a() -> None:
@@ -407,7 +325,7 @@ class TestRunnerCollectionEvent:
         runner.run()
 
         expected_collected_count = 2
-        assert len(collected_items) == expected_collected_count
+        assert len(collected.collection_items) == expected_collected_count
 
     def test_collection_finish_can_filter_tests(self) -> None:
         """COLLECTION_FINISH handler can filter which tests run."""
@@ -557,9 +475,9 @@ class TestRunnerExitFirst:
 
     def test_exitfirst_stops_after_first_failure(self) -> None:
         """With exitfirst=True, remaining tests are cancelled after first failure."""
+        # Given: session with exitfirst enabled and mix of fast/slow tests
         session = ProTestSession(concurrency=4)
         session.exitfirst = True
-
         executed: list[str] = []
 
         @session.test()
@@ -583,9 +501,11 @@ class TestRunnerExitFirst:
             await asyncio.sleep(0.1)
             executed.append("slow_pass_3")
 
+        # When: running tests
         runner = TestRunner(session)
         result = runner.run()
 
+        # Then: stops after first failure, not all tests executed
         assert result is False
         assert "fast_fail" in executed
         executed_count = len(executed)

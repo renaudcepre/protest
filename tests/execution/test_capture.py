@@ -16,6 +16,8 @@ from protest.execution.capture import (
 
 
 class TestTaskAwareStream:
+    """Tests for TaskAwareStream - context-aware stdout/stderr wrapper."""
+
     def test_writes_to_original_when_no_buffer_set(self) -> None:
         original = io.StringIO()
         stream = TaskAwareStream(original)
@@ -61,6 +63,8 @@ class TestTaskAwareStream:
 
 
 class TestCaptureCurrentTest:
+    """Tests for CaptureCurrentTest context manager."""
+
     def test_captures_output_within_context(self) -> None:
         with CaptureCurrentTest() as buffer:
             token = _capture_buffer.set(buffer)
@@ -83,6 +87,8 @@ class TestCaptureCurrentTest:
 
 
 class TestGlobalCapturePatch:
+    """Tests for GlobalCapturePatch - global stdout/stderr patching."""
+
     def test_replaces_stdout_with_task_aware_stream(self) -> None:
         original_stdout = sys.stdout
 
@@ -111,6 +117,8 @@ class TestGlobalCapturePatch:
 
 
 class TestCaptureIntegration:
+    """Integration tests for stdout/stderr capture in test execution."""
+
     def test_print_captured_within_context(self) -> None:
         with GlobalCapturePatch(), CaptureCurrentTest() as buffer:
             print("hello from print")  # noqa: T201
@@ -173,6 +181,8 @@ class TestCaptureIntegration:
 
 
 class TestTaskAwareLogHandler:
+    """Tests for TaskAwareLogHandler - context-aware log record capture."""
+
     def test_does_not_capture_when_no_records_list(self) -> None:
         handler = TaskAwareLogHandler()
         handler.setLevel(logging.DEBUG)
@@ -207,6 +217,8 @@ class TestTaskAwareLogHandler:
 
 
 class TestCaptureCurrentTestLogs:
+    """Tests for log capture within CaptureCurrentTest context."""
+
     def test_captures_logs_in_context(self) -> None:
         handler = TaskAwareLogHandler()
         handler.setLevel(logging.DEBUG)
@@ -245,6 +257,8 @@ class TestCaptureCurrentTestLogs:
 
 
 class TestLogCaptureIntegration:
+    """Integration tests for log capture across concurrent async tasks."""
+
     def test_global_patch_installs_and_removes_handler(self) -> None:
         initial_handler_count = len(logging.root.handlers)
 

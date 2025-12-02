@@ -164,6 +164,7 @@ class TestTreeBasedScoping:
     @pytest.mark.asyncio
     async def test_mixed_scope_dependencies(self) -> None:
         """SESSION fixtures can be used by SUITE and FUNCTION scoped fixtures."""
+        # Given: session with nested scope fixtures (session -> suite -> function)
         session = ProTestSession()
         my_suite = ProTestSuite("my_suite")
         session.add_suite(my_suite)
@@ -179,12 +180,14 @@ class TestTreeBasedScoping:
         def test_helper(svc: Annotated[str, Use(suite_service)]) -> str:
             return f"test_{svc}"
 
+        # When: resolving function-scoped fixture that depends on suite and session
         async with (
             session,
             TestExecutionContext(session.resolver, suite_path="my_suite") as ctx,
         ):
             result = await ctx.resolve(test_helper)
 
+        # Then: dependencies resolved correctly through scope hierarchy
         assert result == "test_suite_global"
 
 
