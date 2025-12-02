@@ -42,14 +42,14 @@ class CachePlugin(PluginBase):
     def on_test_pass(self, result: TestResult) -> None:
         self._results[result.node_id] = {
             "status": "passed",
-            "duration": result.duration or 0,
+            "duration": result.duration,
         }
 
     def on_test_fail(self, result: TestResult) -> None:
         status = "error" if result.is_fixture_error else "failed"
         self._results[result.node_id] = {
             "status": status,
-            "duration": result.duration or 0,
+            "duration": result.duration,
         }
 
     def on_session_end(self, result: SessionResult) -> None:
