@@ -1,10 +1,8 @@
-"""Tests for session.use() plugin wiring."""
-
 import pytest
 
 from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
-from protest.events.data import SessionResult, TestResult
+from protest.entities import SessionResult, TestResult
 from protest.events.types import Event
 from protest.plugin import PluginBase
 

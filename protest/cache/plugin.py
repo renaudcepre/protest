@@ -10,9 +10,8 @@ from typing import TYPE_CHECKING, Any
 from protest.plugin import PluginBase
 
 if TYPE_CHECKING:
-    from protest.core.collector import TestItem
     from protest.core.session import ProTestSession
-    from protest.events.data import SessionResult, TestResult
+    from protest.entities import SessionResult, TestItem, TestResult
 
 CACHE_DIR = Path(".protest")
 CACHE_FILE = CACHE_DIR / "cache.json"

@@ -1,54 +1,17 @@
-"""Test collection and TestItem data structure."""
-
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from inspect import signature
 from itertools import groupby, product
 from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
 from protest.di.markers import ForEach, From, Use
-from protest.utils import get_callable_name
+from protest.entities import FixtureCallable, TestItem
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from protest.core.fixture import FixtureCallable
     from protest.core.session import ProTestSession
     from protest.core.suite import ProTestSuite
-
-
-@dataclass
-class TestItem:
-    """Atomic unit representing a test with its metadata."""
-
-    func: Callable[..., Any]
-    suite: ProTestSuite | None
-    tags: set[str] = field(default_factory=set)
-    case_kwargs: dict[str, Any] = field(default_factory=dict)
-    case_ids: list[str] = field(default_factory=list)
-
-    @property
-    def test_name(self) -> str:
-        return get_callable_name(self.func)
-
-    @property
-    def module_path(self) -> str:
-        return getattr(self.func, "__module__", "<unknown>")
-
-    @property
-    def suite_path(self) -> str | None:
-        return self.suite.full_path if self.suite else None
-
-    @property
-    def node_id(self) -> str:
-        if self.suite_path:
-            base = f"{self.module_path}::{self.suite_path}::{self.test_name}"
-        else:
-            base = f"{self.module_path}::{self.test_name}"
-        if self.case_ids:
-            return f"{base}[{'-'.join(self.case_ids)}]"
-        return base
 
 
 def _extract_from_params(func: Callable[..., Any]) -> dict[str, ForEach[Any]]:

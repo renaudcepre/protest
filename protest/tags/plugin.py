@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from protest.plugin import PluginBase
 
 if TYPE_CHECKING:
-    from protest.core.collector import TestItem
+    from protest.entities import TestItem
 
 
 class TagFilterPlugin(PluginBase):

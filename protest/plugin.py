@@ -1,5 +1,3 @@
-"""Plugin base class for ProTest."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -7,12 +5,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Awaitable
 
-    from protest.core.collector import TestItem
     from protest.core.session import ProTestSession
-    from protest.events.data import (
+    from protest.entities import (
         FixtureInfo,
         HandlerInfo,
         SessionResult,
+        TestItem,
         TestResult,
         TestStartInfo,
     )

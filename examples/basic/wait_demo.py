@@ -1,10 +1,9 @@
-"""Demo showcasing the spinner for async handlers."""
-
 import asyncio
 from time import sleep
-from protest.events.types import Event
+
 from protest import ProTestSession, ProTestSuite
-from protest.events.data import SessionResult
+from protest.entities import SessionResult
+from protest.events.types import Event
 from protest.plugin import PluginBase
 
 session = ProTestSession()

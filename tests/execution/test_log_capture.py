@@ -1,8 +1,6 @@
-"""Tests for LogCapture - the log capture wrapper interface."""
-
 import logging
 
-from protest.execution.log_capture import LogCapture
+from protest.entities import LogCapture
 
 
 class TestLogCapture:

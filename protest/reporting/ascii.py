@@ -1,6 +1,4 @@
-"""Plain ASCII reporter - no colors, no emojis. Zero dependencies."""
-
-from protest.events.data import HandlerInfo, SessionResult, TestResult
+from protest.entities import HandlerInfo, SessionResult, TestResult
 from protest.plugin import PluginBase
 
 

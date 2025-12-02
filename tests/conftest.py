@@ -1,13 +1,10 @@
-"""Shared pytest fixtures for ProTest test suite."""
-
 import asyncio
 from dataclasses import dataclass, field
 
 import pytest
 
-from protest.core.collector import TestItem
 from protest.core.suite import ProTestSuite
-from protest.events.data import SessionResult, TestResult
+from protest.entities import SessionResult, TestItem, TestResult
 from protest.plugin import PluginBase
 
 

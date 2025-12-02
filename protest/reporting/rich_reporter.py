@@ -1,8 +1,6 @@
-"""Rich console reporter with colors and emojis. Requires 'rich' package."""
-
 from rich.console import Console  # type: ignore[import-not-found]
 
-from protest.events.data import HandlerInfo, SessionResult, TestResult
+from protest.entities import HandlerInfo, SessionResult, TestResult
 from protest.plugin import PluginBase
 
 

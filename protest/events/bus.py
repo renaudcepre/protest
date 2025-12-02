@@ -1,5 +1,3 @@
-"""Event bus for decoupled event handling."""
-
 import asyncio
 import logging
 import time
@@ -8,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from protest.events.data import HandlerInfo
+from protest.entities import HandlerInfo
 from protest.events.types import Event
 from protest.execution.async_bridge import run_in_threadpool
 from protest.utils import get_callable_name

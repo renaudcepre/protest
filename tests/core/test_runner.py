@@ -1,12 +1,10 @@
-"""Tests for TestRunner - the core test execution engine."""
-
 import asyncio
 import time
 from typing import Annotated
 
 from protest import ProTestSession, ProTestSuite, Use
-from protest.core.collector import TestItem
 from protest.core.runner import TestRunner
+from protest.entities import TestItem
 from protest.plugin import PluginBase
 from tests.conftest import (
     CollectedEvents,

@@ -1,19 +1,8 @@
-"""Demo: Structured Log Capture (caplog).
-
-Run with: uv run protest run examples/basic/caplog_demo:session
-
-This demo shows how to capture and inspect logs in tests:
-- caplog.records: List of LogRecord objects
-- caplog.text: Text representation for quick debugging
-- caplog.at_level(): Filter logs by level
-- caplog.clear(): Reset captured logs mid-test
-"""
-
 import logging
 from typing import Annotated
 
 from protest import ProTestSession, Use, caplog
-from protest.execution.log_capture import LogCapture
+from protest.entities import LogCapture
 
 session = ProTestSession()
 

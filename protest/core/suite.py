@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Any, TypeVar
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from protest.core.fixture import FixtureCallable
     from protest.core.session import ProTestSession
+    from protest.entities import FixtureCallable
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
 
