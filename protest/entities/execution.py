@@ -1,11 +1,11 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from logging import LogRecord
 
 
 @dataclass
 class LogCapture:
-    _records: list[LogRecord]
+    _records: list[LogRecord] = field(default_factory=list)
 
     @property
     def records(self) -> list[LogRecord]:

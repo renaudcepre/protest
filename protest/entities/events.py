@@ -1,5 +1,3 @@
-"""Dataclasses for event payloads. Extensible without breaking signatures."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -11,8 +9,6 @@ if TYPE_CHECKING:
 
 @dataclass
 class TestCounts:
-    """Counts of test results."""
-
     passed: int = 0
     failed: int = 0
     errored: int = 0
@@ -27,8 +23,6 @@ class TestCounts:
 
 @dataclass
 class TestResult:
-    """Result of a single test execution."""
-
     name: str
     node_id: str = ""
     error: Exception | None = None
@@ -39,8 +33,6 @@ class TestResult:
 
 @dataclass
 class SessionResult:
-    """Result of a test session."""
-
     passed: int
     failed: int
     errors: int = 0
@@ -49,16 +41,12 @@ class SessionResult:
 
 @dataclass
 class TestStartInfo:
-    """Info emitted when a test begins execution."""
-
     name: str
     node_id: str
 
 
 @dataclass
 class HandlerInfo:
-    """Info about a handler execution."""
-
     name: str
     event: Event
     is_async: bool
@@ -68,8 +56,6 @@ class HandlerInfo:
 
 @dataclass
 class FixtureInfo:
-    """Info about a fixture setup/teardown."""
-
     name: str
     scope: str
     duration: float = 0

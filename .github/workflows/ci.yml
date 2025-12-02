@@ -49,11 +49,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
-        run: uv sync --dev
-
       - name: Type check
-        run: uv run mypy --strict protest
+        run: uvx mypy --strict protest
 
   test:
     runs-on: ubuntu-latest

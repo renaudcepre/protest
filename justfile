@@ -30,6 +30,11 @@
 # Development setup
 setup:
     uv sync --dev
+    pre-commit install
+
+# Update pre-commit hooks to latest
+update-hooks:
+    pre-commit autoupdate
 
 # Clean cache and temp files
 clean:

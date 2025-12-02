@@ -10,6 +10,8 @@ if TYPE_CHECKING:
     from protest.entities.events import TestCounts, TestResult
     from protest.events.types import Event
 
+from protest.utils import get_callable_name
+
 FixtureCallable: TypeAlias = "Callable[..., Any]"
 
 
@@ -36,8 +38,6 @@ class TestItem:
 
     @property
     def test_name(self) -> str:
-        from protest.utils import get_callable_name
-
         return get_callable_name(self.func)
 
     @property
