@@ -6,7 +6,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from protest.core.session import ProTestSession
-    from protest.entities import FixtureCallable
+
+from protest.entities import FixtureRegistration
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
 
@@ -37,7 +38,7 @@ class ProTestSuite:
         self._parent_suite: ProTestSuite | None = None
         self._tests: list[Callable[..., Any]] = []
         self._suites: list[ProTestSuite] = []
-        self._fixtures: list[tuple[FixtureCallable, bool, set[str]]] = []
+        self._fixtures: list[FixtureRegistration] = []
         self._max_concurrency = max_concurrency
         self._tags: set[str] = set(tags) if tags else set()
 
@@ -77,7 +78,7 @@ class ProTestSuite:
         return self._suites
 
     @property
-    def fixtures(self) -> list[tuple[FixtureCallable, bool, set[str]]]:
+    def fixtures(self) -> list[FixtureRegistration]:
         return self._fixtures
 
     def test(
@@ -92,13 +93,45 @@ class ProTestSuite:
         return decorator
 
     def fixture(
-        self, factory: bool = False, tags: list[str] | None = None
+        self,
+        tags: list[str] | None = None,
     ) -> Callable[[FuncT], FuncT]:
         """Register a fixture scoped to this suite."""
 
         def decorator(func: FuncT) -> FuncT:
             fixture_tags = set(tags) if tags else set()
-            self._fixtures.append((func, factory, fixture_tags))
+            self._fixtures.append(
+                FixtureRegistration(
+                    func=func,
+                    is_factory=False,
+                    cache=True,
+                    managed=True,
+                    tags=fixture_tags,
+                )
+            )
+            return func
+
+        return decorator
+
+    def factory(
+        self,
+        cache: bool = True,
+        managed: bool = True,
+        tags: list[str] | None = None,
+    ) -> Callable[[FuncT], FuncT]:
+        """Register a factory fixture scoped to this suite."""
+
+        def decorator(func: FuncT) -> FuncT:
+            fixture_tags = set(tags) if tags else set()
+            self._fixtures.append(
+                FixtureRegistration(
+                    func=func,
+                    is_factory=True,
+                    cache=cache,
+                    managed=managed,
+                    tags=fixture_tags,
+                )
+            )
             return func
 
         return decorator

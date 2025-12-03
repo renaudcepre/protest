@@ -1,9 +1,8 @@
 """Integration tests for factory error handling in the test runner."""
 
-from collections.abc import Callable
 from typing import Annotated
 
-from protest import ProTestSession, Use
+from protest import FixtureFactory, ProTestSession, Use
 from protest.core.runner import TestRunner
 from protest.plugin import PluginBase
 from tests.conftest import CollectedEvents
@@ -19,18 +18,15 @@ class TestFactoryErrorDistinction:
         session = ProTestSession()
         session.use(plugin)
 
-        @session.fixture(factory=True)
-        def failing_factory() -> Callable[[], None]:
-            def create() -> None:
-                raise RuntimeError("DB unavailable")
-
-            return create
+        @session.factory()
+        def user(username: str) -> dict[str, str]:
+            raise RuntimeError("DB unavailable")
 
         @session.test()
-        def test_using_factory(
-            make: Annotated[Callable[[], None], Use(failing_factory)],
+        async def test_using_factory(
+            user_factory: Annotated[FixtureFactory[dict[str, str]], Use(user)],
         ) -> None:
-            make()
+            await user_factory(username="alice")
 
         runner = TestRunner(session)
         success = runner.run()
@@ -101,14 +97,11 @@ class TestFactoryErrorDistinction:
         session = ProTestSession()
         session.use(plugin)
 
-        @session.fixture(factory=True)
-        def user_factory() -> Callable[..., dict[str, str]]:
-            def create(fail: bool = False) -> dict[str, str]:
-                if fail:
-                    raise RuntimeError("Factory failed")
-                return {"name": "alice"}
-
-            return create
+        @session.factory()
+        def user(username: str, fail: bool = False) -> dict[str, str]:
+            if fail:
+                raise RuntimeError("Factory failed")
+            return {"name": username}
 
         @session.test()
         def test_passing() -> None:
@@ -119,10 +112,10 @@ class TestFactoryErrorDistinction:
             raise AssertionError("Intentional failure")
 
         @session.test()
-        def test_factory_error(
-            make_user: Annotated[Callable[..., dict[str, str]], Use(user_factory)],
+        async def test_factory_error(
+            user_factory: Annotated[FixtureFactory[dict[str, str]], Use(user)],
         ) -> None:
-            make_user(fail=True)
+            await user_factory(username="alice", fail=True)
 
         runner = TestRunner(session)
         success = runner.run()
@@ -146,18 +139,15 @@ class TestFactoryErrorPreservesOriginal:
         session = ProTestSession()
         session.use(plugin)
 
-        @session.fixture(factory=True)
-        def factory_with_custom_error() -> Callable[[], None]:
-            def create() -> None:
-                raise ValueError("Custom message with details")
-
-            return create
+        @session.factory()
+        def user(username: str) -> dict[str, str]:
+            raise ValueError("Custom message with details")
 
         @session.test()
-        def test_it(
-            factory: Annotated[Callable[[], None], Use(factory_with_custom_error)],
+        async def test_it(
+            user_factory: Annotated[FixtureFactory[dict[str, str]], Use(user)],
         ) -> None:
-            factory()
+            await user_factory(username="alice")
 
         runner = TestRunner(session)
         runner.run()
@@ -178,18 +168,15 @@ class TestAsyncFactoryErrors:
         session = ProTestSession()
         session.use(plugin)
 
-        @session.fixture(factory=True)
-        def async_factory() -> Callable[[], None]:
-            async def create() -> None:
-                raise ConnectionError("API timeout")
-
-            return create  # type: ignore[return-value]
+        @session.factory()
+        async def user(username: str) -> dict[str, str]:
+            raise ConnectionError("API timeout")
 
         @session.test()
         async def test_async_factory(
-            make: Annotated[Callable[[], None], Use(async_factory)],
+            user_factory: Annotated[FixtureFactory[dict[str, str]], Use(user)],
         ) -> None:
-            await make()  # type: ignore[misc]
+            await user_factory(username="alice")
 
         runner = TestRunner(session)
         success = runner.run()
@@ -199,3 +186,104 @@ class TestAsyncFactoryErrors:
         assert len(collected.test_fails) == expected_fail_count
         assert collected.test_fails[0].is_fixture_error is True
         assert collected.session_results[0].errors == 1
+
+
+class TestFactoryWithTeardown:
+    """Test that factory teardown works correctly."""
+
+    def test_factory_teardown_called_on_session_end(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
+        plugin, _collected = event_collector
+        session = ProTestSession()
+        session.use(plugin)
+
+        teardown_called = []
+
+        @session.factory()
+        def user(username: str) -> dict[str, str]:
+            yield {"name": username}
+            teardown_called.append(username)
+
+        @session.test()
+        async def test_create_users(
+            user_factory: Annotated[FixtureFactory[dict[str, str]], Use(user)],
+        ) -> None:
+            await user_factory(username="alice")
+            await user_factory(username="bob")
+
+        runner = TestRunner(session)
+        runner.run()
+
+        expected_teardown_count = 2
+        assert len(teardown_called) == expected_teardown_count
+        assert "alice" in teardown_called
+        assert "bob" in teardown_called
+
+
+class TestFactoryCaching:
+    """Test that factory caching works correctly."""
+
+    def test_factory_caches_by_kwargs(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
+        plugin, _collected = event_collector
+        session = ProTestSession()
+        session.use(plugin)
+
+        call_count = 0
+
+        @session.factory()
+        def user(username: str) -> dict[str, str]:
+            nonlocal call_count
+            call_count += 1
+            return {"name": username, "call": call_count}
+
+        @session.test()
+        async def test_caching(
+            user_factory: Annotated[FixtureFactory[dict[str, str]], Use(user)],
+        ) -> None:
+            user1 = await user_factory(username="alice")
+            user2 = await user_factory(username="alice")
+            user3 = await user_factory(username="bob")
+
+            assert user1 is user2
+            assert user1 is not user3
+            expected_call_count = 2
+            assert call_count == expected_call_count
+
+        runner = TestRunner(session)
+        success = runner.run()
+
+        assert success is True
+
+    def test_factory_no_cache_when_disabled(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
+        plugin, _collected = event_collector
+        session = ProTestSession()
+        session.use(plugin)
+
+        call_count = 0
+
+        @session.factory(cache=False)
+        def user(username: str) -> dict[str, str]:
+            nonlocal call_count
+            call_count += 1
+            return {"name": username, "call": call_count}
+
+        @session.test()
+        async def test_no_caching(
+            user_factory: Annotated[FixtureFactory[dict[str, str]], Use(user)],
+        ) -> None:
+            user1 = await user_factory(username="alice")
+            user2 = await user_factory(username="alice")
+
+            assert user1 is not user2
+            expected_call_count = 2
+            assert call_count == expected_call_count
+
+        runner = TestRunner(session)
+        success = runner.run()
+
+        assert success is True

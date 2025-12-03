@@ -89,18 +89,18 @@ class Collector:
 
     def _build_fixture_index(self, session: ProTestSession) -> None:
         """Build index of all fixtures with their tags and dependencies."""
-        for func, _is_factory, tags in session.fixtures:
-            self._fixture_tags[func] = tags
-            self._fixture_deps[func] = _extract_use_fixtures(func)
+        for reg in session.fixtures:
+            self._fixture_tags[reg.func] = reg.tags
+            self._fixture_deps[reg.func] = _extract_use_fixtures(reg.func)
 
         self._index_suite_fixtures(session.suites)
 
     def _index_suite_fixtures(self, suites: list[ProTestSuite]) -> None:
         """Recursively index fixtures from suites."""
         for suite in suites:
-            for func, _is_factory, tags in suite.fixtures:
-                self._fixture_tags[func] = tags
-                self._fixture_deps[func] = _extract_use_fixtures(func)
+            for reg in suite.fixtures:
+                self._fixture_tags[reg.func] = reg.tags
+                self._fixture_deps[reg.func] = _extract_use_fixtures(reg.func)
             self._index_suite_fixtures(suite.suites)
 
     def _get_transitive_fixture_tags(

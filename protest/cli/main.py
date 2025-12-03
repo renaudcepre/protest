@@ -100,14 +100,14 @@ def _print_tags_summary(
 
     all_tags: set[str] = set()
 
-    for _func, _is_factory, tags in session.fixtures:
-        all_tags.update(tags)
+    for reg in session.fixtures:
+        all_tags.update(reg.tags)
 
     def collect_suite_tags(suites: list[ProTestSuite]) -> None:
         for suite in suites:
             all_tags.update(suite.tags)
-            for _func, _is_factory, tags in suite.fixtures:
-                all_tags.update(tags)
+            for reg in suite.fixtures:
+                all_tags.update(reg.tags)
             collect_suite_tags(suite.suites)
 
     collect_suite_tags(session.suites)

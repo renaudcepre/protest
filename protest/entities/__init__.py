@@ -1,6 +1,7 @@
 from protest.entities.core import (
     Fixture,
     FixtureCallable,
+    FixtureRegistration,
     TestItem,
     TestOutcome,
 )
@@ -18,6 +19,7 @@ __all__ = [
     "Fixture",
     "FixtureCallable",
     "FixtureInfo",
+    "FixtureRegistration",
     "HandlerInfo",
     "LogCapture",
     "SessionResult",

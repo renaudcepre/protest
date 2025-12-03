@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import functools
 import inspect
 import time
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
@@ -9,12 +8,14 @@ from inspect import Parameter, signature
 from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
 from protest.core.fixture import is_generator_like
+from protest.di.decorators import METADATA_ATTR
+from protest.di.factory import FixtureFactory
 from protest.di.markers import Use
-from protest.entities import Fixture, FixtureCallable, FixtureInfo
+from protest.di.proxy import SafeProxy
+from protest.entities import Fixture, FixtureCallable, FixtureInfo, FixtureRegistration
 from protest.events.types import Event
 from protest.exceptions import (
     AlreadyRegisteredError,
-    FixtureError,
     ScopeMismatchError,
 )
 from protest.execution.async_bridge import ensure_async
@@ -25,31 +26,6 @@ if TYPE_CHECKING:
 
     from protest.compat import Self
     from protest.events.bus import EventBus
-
-
-def _wrap_factory(result: Any, fixture_name: str) -> Any:
-    if not callable(result):
-        return result
-
-    if inspect.iscoroutinefunction(result):
-
-        @functools.wraps(result)
-        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-            try:
-                return await result(*args, **kwargs)
-            except Exception as exc:
-                raise FixtureError(fixture_name, exc) from exc
-
-        return async_wrapper
-
-    @functools.wraps(result)
-    def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-        try:
-            return result(*args, **kwargs)
-        except Exception as exc:
-            raise FixtureError(fixture_name, exc) from exc
-
-    return sync_wrapper
 
 
 class Resolver:
@@ -76,11 +52,13 @@ class Resolver:
         self._path_exit_stacks: dict[str, AsyncExitStack] = {}
         self._event_bus = event_bus
 
-    def register(
+    def register(  # noqa: PLR0913
         self,
         func: FixtureCallable,
         scope_path: str | None = None,
         is_factory: bool = False,
+        cache: bool = True,
+        managed: bool = True,
         tags: set[str] | None = None,
     ) -> None:
         """Register a fixture at a specific scope path.
@@ -92,13 +70,22 @@ class Resolver:
                 - "SuiteName": Suite scope
                 - "Parent::Child": Nested suite scope
                 - FUNCTION_SCOPE: Function scope (fresh per test)
-            is_factory: Whether this fixture returns a factory callable.
+            is_factory: Whether this fixture returns a FixtureFactory callable.
+            cache: Whether to cache factory instances by kwargs (only for factories).
+            managed: If True (default), factory fixtures are wrapped in FixtureFactory.
+                     If False, the fixture returns its own callable (legacy/class pattern).
             tags: Tags for this fixture (propagated to tests using it).
         """
         if func in self._registry:
             raise AlreadyRegisteredError(get_callable_name(func))
 
-        fixture = Fixture(func, is_factory=is_factory, tags=tags or set())
+        fixture = Fixture(
+            func,
+            is_factory=is_factory,
+            cache=cache,
+            managed=managed,
+            tags=tags or set(),
+        )
         self._scope_paths[func] = scope_path
         self._analyze_and_store_dependencies(func, scope_path)
         self._registry[func] = fixture
@@ -146,11 +133,20 @@ class Resolver:
     def _ensure_registered(self, func: FixtureCallable) -> Fixture:
         """Auto-register a fixture if not yet registered.
 
-        Unregistered functions are registered as FUNCTION scope (fresh per test).
-        Auto-registered fixtures are never factories (factory=True requires explicit decorator).
+        Reads metadata from @fixture() or @factory() decorators if present.
+        Unregistered plain functions default to FUNCTION scope, not factory, no tags.
         """
         if func not in self._registry:
-            self.register(func, scope_path=self.FUNCTION_SCOPE, is_factory=False)
+            reg = getattr(func, METADATA_ATTR, None) or FixtureRegistration(func=func)
+
+            self.register(
+                func,
+                scope_path=self.FUNCTION_SCOPE,
+                is_factory=reg.is_factory,
+                cache=reg.cache,
+                managed=reg.managed,
+                tags=reg.tags,
+            )
         return self._registry[func]
 
     async def resolve(
@@ -189,7 +185,7 @@ class Resolver:
                 return target_fixture.cached_value
 
             kwargs = await self._resolve_dependencies(target_fixture.func, current_path)
-            result = await self._execute_fixture(
+            result = await self._resolve_fixture_value(
                 target_fixture, kwargs, self._exit_stack
             )
 
@@ -216,7 +212,7 @@ class Resolver:
                 self._path_exit_stacks[scope_path] = AsyncExitStack()
 
             kwargs = await self._resolve_dependencies(target_fixture.func, current_path)
-            result = await self._execute_fixture(
+            result = await self._resolve_fixture_value(
                 target_fixture, kwargs, self._path_exit_stacks[scope_path]
             )
 
@@ -232,7 +228,26 @@ class Resolver:
         which maintains its own cache per test. This method is a fallback.
         """
         kwargs = await self._resolve_dependencies(target_fixture.func, current_path)
-        return await self._execute_fixture(target_fixture, kwargs, AsyncExitStack())
+        exit_stack = AsyncExitStack()
+        return await self._resolve_fixture_value(target_fixture, kwargs, exit_stack)
+
+    async def _resolve_fixture_value(
+        self,
+        fixture: Fixture,
+        kwargs: dict[str, Any],
+        exit_stack: AsyncExitStack,
+    ) -> Any:
+        """Resolve a fixture value based on its type (factory/managed/regular)."""
+        fixture_name = get_callable_name(fixture.func)
+
+        if fixture.is_factory and fixture.managed:
+            return self._create_fixture_factory(fixture, kwargs, exit_stack)
+
+        if fixture.is_factory and not fixture.managed:
+            result = await self._execute_fixture(fixture, kwargs, exit_stack)
+            return SafeProxy(result, fixture_name)
+
+        return await self._execute_fixture(fixture, kwargs, exit_stack)
 
     async def _resolve_dependencies(
         self, target_func: FixtureCallable, current_path: str | None
@@ -242,6 +257,22 @@ class Resolver:
         for param_name, dep_func in self._dependencies.get(target_func, {}).items():
             kwargs[param_name] = await self.resolve(dep_func, current_path)
         return kwargs
+
+    def _create_fixture_factory(
+        self,
+        fixture: Fixture,
+        resolved_dependencies: dict[str, Any],
+        exit_stack: AsyncExitStack,
+    ) -> FixtureFactory[Any]:
+        """Create a FixtureFactory wrapper for a factory fixture."""
+        fixture_name = get_callable_name(fixture.func)
+        return FixtureFactory(
+            fixture=fixture,
+            fixture_name=fixture_name,
+            resolved_dependencies=resolved_dependencies,
+            exit_stack=exit_stack,
+            cache_enabled=fixture.cache,
+        )
 
     async def _execute_fixture(
         self, fixture: Fixture, kwargs: dict[str, Any], exit_stack: AsyncExitStack
@@ -268,8 +299,6 @@ class Resolver:
         else:
             result = await ensure_async(fixture.func, **kwargs)
 
-        if fixture.is_factory:
-            return _wrap_factory(result, fixture_name)
         return result
 
     async def _emit_fixture_setup_async(self, name: str, scope: str) -> None:
