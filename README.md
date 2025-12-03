@@ -185,6 +185,66 @@ def test_with_deps(
     ...
 ```
 
+### Parameterized Tests
+
+Use `ForEach` and `From` to run tests with multiple values:
+
+```python
+from protest import ForEach, From
+
+CODES = ForEach([200, 201, 204])
+
+@session.test()
+def test_success_codes(code: Annotated[int, From(CODES)]):
+    assert code in range(200, 300)  # Runs 3 times
+```
+
+#### Parameterized Fixtures (Inversion of Control)
+
+In pytest, parameterized fixtures hide the iteration from the test:
+
+```python
+# pytest - the test runs twice but you can't tell by reading it
+@pytest.fixture(params=["postgres", "sqlite"])
+def db(request):
+    return connect(request.param)
+
+def test_queries(db): ...  # Magic: runs twice
+```
+
+In ProTest, the **test** controls the parameterization via factories:
+
+```python
+from protest import FixtureFactory, ForEach, From
+
+ENGINES = ForEach(["postgres", "sqlite"])
+
+@session.factory()
+def database(engine_type: str):
+    db = connect(engine_type)
+    yield db
+    db.close()
+
+@session.test()
+async def test_queries(
+    engine: Annotated[str, From(ENGINES)],
+    db_factory: Annotated[FixtureFactory[DB], Use(database)],
+):
+    db = await db_factory(engine_type=engine)  # Explicit wiring
+    assert db.is_connected()
+```
+
+Benefits:
+- **Visible**: `From(ENGINES)` shows the test runs multiple times
+- **Explicit**: You see exactly how the fixture is configured
+- **Flexible**: Other tests can use the same factory with fixed values:
+
+```python
+@session.test()
+async def test_postgres_only(db_factory: Annotated[..., Use(database)]):
+    db = await db_factory(engine_type="postgres")  # No loop, just postgres
+```
+
 ### Scopes
 
 | Scope | Lifecycle | Use Case |
@@ -260,6 +320,7 @@ Cache stored in `.protest/cache.json`.
 |          | pytest             | ProTest                   |
 |----------|--------------------|---------------------------|
 | Fixtures | Implicit (by name) | Explicit (`Use(fixture)`) |
+| Params   | Hidden in fixture  | Visible in test (`From()` + factory) |
 | Async    | Plugin required    | Native                    |
 | Parallel | Plugin required    | Built-in                  |
 | Cycles   | Runtime error      | Impossible by design      |

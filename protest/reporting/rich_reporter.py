@@ -8,7 +8,8 @@ def _format_test_name(result: TestResult) -> str:
     """Format test name with case_ids if present."""
     if "[" in result.node_id:
         suffix = result.node_id[result.node_id.index("[") :]
-        return f"{result.name}{suffix}"
+        escaped_suffix = suffix.replace("[", "\\[")
+        return f"{result.name}{escaped_suffix}"
     return result.name
 
 
