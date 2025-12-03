@@ -106,3 +106,7 @@ dev = [
     "rich>=13.0",
     "ty>=0.0.1a29",
 ]
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.7.0",
+]

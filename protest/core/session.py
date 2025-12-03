@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from protest.plugin import PluginBase
 
 from protest.cache.plugin import CachePlugin
+from protest.core.collector import validate_no_from_params
 from protest.di.resolver import Resolver
 from protest.entities import FixtureRegistration
 from protest.events.bus import EventBus
@@ -163,6 +164,7 @@ class ProTestSession:
         """Register a fixture scoped to the session (lives entire session)."""
 
         def decorator(func: FuncT) -> FuncT:
+            validate_no_from_params(func)
             fixture_tags = set(tags) if tags else set()
             self._fixtures.append(
                 FixtureRegistration(
@@ -186,6 +188,7 @@ class ProTestSession:
         """Register a factory fixture scoped to the session."""
 
         def decorator(func: FuncT) -> FuncT:
+            validate_no_from_params(func)
             fixture_tags = set(tags) if tags else set()
             self._fixtures.append(
                 FixtureRegistration(

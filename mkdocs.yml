@@ -1,0 +1,59 @@
+site_name: ProTest
+site_description: Async-first testing with explicit dependency injection
+repo_url: https://github.com/renaudcepre/protest
+repo_name: renaudcepre/protest
+
+theme:
+  name: material
+  logo: assets/icon.svg
+  favicon: assets/icon.svg
+  palette:
+    - scheme: default
+      primary: black
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: black
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - content.tabs.link
+    - search.highlight
+
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - search
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - Running Tests: getting-started/running-tests.md
+  - Core Concepts:
+      - Sessions & Suites: core-concepts/sessions-and-suites.md
+      - Tests: core-concepts/tests.md
+      - Fixtures: core-concepts/fixtures.md
+      - Factories & Parameterized Tests: core-concepts/factories.md
+      - Dependency Injection: core-concepts/dependency-injection.md
