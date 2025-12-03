@@ -134,38 +134,38 @@ session.include_suite(api_suite)
 
 ### Fixtures
 
-#### `@fixture` decorator
+Fixtures are scoped based on where they are defined:
+- `@session.fixture()` - Session scope (lives entire session)
+- `@suite.fixture()` - Suite scope (lives while suite runs)
+- Plain functions - Function scope (fresh per test)
 
 ```python
-from protest import fixture, Scope
-
-@fixture(scope=Scope.SESSION)        # Once per session
+# Session-scoped fixture with teardown
+@session.fixture()
 async def database():
     db = await connect()
     yield db                         # Teardown after yield
     await db.close()
 
-@fixture(scope=Scope.SUITE)          # Once per suite
-def suite_config():
+# Suite-scoped fixture
+@api_suite.fixture()
+def api_config():
     return load_config()
 
-@fixture(scope=Scope.FUNCTION)       # Fresh per test (default)
-def temp_file():
-    path = create_temp()
-    yield path
-    cleanup(path)
-
-@fixture(scope=Scope.FUNCTION, factory=True)  # Returns a callable
-def make_user():
-    def create(name: str) -> User:
-        return User(name=name)
-    return create
+# Factory fixture - creates instances with automatic caching and teardown
+@session.factory()
+def user(name: str, role: str = "guest"):
+    user = User.create(name=name, role=role)
+    yield user
+    user.delete()  # Teardown called for each created instance
 
 # Usage: factory is injected, call it to create instances
 @session.test()
-def test_multiple_users(factory: Annotated[Callable[[str], User], Use(make_user)]):
-    alice = factory("alice")
-    bob = factory("bob")
+async def test_multiple_users(
+    user_factory: Annotated[FixtureFactory[User], Use(user)]
+):
+    alice = await user_factory(name="alice")
+    bob = await user_factory(name="bob", role="admin")
     assert alice.name != bob.name
 ```
 

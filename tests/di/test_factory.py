@@ -1,84 +1,252 @@
-"""Tests for factory fixture wrapping mechanism."""
+"""Tests for FixtureFactory class."""
+
+from contextlib import AsyncExitStack
+from dataclasses import dataclass
 
 import pytest
 
-from protest.di.resolver import _wrap_factory
+from protest.di.factory import FixtureFactory
+from protest.entities import Fixture
 from protest.exceptions import FixtureError
 
 
-class TestWrapFactory:
-    def test_wraps_callable_result(self) -> None:
-        def my_factory() -> str:
-            return "created"
+@dataclass
+class User:
+    username: str
+    role: str = "guest"
 
-        wrapped = _wrap_factory(my_factory, "test_fixture")
-        assert wrapped() == "created"
 
-    def test_non_callable_returned_unchanged(self) -> None:
-        result = "not a function"
-        wrapped = _wrap_factory(result, "test_fixture")
-        assert wrapped is result
+class TestFixtureFactoryBasic:
+    @pytest.mark.asyncio
+    async def test_creates_instance_with_kwargs(self) -> None:
+        def user_fixture(username: str, role: str = "guest") -> User:
+            return User(username=username, role=role)
 
-    def test_sync_factory_error_becomes_fixture_error(self) -> None:
-        def failing_factory() -> None:
+        fixture = Fixture(func=user_fixture, is_factory=True)
+        exit_stack = AsyncExitStack()
+
+        async with exit_stack:
+            factory: FixtureFactory[User] = FixtureFactory(
+                fixture=fixture,
+                fixture_name="user",
+                resolved_dependencies={},
+                exit_stack=exit_stack,
+                cache_enabled=True,
+            )
+
+            user = await factory(username="alice", role="admin")
+
+            assert user.username == "alice"
+            assert user.role == "admin"
+
+    @pytest.mark.asyncio
+    async def test_caches_by_kwargs_when_enabled(self) -> None:
+        call_count = 0
+
+        def user_fixture(username: str) -> User:
+            nonlocal call_count
+            call_count += 1
+            return User(username=username)
+
+        fixture = Fixture(func=user_fixture, is_factory=True, cache=True)
+        exit_stack = AsyncExitStack()
+
+        async with exit_stack:
+            factory: FixtureFactory[User] = FixtureFactory(
+                fixture=fixture,
+                fixture_name="user",
+                resolved_dependencies={},
+                exit_stack=exit_stack,
+                cache_enabled=True,
+            )
+
+            user1 = await factory(username="alice")
+            user2 = await factory(username="alice")
+            user3 = await factory(username="bob")
+
+            assert user1 is user2
+            assert user1 is not user3
+            expected_call_count = 2
+            assert call_count == expected_call_count
+
+    @pytest.mark.asyncio
+    async def test_no_cache_when_disabled(self) -> None:
+        call_count = 0
+
+        def user_fixture(username: str) -> User:
+            nonlocal call_count
+            call_count += 1
+            return User(username=username)
+
+        fixture = Fixture(func=user_fixture, is_factory=True, cache=False)
+        exit_stack = AsyncExitStack()
+
+        async with exit_stack:
+            factory: FixtureFactory[User] = FixtureFactory(
+                fixture=fixture,
+                fixture_name="user",
+                resolved_dependencies={},
+                exit_stack=exit_stack,
+                cache_enabled=False,
+            )
+
+            user1 = await factory(username="alice")
+            user2 = await factory(username="alice")
+
+            assert user1 is not user2
+            expected_call_count = 2
+            assert call_count == expected_call_count
+
+
+class TestFixtureFactoryWithGenerator:
+    @pytest.mark.asyncio
+    async def test_generator_teardown_called(self) -> None:
+        teardown_called = []
+
+        def user_fixture(username: str) -> User:
+            user = User(username=username)
+            yield user
+            teardown_called.append(username)
+
+        fixture = Fixture(func=user_fixture, is_factory=True)
+        exit_stack = AsyncExitStack()
+
+        async with exit_stack:
+            factory: FixtureFactory[User] = FixtureFactory(
+                fixture=fixture,
+                fixture_name="user",
+                resolved_dependencies={},
+                exit_stack=exit_stack,
+                cache_enabled=True,
+            )
+
+            await factory(username="alice")
+            await factory(username="bob")
+
+            assert len(teardown_called) == 0
+
+        expected_teardown_count = 2
+        assert len(teardown_called) == expected_teardown_count
+        assert "alice" in teardown_called
+        assert "bob" in teardown_called
+
+    @pytest.mark.asyncio
+    async def test_async_generator_teardown_called(self) -> None:
+        teardown_called = []
+
+        async def user_fixture(username: str) -> User:
+            user = User(username=username)
+            yield user
+            teardown_called.append(username)
+
+        fixture = Fixture(func=user_fixture, is_factory=True)
+        exit_stack = AsyncExitStack()
+
+        async with exit_stack:
+            factory: FixtureFactory[User] = FixtureFactory(
+                fixture=fixture,
+                fixture_name="user",
+                resolved_dependencies={},
+                exit_stack=exit_stack,
+                cache_enabled=True,
+            )
+
+            await factory(username="alice")
+
+        expected_teardown_count = 1
+        assert len(teardown_called) == expected_teardown_count
+
+
+class TestFixtureFactoryErrors:
+    @pytest.mark.asyncio
+    async def test_error_becomes_fixture_error(self) -> None:
+        def failing_fixture(username: str) -> User:
             raise ValueError("DB connection failed")
 
-        wrapped = _wrap_factory(failing_factory, "user_factory")
+        fixture = Fixture(func=failing_fixture, is_factory=True)
+        exit_stack = AsyncExitStack()
 
-        with pytest.raises(FixtureError) as exc_info:
-            wrapped()
+        async with exit_stack:
+            factory: FixtureFactory[User] = FixtureFactory(
+                fixture=fixture,
+                fixture_name="user_factory",
+                resolved_dependencies={},
+                exit_stack=exit_stack,
+                cache_enabled=True,
+            )
 
-        assert exc_info.value.fixture_name == "user_factory"
-        assert isinstance(exc_info.value.original, ValueError)
-        assert "DB connection failed" in str(exc_info.value.original)
+            with pytest.raises(FixtureError) as exc_info:
+                await factory(username="alice")
 
-    def test_preserves_function_metadata(self) -> None:
-        def documented_factory() -> str:
-            """Creates something useful."""
-            return "value"
-
-        wrapped = _wrap_factory(documented_factory, "test")
-        assert wrapped.__name__ == "documented_factory"
-        assert wrapped.__doc__ == "Creates something useful."
-
-    def test_passes_args_and_kwargs(self) -> None:
-        def factory_with_args(name: str, role: str = "guest") -> dict[str, str]:
-            return {"name": name, "role": role}
-
-        wrapped = _wrap_factory(factory_with_args, "test")
-        result = wrapped("alice", role="admin")
-        assert result == {"name": "alice", "role": "admin"}
-
-
-class TestWrapFactoryAsync:
-    @pytest.mark.asyncio
-    async def test_wraps_async_callable(self) -> None:
-        async def async_factory() -> str:
-            return "async_created"
-
-        wrapped = _wrap_factory(async_factory, "test_fixture")
-        result = await wrapped()
-        assert result == "async_created"
+            assert exc_info.value.fixture_name == "user_factory"
+            assert isinstance(exc_info.value.original, ValueError)
+            assert "DB connection failed" in str(exc_info.value.original)
 
     @pytest.mark.asyncio
-    async def test_async_factory_error_becomes_fixture_error(self) -> None:
-        async def failing_async_factory() -> None:
-            raise ConnectionError("API unavailable")
+    async def test_unhashable_kwargs_raises_type_error(self) -> None:
+        def fixture_with_list(items: list[str]) -> str:
+            return ",".join(items)
 
-        wrapped = _wrap_factory(failing_async_factory, "api_factory")
+        fixture = Fixture(func=fixture_with_list, is_factory=True)
+        exit_stack = AsyncExitStack()
 
-        with pytest.raises(FixtureError) as exc_info:
-            await wrapped()
+        async with exit_stack:
+            factory: FixtureFactory[str] = FixtureFactory(
+                fixture=fixture,
+                fixture_name="test",
+                resolved_dependencies={},
+                exit_stack=exit_stack,
+                cache_enabled=True,
+            )
 
-        assert exc_info.value.fixture_name == "api_factory"
-        assert isinstance(exc_info.value.original, ConnectionError)
+            with pytest.raises(TypeError) as exc_info:
+                await factory(items=["a", "b"])
 
+            assert "unhashable kwargs" in str(exc_info.value)
+
+
+class TestFixtureFactoryWithDependencies:
     @pytest.mark.asyncio
-    async def test_async_preserves_function_metadata(self) -> None:
-        async def async_documented() -> str:
-            """Async doc."""
-            return "value"
+    async def test_merges_resolved_dependencies_with_user_kwargs(self) -> None:
+        def user_fixture(db_connection: str, username: str) -> dict[str, str]:
+            return {"db": db_connection, "user": username}
 
-        wrapped = _wrap_factory(async_documented, "test")
-        assert wrapped.__name__ == "async_documented"
-        assert wrapped.__doc__ == "Async doc."
+        fixture = Fixture(func=user_fixture, is_factory=True)
+        exit_stack = AsyncExitStack()
+
+        async with exit_stack:
+            factory: FixtureFactory[dict[str, str]] = FixtureFactory(
+                fixture=fixture,
+                fixture_name="user",
+                resolved_dependencies={"db_connection": "postgres://localhost"},
+                exit_stack=exit_stack,
+                cache_enabled=True,
+            )
+
+            result = await factory(username="alice")
+
+            assert result["db"] == "postgres://localhost"
+            assert result["user"] == "alice"
+
+
+class TestFixtureFactoryAsync:
+    @pytest.mark.asyncio
+    async def test_async_fixture_function(self) -> None:
+        async def async_user_fixture(username: str) -> User:
+            return User(username=username)
+
+        fixture = Fixture(func=async_user_fixture, is_factory=True)
+        exit_stack = AsyncExitStack()
+
+        async with exit_stack:
+            factory: FixtureFactory[User] = FixtureFactory(
+                fixture=fixture,
+                fixture_name="user",
+                resolved_dependencies={},
+                exit_stack=exit_stack,
+                cache_enabled=True,
+            )
+
+            user = await factory(username="alice")
+
+            assert user.username == "alice"

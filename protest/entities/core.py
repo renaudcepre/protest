@@ -16,9 +16,22 @@ FixtureCallable: TypeAlias = "Callable[..., Any]"
 
 
 @dataclass
+class FixtureRegistration:
+    """Registration info for a fixture before it's added to the resolver."""
+
+    func: FixtureCallable
+    is_factory: bool = False
+    cache: bool = True
+    managed: bool = True
+    tags: set[str] = field(default_factory=set)
+
+
+@dataclass
 class Fixture:
     func: FixtureCallable
     is_factory: bool = False
+    cache: bool = True
+    managed: bool = True
     tags: set[str] = field(default_factory=set)
     cached_value: Any = field(default=None, repr=False)
     is_cached: bool = False

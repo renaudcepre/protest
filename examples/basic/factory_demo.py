@@ -7,10 +7,9 @@ This demo shows how ProTest distinguishes:
 - TEST FAIL: Your code has a bug
 """
 
-from collections.abc import Callable
 from typing import Annotated
 
-from protest import ProTestSession, Use
+from protest import FixtureFactory, ProTestSession, Use
 
 session = ProTestSession()
 
@@ -20,29 +19,22 @@ session = ProTestSession()
 # =============================================================================
 
 
-@session.fixture(factory=True)
-def user_factory() -> Callable[..., dict[str, str]]:
-    """Returns a factory that creates users. Marked as factory=True."""
-    print("  [setup] Connecting to user database...")
-
-    def create_user(name: str, role: str = "guest") -> dict[str, str]:
-        if name == "crash":
-            raise ConnectionError("Database connection lost!")
-        return {"name": name, "role": role}
-
-    return create_user
+@session.factory()
+def user(name: str, role: str = "guest") -> dict[str, str]:
+    """Factory fixture with automatic teardown via yield."""
+    print(f"  [setup] Creating user {name}...")
+    if name == "crash":
+        raise ConnectionError("Database connection lost!")
+    yield {"name": name, "role": role}
+    print(f"  [teardown] Deleting user {name}...")
 
 
-@session.fixture(factory=True)
-def api_client_factory() -> Callable[..., dict[str, str]]:
-    """Returns an API client factory. Marked as factory=True."""
-
-    def make_request(endpoint: str) -> dict[str, str]:
-        if endpoint == "/unstable":
-            raise TimeoutError("API request timed out after 30s")
-        return {"status": "ok", "endpoint": endpoint}
-
-    return make_request
+@session.factory()
+def api_response(endpoint: str) -> dict[str, str]:
+    """Factory fixture that makes API requests."""
+    if endpoint == "/unstable":
+        raise TimeoutError("API request timed out after 30s")
+    return {"status": "ok", "endpoint": endpoint}
 
 
 # =============================================================================
@@ -57,29 +49,29 @@ def test_passing() -> None:
 
 
 @session.test()
-def test_user_creation(
-    make_user: Annotated[Callable[..., dict[str, str]], Use(user_factory)],
+async def test_user_creation(
+    user_factory: Annotated[FixtureFactory[dict[str, str]], Use(user)],
 ) -> None:
     """This test passes - factory works fine."""
-    user = make_user("alice", role="admin")
-    assert user["name"] == "alice"
-    assert user["role"] == "admin"
+    alice = await user_factory(name="alice", role="admin")
+    assert alice["name"] == "alice"
+    assert alice["role"] == "admin"
 
 
 @session.test()
-def test_factory_crashes(
-    make_user: Annotated[Callable[..., dict[str, str]], Use(user_factory)],
+async def test_factory_crashes(
+    user_factory: Annotated[FixtureFactory[dict[str, str]], Use(user)],
 ) -> None:
     """This triggers a SETUP ERROR - the factory fails, not the test logic."""
-    make_user("crash")  # DB "crashes" -> SETUP ERROR, not test fail
+    await user_factory(name="crash")  # DB "crashes" -> SETUP ERROR, not test fail
 
 
 @session.test()
-def test_api_timeout(
-    client: Annotated[Callable[..., dict[str, str]], Use(api_client_factory)],
+async def test_api_timeout(
+    api_factory: Annotated[FixtureFactory[dict[str, str]], Use(api_response)],
 ) -> None:
     """This triggers a SETUP ERROR - API times out."""
-    client("/unstable")  # API "times out" -> SETUP ERROR
+    await api_factory(endpoint="/unstable")  # API "times out" -> SETUP ERROR
 
 
 @session.test()

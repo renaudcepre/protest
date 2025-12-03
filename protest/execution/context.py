@@ -6,7 +6,9 @@ from typing import Any
 
 from protest.compat import Self
 from protest.core.fixture import is_generator_like
-from protest.di.resolver import Resolver, _wrap_factory
+from protest.di.factory import FixtureFactory
+from protest.di.proxy import SafeProxy
+from protest.di.resolver import Resolver
 from protest.entities import Fixture, FixtureCallable, FixtureInfo
 from protest.events.types import Event
 from protest.execution.async_bridge import ensure_async
@@ -56,10 +58,32 @@ class TestExecutionContext:
             return self._cache[target_func]
 
         fixture_name = get_callable_name(fixture.func)
+        kwargs = await self._resolve_dependencies(target_func)
+
+        result: Any
+        if fixture.is_factory and fixture.managed:
+            result = FixtureFactory(
+                fixture=fixture,
+                fixture_name=fixture_name,
+                resolved_dependencies=kwargs,
+                exit_stack=self._exit_stack,
+                cache_enabled=fixture.cache,
+            )
+        elif fixture.is_factory and not fixture.managed:
+            result = await self._execute_fixture(fixture, kwargs, fixture_name)
+            result = SafeProxy(result, fixture_name)
+        else:
+            result = await self._execute_fixture(fixture, kwargs, fixture_name)
+
+        self._cache[target_func] = result
+        return result
+
+    async def _execute_fixture(
+        self, fixture: Fixture, kwargs: dict[str, Any], fixture_name: str
+    ) -> Any:
+        """Execute a fixture function, handling generators for setup/teardown."""
         start_time = time.perf_counter()
         await self._emit_fixture_setup_async(fixture_name)
-
-        kwargs = await self._resolve_dependencies(target_func)
 
         if is_generator_like(fixture.func):
             if inspect.isasyncgenfunction(fixture.func):
@@ -75,10 +99,6 @@ class TestExecutionContext:
         else:
             result = await ensure_async(fixture.func, **kwargs)
 
-        if fixture.is_factory:
-            result = _wrap_factory(result, fixture_name)
-
-        self._cache[target_func] = result
         return result
 
     async def _emit_fixture_setup_async(self, name: str) -> None:

@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 from protest.cache.plugin import CachePlugin
 from protest.di.resolver import Resolver
+from protest.entities import FixtureRegistration
 from protest.events.bus import EventBus
 from protest.events.types import Event
 from protest.tags.plugin import TagFilterPlugin
@@ -60,7 +61,7 @@ class ProTestSession:
         self._resolver = Resolver(event_bus=self._events)
         self._suites: list[ProTestSuite] = []
         self._tests: list[Callable[..., Any]] = []
-        self._fixtures: list[tuple[FixtureCallable, bool, set[str]]] = []
+        self._fixtures: list[FixtureRegistration] = []
         self._concurrency = max(1, concurrency)
         self._autouse = autouse or []
         self._cache_plugin: CachePlugin | None = None
@@ -141,7 +142,7 @@ class ProTestSession:
         return self._tests
 
     @property
-    def fixtures(self) -> list[tuple[FixtureCallable, bool, set[str]]]:
+    def fixtures(self) -> list[FixtureRegistration]:
         return self._fixtures
 
     def test(
@@ -156,13 +157,45 @@ class ProTestSession:
         return decorator
 
     def fixture(
-        self, factory: bool = False, tags: list[str] | None = None
+        self,
+        tags: list[str] | None = None,
     ) -> Callable[[FuncT], FuncT]:
         """Register a fixture scoped to the session (lives entire session)."""
 
         def decorator(func: FuncT) -> FuncT:
             fixture_tags = set(tags) if tags else set()
-            self._fixtures.append((func, factory, fixture_tags))
+            self._fixtures.append(
+                FixtureRegistration(
+                    func=func,
+                    is_factory=False,
+                    cache=True,
+                    managed=True,
+                    tags=fixture_tags,
+                )
+            )
+            return func
+
+        return decorator
+
+    def factory(
+        self,
+        cache: bool = True,
+        managed: bool = True,
+        tags: list[str] | None = None,
+    ) -> Callable[[FuncT], FuncT]:
+        """Register a factory fixture scoped to the session."""
+
+        def decorator(func: FuncT) -> FuncT:
+            fixture_tags = set(tags) if tags else set()
+            self._fixtures.append(
+                FixtureRegistration(
+                    func=func,
+                    is_factory=True,
+                    cache=cache,
+                    managed=managed,
+                    tags=fixture_tags,
+                )
+            )
             return func
 
         return decorator
@@ -194,18 +227,28 @@ class ProTestSession:
 
     def _register_fixtures(self) -> None:
         """Register all fixtures from session and suites into resolver."""
-        for func, is_factory, tags in self._fixtures:
+        for reg in self._fixtures:
             self._resolver.register(
-                func, scope_path=None, is_factory=is_factory, tags=tags
+                reg.func,
+                scope_path=None,
+                is_factory=reg.is_factory,
+                cache=reg.cache,
+                managed=reg.managed,
+                tags=reg.tags,
             )
         self._register_suite_fixtures(self._suites)
 
     def _register_suite_fixtures(self, suites: list[ProTestSuite]) -> None:
         """Recursively register fixtures from suites."""
         for suite in suites:
-            for func, is_factory, tags in suite.fixtures:
+            for reg in suite.fixtures:
                 self._resolver.register(
-                    func, scope_path=suite.full_path, is_factory=is_factory, tags=tags
+                    reg.func,
+                    scope_path=suite.full_path,
+                    is_factory=reg.is_factory,
+                    cache=reg.cache,
+                    managed=reg.managed,
+                    tags=reg.tags,
                 )
             self._register_suite_fixtures(suite.suites)
 
