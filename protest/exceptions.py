@@ -42,3 +42,13 @@ class UnregisteredDependencyError(ProTestError):
 class FixtureNotFoundError(ProTestError):
     def __init__(self, fixture_name: str):
         super().__init__(f"Fixture '{fixture_name}' is not registered.")
+
+
+class ParameterizedFixtureError(ProTestError):
+    def __init__(self, fixture_name: str, param_names: list[str]):
+        params = ", ".join(param_names)
+        super().__init__(
+            f"Fixture '{fixture_name}' uses From() on parameters: {params}. "
+            f"From() is only allowed in tests, not fixtures. "
+            f"Use a factory instead and let the test control parameterization."
+        )

@@ -42,3 +42,7 @@ clean:
     rm -rf .ruff_cache/
     rm -rf htmlcov/
     find . -type d -name __pycache__ -exec rm -rf {} +
+
+# Serve docs with hot reload
+docs:
+    uv run mkdocs serve

@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from typing import TypeVar
 
+from protest.core.collector import validate_no_from_params
 from protest.entities import FixtureRegistration
 
 FuncT = TypeVar("FuncT", bound=Callable[..., object])
@@ -29,6 +30,7 @@ def fixture(
     """
 
     def decorator(func: FuncT) -> FuncT:
+        validate_no_from_params(func)
         func._protest_registration = FixtureRegistration(  # type: ignore[attr-defined]
             func=func,
             is_factory=False,
@@ -70,6 +72,7 @@ def factory(
     """
 
     def decorator(func: FuncT) -> FuncT:
+        validate_no_from_params(func)
         func._protest_registration = FixtureRegistration(  # type: ignore[attr-defined]
             func=func,
             is_factory=True,

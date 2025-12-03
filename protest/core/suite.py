@@ -7,6 +7,7 @@ if TYPE_CHECKING:
 
     from protest.core.session import ProTestSession
 
+from protest.core.collector import validate_no_from_params
 from protest.entities import FixtureRegistration
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
@@ -99,6 +100,7 @@ class ProTestSuite:
         """Register a fixture scoped to this suite."""
 
         def decorator(func: FuncT) -> FuncT:
+            validate_no_from_params(func)
             fixture_tags = set(tags) if tags else set()
             self._fixtures.append(
                 FixtureRegistration(
@@ -122,6 +124,7 @@ class ProTestSuite:
         """Register a factory fixture scoped to this suite."""
 
         def decorator(func: FuncT) -> FuncT:
+            validate_no_from_params(func)
             fixture_tags = set(tags) if tags else set()
             self._fixtures.append(
                 FixtureRegistration(

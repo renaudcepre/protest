@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
 from protest.di.markers import ForEach, From, Use
 from protest.entities import FixtureCallable, TestItem
+from protest.exceptions import ParameterizedFixtureError
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -24,6 +25,13 @@ def _extract_from_params(func: Callable[..., Any]) -> dict[str, ForEach[Any]]:
                     result[param_name] = metadata.source
                     break
     return result
+
+
+def validate_no_from_params(func: Callable[..., Any]) -> None:
+    """Raise ParameterizedFixtureError if fixture uses From()."""
+    from_params = _extract_from_params(func)
+    if from_params:
+        raise ParameterizedFixtureError(func.__name__, list(from_params.keys()))
 
 
 def _extract_use_fixtures(func: Callable[..., Any]) -> list[FixtureCallable]:
