@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from protest.plugin import PluginBase
 
 from protest.cache.plugin import CachePlugin
+from protest.cache.storage import CacheStorage
 from protest.core.collector import validate_no_from_params
 from protest.di.decorators import FixtureWrapper
 from protest.di.resolver import Resolver
@@ -67,6 +68,7 @@ class ProTestSession:
         self._fixtures: list[FixtureRegistration] = []
         self._concurrency = max(1, concurrency)
         self._autouse = autouse or []
+        self._cache_storage = CacheStorage()
         self._cache_plugin: CachePlugin | None = None
         self._tag_filter_plugin: TagFilterPlugin | None = None
         self._exitfirst: bool = False
@@ -147,6 +149,11 @@ class ProTestSession:
     @property
     def fixtures(self) -> list[FixtureRegistration]:
         return self._fixtures
+
+    @property
+    def cache(self) -> CacheStorage:
+        """Shared cache storage for inter-plugin data sharing."""
+        return self._cache_storage
 
     def test(
         self,
