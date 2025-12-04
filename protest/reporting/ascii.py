@@ -52,6 +52,16 @@ class AsciiReporter(PluginBase):
         name = _format_test_name(result)
         print(f"  -- {name} ({result.skip_reason})")
 
+    def on_test_xfail(self, result: TestResult) -> None:
+        name = _format_test_name(result)
+        duration = _format_duration(result.duration)
+        print(f"  xf {name} ({result.xfail_reason}) ({duration})")
+
+    def on_test_xpass(self, result: TestResult) -> None:
+        name = _format_test_name(result)
+        duration = _format_duration(result.duration)
+        print(f"  XP {name} UNEXPECTED PASS ({duration})")
+
     def on_waiting_handlers(self, pending_count: int) -> None:
         print(f"\n.. Async handlers ({pending_count})")
 
@@ -65,9 +75,16 @@ class AsciiReporter(PluginBase):
             print(f"  OK {info.name} ({duration})")
 
     def on_session_complete(self, result: SessionResult) -> None:
-        total = result.passed + result.failed + result.errors + result.skipped
+        total = (
+            result.passed
+            + result.failed
+            + result.errors
+            + result.skipped
+            + result.xfailed
+            + result.xpassed
+        )
 
-        if result.failed == 0 and result.errors == 0:
+        if result.failed == 0 and result.errors == 0 and result.xpassed == 0:
             status = "OK ALL PASSED"
         else:
             status = "XX FAILURES"
@@ -75,6 +92,10 @@ class AsciiReporter(PluginBase):
         parts = [f"{result.passed}/{total} passed"]
         if result.skipped:
             parts.append(f"{result.skipped} skipped")
+        if result.xfailed:
+            parts.append(f"{result.xfailed} xfailed")
+        if result.xpassed:
+            parts.append(f"{result.xpassed} xpassed")
         if result.failed:
             parts.append(f"{result.failed} failed")
         if result.errors:

@@ -17,6 +17,8 @@ class Event(Enum):
     TEST_PASS = "test_pass"  # noqa: S105
     TEST_FAIL = "test_fail"
     TEST_SKIP = "test_skip"
+    TEST_XFAIL = "test_xfail"
+    TEST_XPASS = "test_xpass"
     WAITING_HANDLERS = "waiting_handlers"
     HANDLER_START = "handler_start"
     HANDLER_END = "handler_end"

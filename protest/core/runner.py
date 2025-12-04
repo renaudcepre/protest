@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import io
 import time
+from dataclasses import dataclass
 from inspect import signature
 from typing import Any
 
@@ -26,6 +27,20 @@ from protest.execution.async_bridge import ensure_async
 from protest.execution.capture import CaptureCurrentTest, GlobalCapturePatch
 from protest.execution.context import TestExecutionContext
 from protest.utils import get_callable_name
+
+
+@dataclass
+class _TestExecutionResult:
+    """Internal result of test execution before outcome determination."""
+
+    test_name: str
+    node_id: str
+    duration: float = 0
+    output: str = ""
+    error: Exception | None = None
+    is_fixture_error: bool = False
+    skip_reason: str | None = None
+    xfail_reason: str | None = None
 
 
 class TestRunner:
@@ -108,6 +123,8 @@ class TestRunner:
             failed=total_counts.failed,
             errors=total_counts.errored,
             skipped=total_counts.skipped,
+            xfailed=total_counts.xfailed,
+            xpassed=total_counts.xpassed,
             duration=session_duration,
         )
         await self._session.events.emit(Event.SESSION_END, session_result)
@@ -117,7 +134,11 @@ class TestRunner:
             )
         await self._session.events.wait_pending()
         await self._session.events.emit(Event.SESSION_COMPLETE, session_result)
-        return total_counts.failed == 0 and total_counts.errored == 0
+        return (
+            total_counts.failed == 0
+            and total_counts.errored == 0
+            and total_counts.xpassed == 0
+        )
 
     async def _run_chunk_parallel(
         self,
@@ -180,6 +201,82 @@ class TestRunner:
 
         return total
 
+    async def _resolve_test_kwargs(
+        self,
+        item: TestItem,
+        ctx: TestExecutionContext,
+    ) -> dict[str, Any]:
+        """Resolve fixture dependencies for a test."""
+        func_signature = signature(item.func)
+        kwargs: dict[str, Any] = dict(item.case_kwargs)
+
+        for param_name, param in func_signature.parameters.items():
+            if param_name in kwargs:
+                continue
+            if dependency := Resolver._extract_dependency_from_parameter(param):
+                kwargs[param_name] = await ctx.resolve(dependency)
+
+        return kwargs
+
+    def _build_outcome(self, exec_result: _TestExecutionResult) -> TestOutcome:
+        """Build TestOutcome based on test execution results."""
+        if exec_result.skip_reason:
+            result = TestResult(
+                name=exec_result.test_name,
+                node_id=exec_result.node_id,
+                skip_reason=exec_result.skip_reason,
+            )
+            return TestOutcome(result, TestCounts(skipped=1), Event.TEST_SKIP)
+
+        if exec_result.error is None:
+            if exec_result.xfail_reason:
+                result = TestResult(
+                    name=exec_result.test_name,
+                    node_id=exec_result.node_id,
+                    duration=exec_result.duration,
+                    output=exec_result.output,
+                    xfail_reason=exec_result.xfail_reason,
+                )
+                return TestOutcome(result, TestCounts(xpassed=1), Event.TEST_XPASS)
+            result = TestResult(
+                name=exec_result.test_name,
+                node_id=exec_result.node_id,
+                duration=exec_result.duration,
+                output=exec_result.output,
+            )
+            return TestOutcome(result, TestCounts(passed=1), Event.TEST_PASS)
+
+        if exec_result.is_fixture_error:
+            result = TestResult(
+                name=exec_result.test_name,
+                node_id=exec_result.node_id,
+                error=exec_result.error,
+                duration=exec_result.duration,
+                output=exec_result.output,
+                is_fixture_error=True,
+            )
+            return TestOutcome(result, TestCounts(errored=1), Event.TEST_FAIL)
+
+        if exec_result.xfail_reason:
+            result = TestResult(
+                name=exec_result.test_name,
+                node_id=exec_result.node_id,
+                error=exec_result.error,
+                duration=exec_result.duration,
+                output=exec_result.output,
+                xfail_reason=exec_result.xfail_reason,
+            )
+            return TestOutcome(result, TestCounts(xfailed=1), Event.TEST_XFAIL)
+
+        result = TestResult(
+            name=exec_result.test_name,
+            node_id=exec_result.node_id,
+            error=exec_result.error,
+            duration=exec_result.duration,
+            output=exec_result.output,
+        )
+        return TestOutcome(result, TestCounts(failed=1), Event.TEST_FAIL)
+
     async def _run_test(
         self,
         item: TestItem,
@@ -187,76 +284,58 @@ class TestRunner:
         buffer: io.StringIO,
     ) -> TestOutcome:
         """Run a single test and return outcome (event emitted by caller)."""
-        test_func = item.func
-        test_name = get_callable_name(test_func)
+        test_name = get_callable_name(item.func)
         node_id = item.node_id
 
         if item.skip_reason:
-            result = TestResult(
-                name=test_name,
-                node_id=node_id,
-                skip_reason=item.skip_reason,
+            return self._build_outcome(
+                _TestExecutionResult(
+                    test_name=test_name,
+                    node_id=node_id,
+                    skip_reason=item.skip_reason,
+                )
             )
-            return TestOutcome(result, TestCounts(skipped=1), Event.TEST_SKIP)
 
         start_info = TestStartInfo(name=test_name, node_id=node_id)
         await self._session.events.emit(Event.TEST_START, start_info)
 
         start = time.perf_counter()
 
-        func_signature = signature(test_func)
-        kwargs: dict[str, Any] = {}
-
-        kwargs.update(item.case_kwargs)
-
         try:
-            for param_name, param in func_signature.parameters.items():
-                if param_name in kwargs:
-                    continue
-                if dependency := Resolver._extract_dependency_from_parameter(param):
-                    kwargs[param_name] = await ctx.resolve(dependency)
+            kwargs = await self._resolve_test_kwargs(item, ctx)
         except Exception as exc:
-            duration = time.perf_counter() - start
-            result = TestResult(
-                name=test_name,
-                node_id=node_id,
-                error=exc,
-                duration=duration,
-                output=buffer.getvalue(),
-                is_fixture_error=True,
+            return self._build_outcome(
+                _TestExecutionResult(
+                    test_name=test_name,
+                    node_id=node_id,
+                    duration=time.perf_counter() - start,
+                    output=buffer.getvalue(),
+                    error=exc,
+                    is_fixture_error=True,
+                )
             )
-            return TestOutcome(result, TestCounts(errored=1), Event.TEST_FAIL)
 
         await self._session.events.emit(Event.TEST_SETUP_DONE, start_info)
 
+        error: Exception | None = None
+        is_fixture_error = False
+
         try:
-            await ensure_async(test_func, **kwargs)
-            duration = time.perf_counter() - start
-            result = TestResult(
-                name=test_name,
-                node_id=node_id,
-                duration=duration,
-                output=buffer.getvalue(),
-            )
-            return TestOutcome(result, TestCounts(passed=1), Event.TEST_PASS)
+            await ensure_async(item.func, **kwargs)
         except FixtureError as exc:
-            duration = time.perf_counter() - start
-            result = TestResult(
-                name=test_name,
-                node_id=node_id,
-                error=exc.original,
-                duration=duration,
-                output=buffer.getvalue(),
-                is_fixture_error=True,
-            )
-            return TestOutcome(result, TestCounts(errored=1), Event.TEST_FAIL)
+            error = exc.original
+            is_fixture_error = True
         except Exception as exc:
-            duration = time.perf_counter() - start
-            result = TestResult(
-                name=test_name,
+            error = exc
+
+        return self._build_outcome(
+            _TestExecutionResult(
+                test_name=test_name,
                 node_id=node_id,
-                error=exc,
-                duration=duration,
+                duration=time.perf_counter() - start,
                 output=buffer.getvalue(),
+                error=error,
+                is_fixture_error=is_fixture_error,
+                xfail_reason=item.xfail_reason if not is_fixture_error else None,
             )
-            return TestOutcome(result, TestCounts(failed=1), Event.TEST_FAIL)
+        )
