@@ -61,6 +61,12 @@ class PluginBase:
     def on_test_skip(self, result: TestResult) -> None | Awaitable[None]:
         """Called when a test is skipped."""
 
+    def on_test_xfail(self, result: TestResult) -> None | Awaitable[None]:
+        """Called when a test fails as expected (xfail)."""
+
+    def on_test_xpass(self, result: TestResult) -> None | Awaitable[None]:
+        """Called when a test marked xfail unexpectedly passes."""
+
     def on_handler_start(self, info: HandlerInfo) -> None | Awaitable[None]:
         """Called when an event handler starts executing."""
 

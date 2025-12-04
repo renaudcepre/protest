@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
 from protest.core.collector import validate_no_from_params
 from protest.entities import FixtureRegistration
+from protest.utils import normalize_reason
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
 
@@ -86,12 +87,15 @@ class ProTestSuite:
         self,
         tags: list[str] | None = None,
         skip: bool | str = False,
+        xfail: bool | str = False,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             if tags:
                 func._protest_tags = set(tags)  # type: ignore[attr-defined]
-            if skip:
-                func._protest_skip = skip if isinstance(skip, str) else "Skipped"  # type: ignore[attr-defined]
+            if skip_reason := normalize_reason(skip, "Skipped"):
+                func._protest_skip = skip_reason  # type: ignore[attr-defined]
+            if xfail_reason := normalize_reason(xfail, "Expected failure"):
+                func._protest_xfail = xfail_reason  # type: ignore[attr-defined]
             self._tests.append(func)
             return func
 

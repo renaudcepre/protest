@@ -60,6 +60,18 @@ class RichReporter(PluginBase):
         name = _format_test_name(result)
         self.console.print(f"  [yellow]○[/] {name} [dim]({result.skip_reason})[/]")
 
+    def on_test_xfail(self, result: TestResult) -> None:
+        name = _format_test_name(result)
+        duration = _format_duration(result.duration)
+        self.console.print(
+            f"  [green]✗[/] {name} [dim]({result.xfail_reason}) ({duration})[/]"
+        )
+
+    def on_test_xpass(self, result: TestResult) -> None:
+        name = _format_test_name(result)
+        duration = _format_duration(result.duration)
+        self.console.print(f"  [red]⚡[/] {name} [red]XPASS[/] [dim]({duration})[/]")
+
     def on_waiting_handlers(self, pending_count: int) -> None:
         self.console.print(f"\n[cyan]⏳ Async handlers ({pending_count})[/]")
 
@@ -73,9 +85,16 @@ class RichReporter(PluginBase):
             self.console.print(f"  [green]✓[/] {info.name} [dim]({duration})[/]")
 
     def on_session_complete(self, result: SessionResult) -> None:
-        total = result.passed + result.failed + result.errors + result.skipped
+        total = (
+            result.passed
+            + result.failed
+            + result.errors
+            + result.skipped
+            + result.xfailed
+            + result.xpassed
+        )
 
-        if result.failed == 0 and result.errors == 0:
+        if result.failed == 0 and result.errors == 0 and result.xpassed == 0:
             status = "[bold green]✓ ALL PASSED[/]"
         else:
             status = "[bold red]✗ FAILURES[/]"
@@ -83,6 +102,10 @@ class RichReporter(PluginBase):
         parts = [f"{result.passed}/{total} passed"]
         if result.skipped:
             parts.append(f"[yellow]{result.skipped} skipped[/]")
+        if result.xfailed:
+            parts.append(f"[dim]{result.xfailed} xfailed[/]")
+        if result.xpassed:
+            parts.append(f"[red]{result.xpassed} xpassed[/]")
         if result.failed:
             parts.append(f"[red]{result.failed} failed[/]")
         if result.errors:

@@ -13,6 +13,8 @@ class TestCounts:
     failed: int = 0
     errored: int = 0
     skipped: int = 0
+    xfailed: int = 0
+    xpassed: int = 0
 
     def __add__(self, other: TestCounts) -> TestCounts:
         return TestCounts(
@@ -20,6 +22,8 @@ class TestCounts:
             failed=self.failed + other.failed,
             errored=self.errored + other.errored,
             skipped=self.skipped + other.skipped,
+            xfailed=self.xfailed + other.xfailed,
+            xpassed=self.xpassed + other.xpassed,
         )
 
 
@@ -32,6 +36,7 @@ class TestResult:
     output: str = ""
     is_fixture_error: bool = False
     skip_reason: str | None = None
+    xfail_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -40,6 +45,8 @@ class SessionResult:
     failed: int
     errors: int = 0
     skipped: int = 0
+    xfailed: int = 0
+    xpassed: int = 0
     duration: float = 0
 
 

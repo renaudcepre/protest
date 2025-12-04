@@ -151,11 +151,18 @@ class Collector:
         """Expand a test function into TestItems with computed tags."""
         tags = self._compute_test_tags(func, suite)
         skip_reason = getattr(func, "_protest_skip", None)
+        xfail_reason = getattr(func, "_protest_xfail", None)
         from_params = _extract_from_params(func)
 
         if not from_params:
             return [
-                TestItem(func=func, suite=suite, tags=tags, skip_reason=skip_reason)
+                TestItem(
+                    func=func,
+                    suite=suite,
+                    tags=tags,
+                    skip_reason=skip_reason,
+                    xfail_reason=xfail_reason,
+                )
             ]
 
         param_names = list(from_params.keys())
@@ -174,6 +181,7 @@ class Collector:
                     case_kwargs=case_kwargs,
                     case_ids=case_ids,
                     skip_reason=skip_reason,
+                    xfail_reason=xfail_reason,
                 )
             )
 
