@@ -81,3 +81,19 @@ class TestRunLastFailed:
         result.assert_failure()
         result.assert_output_contains("test_passing")
         result.assert_output_contains("test_failing")
+
+
+class TestRunCapture:
+    def test_no_capture_shows_print_output(
+        self, run_protest: Callable[..., CLIResult]
+    ) -> None:
+        result = run_protest("run", "print_session:session", "-s")
+        result.assert_success()
+        result.assert_output_contains("VISIBLE_OUTPUT_FROM_TEST")
+
+    def test_capture_hides_print_output(
+        self, run_protest: Callable[..., CLIResult]
+    ) -> None:
+        result = run_protest("run", "print_session:session")
+        result.assert_success()
+        assert "VISIBLE_OUTPUT_FROM_TEST" not in result.stdout

@@ -33,6 +33,7 @@ def run_session(  # noqa: PLR0913
     cache_clear: bool = False,
     include_tags: set[str] | None = None,
     exclude_tags: set[str] | None = None,
+    capture: bool = True,
 ) -> bool:
     """Run a test session and return success status.
 
@@ -46,6 +47,7 @@ def run_session(  # noqa: PLR0913
         cache_clear: Clear the cache before running.
         include_tags: Only run tests with these tags (OR logic).
         exclude_tags: Exclude tests with these tags.
+        capture: Capture stdout/stderr during tests (default: True).
 
     Returns:
         True if all tests passed, False otherwise.
@@ -55,6 +57,7 @@ def run_session(  # noqa: PLR0913
     if concurrency is not None:
         session.concurrency = concurrency
     session.exitfirst = exitfirst
+    session.capture = capture
     session.configure_cache(last_failed=last_failed, cache_clear=cache_clear)
     session.configure_tags(include_tags=include_tags, exclude_tags=exclude_tags)
 

@@ -72,6 +72,7 @@ class ProTestSession:
         self._cache_plugin: CachePlugin | None = None
         self._tag_filter_plugin: TagFilterPlugin | None = None
         self._exitfirst: bool = False
+        self._capture: bool = True
 
         if default_reporter:
             self.use(_get_default_reporter())
@@ -106,6 +107,14 @@ class ProTestSession:
     @exitfirst.setter
     def exitfirst(self, value: bool) -> None:
         self._exitfirst = value
+
+    @property
+    def capture(self) -> bool:
+        return self._capture
+
+    @capture.setter
+    def capture(self, value: bool) -> None:
+        self._capture = value
 
     def configure_cache(
         self, last_failed: bool = False, cache_clear: bool = False
