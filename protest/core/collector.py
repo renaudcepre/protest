@@ -150,10 +150,13 @@ class Collector:
     ) -> list[TestItem]:
         """Expand a test function into TestItems with computed tags."""
         tags = self._compute_test_tags(func, suite)
+        skip_reason = getattr(func, "_protest_skip", None)
         from_params = _extract_from_params(func)
 
         if not from_params:
-            return [TestItem(func=func, suite=suite, tags=tags)]
+            return [
+                TestItem(func=func, suite=suite, tags=tags, skip_reason=skip_reason)
+            ]
 
         param_names = list(from_params.keys())
         sources = [from_params[name] for name in param_names]
@@ -170,6 +173,7 @@ class Collector:
                     tags=tags.copy(),
                     case_kwargs=case_kwargs,
                     case_ids=case_ids,
+                    skip_reason=skip_reason,
                 )
             )
 

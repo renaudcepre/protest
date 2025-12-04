@@ -58,6 +58,9 @@ class PluginBase:
     def on_test_fail(self, result: TestResult) -> None | Awaitable[None]:
         """Called when a test fails."""
 
+    def on_test_skip(self, result: TestResult) -> None | Awaitable[None]:
+        """Called when a test is skipped."""
+
     def on_handler_start(self, info: HandlerInfo) -> None | Awaitable[None]:
         """Called when an event handler starts executing."""
 

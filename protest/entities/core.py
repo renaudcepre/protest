@@ -48,6 +48,7 @@ class TestItem:
     tags: set[str] = field(default_factory=set)
     case_kwargs: dict[str, Any] = field(default_factory=dict)
     case_ids: list[str] = field(default_factory=list)
+    skip_reason: str | None = None
 
     @property
     def test_name(self) -> str:

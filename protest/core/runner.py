@@ -107,6 +107,7 @@ class TestRunner:
             passed=total_counts.passed,
             failed=total_counts.failed,
             errors=total_counts.errored,
+            skipped=total_counts.skipped,
             duration=session_duration,
         )
         await self._session.events.emit(Event.SESSION_END, session_result)
@@ -189,6 +190,14 @@ class TestRunner:
         test_func = item.func
         test_name = get_callable_name(test_func)
         node_id = item.node_id
+
+        if item.skip_reason:
+            result = TestResult(
+                name=test_name,
+                node_id=node_id,
+                skip_reason=item.skip_reason,
+            )
+            return TestOutcome(result, TestCounts(skipped=1), Event.TEST_SKIP)
 
         start_info = TestStartInfo(name=test_name, node_id=node_id)
         await self._session.events.emit(Event.TEST_START, start_info)
