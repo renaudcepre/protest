@@ -6,10 +6,85 @@ ProTest is a Python testing framework designed for modern async applications. In
 
 ## Why ProTest?
 
-- **Explicit dependencies**: No guessing where fixtures come from. You declare them with `Use(fixture)`.
-- **Tree-based scoping**: Fixture scope is determined by where you decorate, not a string parameter.
-- **Async-native**: Built for async from the ground up, not bolted on.
-- **Built-in parallelism**: Run tests concurrently with `-n 4`.
+ProTest isn't just another test runner. It's built for **modern Python**: typed, async, and explicit.
+
+### Native I/O Concurrency
+
+Run HTTP tests in parallel for nearly free. No heavy processes, no RAM explosion—just asyncio.
+
+```bash
+protest tests:session -n 10
+```
+
+*pytest-xdist spawns processes. ProTest uses coroutines.*
+
+### Zero-Magic Injection (IDE-Ready)
+
+**Ctrl+Click works.** Your IDE knows every type. No guessing where fixtures come from.
+
+```python
+# pytest: Where does "db" come from? Good luck finding it.
+def test_user(db): ...
+
+# ProTest: Ctrl+Click → Go to definition. Full type inference.
+def test_user(db: Annotated[Database, Use(database)]): ...
+```
+
+### Smart Tagging (Tag Propagation)
+
+Tag a fixture once, and **every test using it inherits the tag automatically**—even through deep dependency chains.
+
+```python
+@session.fixture(tags=["database"])
+def db(): ...
+
+@session.fixture()
+def user_repo(db: Annotated[DB, Use(db)]): ...  # Inherits "database" tag
+
+@session.test()
+def test_users(repo: Annotated[Repo, Use(user_repo)]): ...  # Also tagged "database"
+```
+
+```bash
+protest tests:session --exclude-tag database  # Skips ALL tests touching DB
+```
+
+*No manual tagging. No forgotten markers.*
+
+### Infra vs Code Errors
+
+Know instantly if your **code** failed or your **infrastructure** crashed.
+
+```
+✗ test_create_user: AssertionError          # Your bug - TEST FAILED
+⚠ test_with_db: [FIXTURE] ConnectionError   # Infra issue - SETUP ERROR
+```
+
+*pytest says FAILED for both. You waste time debugging the wrong thing.*
+
+### Typed Parameterization
+
+No more string-matching that breaks when you rename arguments.
+
+```python
+# pytest: Rename "code" → runtime error
+@pytest.mark.parametrize("code", [200, 201])
+def test_status(code): ...
+
+# ProTest: Rename-safe, IDE-aware, type-checked
+CODES = ForEach([200, 201])
+
+@session.test()
+def test_status(code: Annotated[int, From(CODES)]): ...
+```
+
+### Tree-Based Scoping (Smart Teardown)
+
+Resources are cleaned up **as soon as they're no longer needed**. Nested suites with predictive cleanup.
+
+### Managed Factories
+
+Create test data with automatic caching and cleanup. No manual teardown.
 
 ## Quick Example
 
