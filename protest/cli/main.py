@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
-import importlib
 import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from protest.core.suite import ProTestSuite
     from protest.entities import TestItem
 
 HELP_EPILOG = """
@@ -49,81 +46,31 @@ def _handle_tags_command() -> None:
     args = parser.parse_args(sys.argv[2:])
 
     if args.subcommand == "list":
-        sys.path.insert(0, args.app_dir)
-        _list_tags(args.target, recursive=args.recursive)
+        _list_tags(args.target, app_dir=args.app_dir, recursive=args.recursive)
 
 
-def _list_tags(target: str, recursive: bool = False) -> None:
+def _list_tags(target: str, app_dir: str, recursive: bool = False) -> None:
     """List all tags in a session."""
-    if ":" not in target:
-        print(f"Error: Invalid format '{target}'. Use 'module:session'")
-        sys.exit(1)
-
-    module_path, session_name = target.rsplit(":", 1)
+    from protest.api import collect_tests, list_tags
+    from protest.loader import LoadError, load_session
 
     try:
-        module = importlib.import_module(module_path)
-    except ModuleNotFoundError as exc:
-        print(f"Error: Cannot import module '{module_path}': {exc}")
+        session = load_session(target, app_dir)
+    except LoadError as exc:
+        print(f"Error: {exc}")
         sys.exit(1)
-
-    session = getattr(module, session_name, None)
-    if session is None:
-        print(f"Error: No '{session_name}' found in module '{module_path}'")
-        sys.exit(1)
-
-    from protest.core.collector import Collector
-    from protest.core.session import ProTestSession
-
-    if not isinstance(session, ProTestSession):
-        print(f"Error: '{session_name}' is not a ProTestSession")
-        sys.exit(1)
-
-    collector = Collector()
-    items = collector.collect(session)
 
     if recursive:
+        items = collect_tests(session)
         _print_tags_recursive(items)
     else:
-        _print_tags_summary(items, session, collector)
+        tags = list_tags(session)
+        _print_tags_summary(tags)
 
 
-def _print_tags_summary(
-    items: list[TestItem], session: object, collector: object
-) -> None:
+def _print_tags_summary(tags: set[str]) -> None:
     """Print summary of all declared tags."""
-    from protest.core.collector import Collector
-    from protest.core.session import ProTestSession
-
-    assert isinstance(session, ProTestSession)
-    assert isinstance(collector, Collector)
-
-    all_tags: set[str] = set()
-
-    for reg in session.fixtures:
-        all_tags.update(reg.tags)
-
-    def collect_suite_tags(suites: list[ProTestSuite]) -> None:
-        for suite in suites:
-            all_tags.update(suite.tags)
-            for reg in suite.fixtures:
-                all_tags.update(reg.tags)
-            collect_suite_tags(suite.suites)
-
-    collect_suite_tags(session.suites)
-
-    for test_reg in session.tests:
-        all_tags.update(test_reg.tags)
-
-    def collect_suite_test_tags(suites: list[ProTestSuite]) -> None:
-        for suite in suites:
-            for test_reg in suite.tests:
-                all_tags.update(test_reg.tags)
-            collect_suite_test_tags(suite.suites)
-
-    collect_suite_test_tags(session.suites)
-
-    for tag in sorted(all_tags):
+    for tag in sorted(tags):
         print(tag)
 
 
@@ -233,21 +180,22 @@ def _handle_run_command() -> None:
 
     args = parser.parse_args(sys.argv[2:])
 
-    sys.path.insert(0, args.app_dir)
     run_tests(
         args.target,
-        args.concurrency,
+        app_dir=args.app_dir,
+        concurrency=args.concurrency,
         last_failed=args.last_failed,
         cache_clear=args.cache_clear,
         collect_only=args.collect_only,
-        include_tags=set(args.tags),
-        exclude_tags=set(args.exclude_tags),
+        include_tags=set(args.tags) if args.tags else None,
+        exclude_tags=set(args.exclude_tags) if args.exclude_tags else None,
         exitfirst=args.exitfirst,
     )
 
 
 def run_tests(  # noqa: PLR0913
     target: str,
+    app_dir: str = ".",
     concurrency: int = 1,
     last_failed: bool = False,
     cache_clear: bool = False,
@@ -256,52 +204,33 @@ def run_tests(  # noqa: PLR0913
     exclude_tags: set[str] | None = None,
     exitfirst: bool = False,
 ) -> None:
-    if ":" not in target:
-        print(f"Error: Invalid format '{target}'. Use 'module:session'")
-        sys.exit(1)
-
-    module_path, session_name = target.rsplit(":", 1)
+    from protest.api import collect_tests, run_session
+    from protest.loader import LoadError, load_session
 
     try:
-        module = importlib.import_module(module_path)
-    except ModuleNotFoundError as exc:
-        print(f"Error: Cannot import module '{module_path}': {exc}")
+        session = load_session(target, app_dir)
+    except LoadError as exc:
+        print(f"Error: {exc}")
         sys.exit(1)
-
-    session = getattr(module, session_name, None)
-    if session is None:
-        print(f"Error: No '{session_name}' found in module '{module_path}'")
-        sys.exit(1)
-
-    from protest.core.collector import Collector
-    from protest.core.runner import TestRunner
-    from protest.core.session import ProTestSession
-
-    if not isinstance(session, ProTestSession):
-        print(f"Error: '{session_name}' is not a ProTestSession")
-        sys.exit(1)
-
-    session.concurrency = concurrency
-    session.exitfirst = exitfirst
-    session.configure_cache(last_failed=last_failed, cache_clear=cache_clear)
-
-    session.configure_tags(include_tags=include_tags, exclude_tags=exclude_tags)
 
     if collect_only:
-        from protest.events.types import Event
-
-        collector = Collector()
-        items = collector.collect(session)
-        items = asyncio.run(
-            session.events.emit_and_collect(Event.COLLECTION_FINISH, items)
+        items = collect_tests(
+            session, include_tags=include_tags, exclude_tags=exclude_tags
         )
         print(f"Collected {len(items)} test(s):\n")
         for item in items:
             print(f"  {item.node_id}")
         sys.exit(0)
 
-    runner = TestRunner(session)
-    success = runner.run()
+    success = run_session(
+        session,
+        concurrency=concurrency,
+        exitfirst=exitfirst,
+        last_failed=last_failed,
+        cache_clear=cache_clear,
+        include_tags=include_tags,
+        exclude_tags=exclude_tags,
+    )
     sys.exit(0 if success else 1)
 
 
