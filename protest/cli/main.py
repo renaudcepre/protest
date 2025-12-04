@@ -14,6 +14,7 @@ Examples:
   protest run demo:session --lf         Re-run only failed tests
   protest run demo:session --collect-only   List tests without running
   protest run demo:session --tag slow   Run tests with 'slow' tag
+  protest run demo:session -s           Disable capture (show print output)
   protest tags list demo:session        List all available tags
 """
 
@@ -177,6 +178,13 @@ def _handle_run_command() -> None:
         action="store_true",
         help="Exit after first failed test",
     )
+    parser.add_argument(
+        "-s",
+        "--no-capture",
+        dest="no_capture",
+        action="store_true",
+        help="Disable stdout/stderr capture (show print output)",
+    )
 
     args = parser.parse_args(sys.argv[2:])
 
@@ -190,6 +198,7 @@ def _handle_run_command() -> None:
         include_tags=set(args.tags) if args.tags else None,
         exclude_tags=set(args.exclude_tags) if args.exclude_tags else None,
         exitfirst=args.exitfirst,
+        capture=not args.no_capture,
     )
 
 
@@ -203,6 +212,7 @@ def run_tests(  # noqa: PLR0913
     include_tags: set[str] | None = None,
     exclude_tags: set[str] | None = None,
     exitfirst: bool = False,
+    capture: bool = True,
 ) -> None:
     from protest.api import collect_tests, run_session
     from protest.loader import LoadError, load_session
@@ -230,6 +240,7 @@ def run_tests(  # noqa: PLR0913
         cache_clear=cache_clear,
         include_tags=include_tags,
         exclude_tags=exclude_tags,
+        capture=capture,
     )
     sys.exit(0 if success else 1)
 

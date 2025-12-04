@@ -10,6 +10,7 @@ EXAMPLES=(
     "run examples.basic.demo_async:session"
     "run examples.basic.demo_async:session -n 4"
     "run examples.basic.demo_capture:session"
+    "run examples.basic.demo_capture:session -s"
     "run examples.basic.caplog_demo:session"
     "run examples.basic.factory_demo:session"
     "run examples.basic.nested_suites:session"

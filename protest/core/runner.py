@@ -74,7 +74,10 @@ class TestRunner:
 
         await self._session.events.emit(Event.SESSION_START)
 
-        with GlobalCapturePatch():
+        capture_ctx = (
+            GlobalCapturePatch() if self._session.capture else contextlib.nullcontext()
+        )
+        with capture_ctx:
             async with self._session:
                 await self._session.resolve_autouse()
 

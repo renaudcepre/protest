@@ -76,6 +76,16 @@ uv run protest demo:session --collect-only
 uv run protest demo:session --lf --collect-only
 ```
 
+### Disable capture (-s / --no-capture)
+
+```bash
+# Show print output in real-time (like pytest -s)
+uv run protest demo_capture:session -s
+
+# Useful for debugging - see stdout immediately
+uv run protest demo:session --no-capture
+```
+
 ### Combined options
 
 ```bash
