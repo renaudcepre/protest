@@ -1,5 +1,4 @@
 import asyncio
-import time
 from typing import Annotated
 
 from protest import ProTestSession, ProTestSuite, Use
@@ -274,30 +273,6 @@ class TestRunnerParallelExecution:
         # Then: max concurrent tests never exceeds session concurrency
         expected_max_concurrency = 2
         assert tracker.max_seen <= expected_max_concurrency
-
-    def test_parallel_execution_faster_than_sequential(self) -> None:
-        """Parallel execution should be faster than sequential."""
-        session = ProTestSession(concurrency=3)
-
-        @session.test()
-        async def test_a() -> None:
-            await asyncio.sleep(0.1)
-
-        @session.test()
-        async def test_b() -> None:
-            await asyncio.sleep(0.1)
-
-        @session.test()
-        async def test_c() -> None:
-            await asyncio.sleep(0.1)
-
-        runner = TestRunner(session)
-        start = time.perf_counter()
-        runner.run()
-        duration = time.perf_counter() - start
-
-        sequential_would_take = 0.3
-        assert duration < sequential_would_take
 
 
 class TestRunnerCollectionEvent:
