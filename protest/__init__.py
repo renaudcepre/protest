@@ -1,3 +1,4 @@
+from protest.api import collect_tests, list_tags, run_session
 from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
 from protest.di.decorators import factory, fixture
@@ -6,6 +7,7 @@ from protest.di.markers import ForEach, From, Use
 from protest.entities import FixtureCallable
 from protest.exceptions import FixtureError, ProTestError
 from protest.fixtures.builtins import caplog
+from protest.loader import LoadError, load_session
 from protest.plugin import PluginBase
 
 __version__ = "0.1.0"
@@ -16,6 +18,7 @@ __all__ = [
     "FixtureFactory",
     "ForEach",
     "From",
+    "LoadError",
     "PluginBase",
     "ProTestError",
     "ProTestSession",
@@ -23,6 +26,10 @@ __all__ = [
     "Use",
     "__version__",
     "caplog",
+    "collect_tests",
     "factory",
     "fixture",
+    "list_tags",
+    "load_session",
+    "run_session",
 ]
