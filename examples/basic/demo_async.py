@@ -4,6 +4,7 @@ import asyncio
 from typing import Annotated
 
 from protest import ProTestSession, Use
+from protest.di.decorators import fixture
 
 session = ProTestSession()
 
@@ -35,6 +36,7 @@ def test_sync_stuff():
     assert True
 
 
+@fixture()
 def sync_fixture():
     return "sync_data"
 

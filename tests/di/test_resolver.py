@@ -6,12 +6,14 @@ from typing import Annotated
 import pytest
 
 from protest.core.fixture import is_generator_like
+from protest.di.decorators import fixture
 from protest.di.markers import Use
 from protest.di.resolver import (
     AlreadyRegisteredError,
     Resolver,
     ScopeMismatchError,
 )
+from protest.exceptions import PlainFunctionError
 from tests.di.dependencies import (
     function_dependency,
     generator_function_fixture,
@@ -111,25 +113,24 @@ def test_cannot_register_same_function_twice(resolver: Resolver) -> None:
 # --- Auto-registration and Scope Mismatch Tests ---
 
 
-def test_undecorated_dependency_auto_registered_as_function_scope(
+def test_undecorated_dependency_raises_plain_function_error(
     resolver: Resolver,
 ) -> None:
-    """Undecorated functions are auto-registered with FUNCTION scope.
-
-    A SESSION-scoped fixture cannot depend on a FUNCTION-scoped fixture,
-    so this raises ScopeMismatchError (not UnregisteredDependencyError).
-    """
+    """Plain functions without @fixture()/@factory() raise PlainFunctionError."""
 
     def unregistered_dependency() -> str:
         return "unregistered_data"
 
+    @fixture()
     def fixture_with_unregistered_dep(
         dep: Annotated[str, Use(unregistered_dependency)],
     ) -> str:
         return f"fixture({dep})"
 
-    with pytest.raises(ScopeMismatchError):
-        resolver.register(fixture_with_unregistered_dep, scope_path=None)
+    with pytest.raises(PlainFunctionError) as exc_info:
+        resolver.register(fixture_with_unregistered_dep.func, scope_path=None)
+
+    assert "unregistered_dependency" in str(exc_info.value)
 
 
 def test_extract_dependency_returns_none_for_regular_params() -> None:
@@ -295,16 +296,17 @@ def test_is_generator_like_ignores_annotation_without_yield() -> None:
 
 
 @pytest.mark.asyncio
-async def test_undecorated_function_auto_registered_and_resolved(
+async def test_decorated_function_auto_registered_and_resolved(
     resolver: Resolver,
 ) -> None:
-    """Undecorated functions are auto-registered with FUNCTION scope and resolved."""
+    """@fixture() decorated functions are auto-registered with FUNCTION scope."""
 
-    def unregistered_fixture() -> str:
+    @fixture()
+    def my_fixture() -> str:
         return "auto_registered_data"
 
     async with resolver:
-        result = await resolver.resolve(unregistered_fixture)
+        result = await resolver.resolve(my_fixture)
         assert result == "auto_registered_data"
 
 
@@ -315,10 +317,11 @@ async def test_undecorated_function_auto_registered_and_resolved(
 async def test_fixture_error_during_setup_propagates(resolver: Resolver) -> None:
     """Test that errors during fixture setup are propagated correctly."""
 
+    @fixture()
     def failing_fixture() -> str:
         raise RuntimeError("Setup failed intentionally")
 
-    resolver.register(failing_fixture, scope_path=None)
+    resolver.register(failing_fixture.func, scope_path=None)
 
     with pytest.raises(RuntimeError, match="Setup failed intentionally"):
         await resolver.resolve(failing_fixture)

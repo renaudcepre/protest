@@ -6,6 +6,8 @@ from typing import Annotated
 import pytest
 
 from protest import ProTestSession, ProTestSuite, Use
+from protest.di.decorators import fixture
+from protest.exceptions import PlainFunctionError
 from protest.execution.context import TestExecutionContext
 
 
@@ -122,26 +124,20 @@ class TestTreeBasedScoping:
         assert call_count == 2
 
     @pytest.mark.asyncio
-    async def test_undecorated_function_defaults_to_function_scope(self) -> None:
-        """Functions without decoration are treated as FUNCTION scope."""
-        call_count = 0
+    async def test_undecorated_function_raises_error(self) -> None:
+        """Plain functions without @fixture()/@factory() raise PlainFunctionError."""
 
         def simple_fixture() -> str:
-            nonlocal call_count
-            call_count += 1
-            return f"value_{call_count}"
+            return "value"
 
         session = ProTestSession()
 
-        async with session:
-            async with TestExecutionContext(session.resolver) as ctx1:
-                result1 = await ctx1.resolve(simple_fixture)
-            async with TestExecutionContext(session.resolver) as ctx2:
-                result2 = await ctx2.resolve(simple_fixture)
+        async with session, TestExecutionContext(session.resolver) as ctx:
+            with pytest.raises(PlainFunctionError) as exc_info:
+                await ctx.resolve(simple_fixture)
 
-        assert result1 == "value_1"
-        assert result2 == "value_2"
-        assert call_count == 2
+        assert "simple_fixture" in str(exc_info.value)
+        assert "@fixture()" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_fixture_with_dependencies(self) -> None:
@@ -177,6 +173,7 @@ class TestTreeBasedScoping:
         def suite_service(cfg: Annotated[str, Use(global_config)]) -> str:
             return f"suite_{cfg}"
 
+        @fixture()
         def test_helper(svc: Annotated[str, Use(suite_service)]) -> str:
             return f"test_{svc}"
 
@@ -199,9 +196,7 @@ class TestAutouse:
         """Autouse fixtures are resolved when session starts."""
         setup_done = False
 
-        session = ProTestSession()
-
-        @session.fixture()
+        @fixture()
         def setup_database() -> str:
             nonlocal setup_done
             setup_done = True
@@ -220,14 +215,12 @@ class TestAutouse:
         """Autouse fixtures can have dependencies."""
         log: list[str] = []
 
-        session = ProTestSession()
-
-        @session.fixture()
+        @fixture()
         def database() -> str:
             log.append("database")
             return "db"
 
-        @session.fixture()
+        @fixture()
         def init_tables(db: Annotated[str, Use(database)]) -> str:
             log.append(f"tables_on_{db}")
             return "tables"

@@ -5,6 +5,7 @@ from typing import Annotated
 
 from examples.basic.slack_notifier import FakeSlackNotifier
 from protest import ProTestSession, ProTestSuite, Use
+from protest.di.decorators import fixture
 
 session = ProTestSession()
 api_suite = ProTestSuite("API Tests")
@@ -64,10 +65,11 @@ def auth_token(
 
 
 # =============================================================================
-# API SUITE - FUNCTION-SCOPED FIXTURES (plain functions, fresh for each test)
+# API SUITE - FUNCTION-SCOPED FIXTURES (fresh for each test)
 # =============================================================================
 
 
+@fixture()
 def request_id() -> Generator[str, None, None]:
     import random
 
@@ -109,16 +111,18 @@ def test_api_broken() -> None:
 
 
 # =============================================================================
-# UNIT SUITE - FUNCTION-SCOPED FIXTURES (plain functions)
+# UNIT SUITE - FUNCTION-SCOPED FIXTURES
 # =============================================================================
 
 
+@fixture()
 def temp_file() -> Generator[str, None, None]:
     print("    [FUNCTION setup] temp file created")
     yield "/tmp/test_file.txt"
     print("    [FUNCTION teardown] temp file deleted")
 
 
+@fixture()
 def counter() -> int:
     return 42
 
