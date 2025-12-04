@@ -1,4 +1,16 @@
-from protest.entities import SessionResult, TestCounts, TestResult
+from dataclasses import FrozenInstanceError
+
+import pytest
+
+from protest.entities import (
+    FixtureInfo,
+    HandlerInfo,
+    SessionResult,
+    TestCounts,
+    TestResult,
+    TestStartInfo,
+)
+from protest.events.types import Event
 
 
 class TestTestCounts:
@@ -100,3 +112,43 @@ class TestSessionResult:
         assert result.failed == 2
         assert result.errors == 1
         assert result.duration == 10.5
+
+
+class TestFrozenDataclasses:
+    """Event dataclasses are frozen to prevent race conditions in async handlers."""
+
+    def test_test_counts_is_immutable(self) -> None:
+        counts = TestCounts(passed=1)
+
+        with pytest.raises(FrozenInstanceError):
+            counts.passed = 2  # type: ignore[misc]
+
+    def test_test_result_is_immutable(self) -> None:
+        result = TestResult(name="test")
+
+        with pytest.raises(FrozenInstanceError):
+            result.output = "mutated"  # type: ignore[misc]
+
+    def test_session_result_is_immutable(self) -> None:
+        result = SessionResult(passed=1, failed=0)
+
+        with pytest.raises(FrozenInstanceError):
+            result.passed = 999  # type: ignore[misc]
+
+    def test_test_start_info_is_immutable(self) -> None:
+        info = TestStartInfo(name="test", node_id="mod::test")
+
+        with pytest.raises(FrozenInstanceError):
+            info.name = "mutated"  # type: ignore[misc]
+
+    def test_handler_info_is_immutable(self) -> None:
+        info = HandlerInfo(name="handler", event=Event.TEST_PASS, is_async=True)
+
+        with pytest.raises(FrozenInstanceError):
+            info.duration = 999.0  # type: ignore[misc]
+
+    def test_fixture_info_is_immutable(self) -> None:
+        info = FixtureInfo(name="db", scope="session")
+
+        with pytest.raises(FrozenInstanceError):
+            info.scope = "function"  # type: ignore[misc]
