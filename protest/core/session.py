@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 from protest.cache.plugin import CachePlugin
 from protest.core.collector import validate_no_from_params
 from protest.di.resolver import Resolver
-from protest.entities import FixtureRegistration
+from protest.entities import FixtureRegistration, TestRegistration
 from protest.events.bus import EventBus
 from protest.events.types import Event
 from protest.tags.plugin import TagFilterPlugin
@@ -62,7 +62,7 @@ class ProTestSession:
         self._events = EventBus()
         self._resolver = Resolver(event_bus=self._events)
         self._suites: list[ProTestSuite] = []
-        self._tests: list[Callable[..., Any]] = []
+        self._tests: list[TestRegistration] = []
         self._fixtures: list[FixtureRegistration] = []
         self._concurrency = max(1, concurrency)
         self._autouse = autouse or []
@@ -140,7 +140,7 @@ class ProTestSession:
         return self._suites
 
     @property
-    def tests(self) -> list[Callable[..., Any]]:
+    def tests(self) -> list[TestRegistration]:
         return self._tests
 
     @property
@@ -152,15 +152,16 @@ class ProTestSession:
         tags: list[str] | None = None,
         skip: bool | str = False,
         xfail: bool | str = False,
-    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-            if tags:
-                func._protest_tags = set(tags)  # type: ignore[attr-defined]
-            if skip_reason := normalize_reason(skip, "Skipped"):
-                func._protest_skip = skip_reason  # type: ignore[attr-defined]
-            if xfail_reason := normalize_reason(xfail, "Expected failure"):
-                func._protest_xfail = xfail_reason  # type: ignore[attr-defined]
-            self._tests.append(func)
+    ) -> Callable[[FuncT], FuncT]:
+        def decorator(func: FuncT) -> FuncT:
+            self._tests.append(
+                TestRegistration(
+                    func=func,
+                    tags=set(tags) if tags else set(),
+                    skip_reason=normalize_reason(skip, "Skipped"),
+                    xfail_reason=normalize_reason(xfail, "Expected failure"),
+                )
+            )
             return func
 
         return decorator

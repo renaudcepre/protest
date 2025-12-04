@@ -112,10 +112,16 @@ def _print_tags_summary(
 
     collect_suite_tags(session.suites)
 
-    for item in items:
-        explicit_tags = getattr(item.func, "_protest_tags", None)
-        if explicit_tags:
-            all_tags.update(explicit_tags)
+    for test_reg in session.tests:
+        all_tags.update(test_reg.tags)
+
+    def collect_suite_test_tags(suites: list[ProTestSuite]) -> None:
+        for suite in suites:
+            for test_reg in suite.tests:
+                all_tags.update(test_reg.tags)
+            collect_suite_test_tags(suite.suites)
+
+    collect_suite_test_tags(session.suites)
 
     for tag in sorted(all_tags):
         print(tag)

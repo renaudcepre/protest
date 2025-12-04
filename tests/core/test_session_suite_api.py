@@ -41,8 +41,8 @@ class TestSessionSuiteAPI:
 
         assert len(session.tests) == 1
         assert len(suite_a.tests) == 1
-        assert getattr(session.tests[0], "__name__", None) == "session_test"
-        assert getattr(suite_a.tests[0], "__name__", None) == "suite_test"
+        assert session.tests[0].func.__name__ == "session_test"
+        assert suite_a.tests[0].func.__name__ == "suite_test"
 
     def test_nested_suite_full_path(self) -> None:
         """Nested suites have correct full_path."""
