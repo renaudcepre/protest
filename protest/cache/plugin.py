@@ -2,19 +2,14 @@
 
 from __future__ import annotations
 
-import json
-import time
-from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from protest.plugin import PluginBase
 
 if TYPE_CHECKING:
+    from protest.cache.storage import CacheStorage
     from protest.core.session import ProTestSession
     from protest.entities import SessionResult, TestItem, TestResult
-
-CACHE_DIR = Path(".protest")
-CACHE_FILE = CACHE_DIR / "cache.json"
 
 
 class CachePlugin(PluginBase):
@@ -23,72 +18,40 @@ class CachePlugin(PluginBase):
     def __init__(self, last_failed: bool = False, cache_clear: bool = False) -> None:
         self._last_failed = last_failed
         self._cache_clear = cache_clear
-        self._results: dict[str, dict[str, float | str]] = {}
-        self._cache_data: dict[str, Any] = {}
+        self._cache: CacheStorage | None = None
 
     def setup(self, session: ProTestSession) -> None:
+        self._cache = session.cache
         if self._cache_clear:
-            self._clear_cache()
+            self._cache.clear()
         else:
-            self._load_cache()
+            self._cache.load()
 
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
         """Filter tests based on --lf flag."""
-        if self._last_failed:
+        if self._last_failed and self._cache is not None:
             return self._filter_last_failed(items)
         return items
 
     def on_test_pass(self, result: TestResult) -> None:
-        self._results[result.node_id] = {
-            "status": "passed",
-            "duration": result.duration,
-        }
+        if self._cache is not None:
+            self._cache.set_result(result.node_id, "passed", result.duration)
 
     def on_test_fail(self, result: TestResult) -> None:
-        status = "error" if result.is_fixture_error else "failed"
-        self._results[result.node_id] = {
-            "status": status,
-            "duration": result.duration,
-        }
+        if self._cache is not None:
+            status = "error" if result.is_fixture_error else "failed"
+            self._cache.set_result(result.node_id, status, result.duration)
 
     def on_session_end(self, result: SessionResult) -> None:
-        self._save_cache()
+        if self._cache is not None:
+            self._cache.save()
 
     def _filter_last_failed(self, items: list[TestItem]) -> list[TestItem]:
         """Keep only tests that failed in the last run."""
-        results = self._cache_data.get("results", {})
-        if not isinstance(results, dict):
+        if self._cache is None:
             return items
-        failed_ids = {
-            node_id
-            for node_id, result in results.items()
-            if isinstance(result, dict) and result.get("status") in ("failed", "error")
-        }
+        failed_ids = self._cache.get_failed_node_ids()
+        if not failed_ids:
+            return items
         filtered = [item for item in items if item.node_id in failed_ids]
         return filtered if filtered else items
-
-    def _load_cache(self) -> None:
-        if CACHE_FILE.exists():
-            try:
-                self._cache_data = json.loads(CACHE_FILE.read_text())
-            except json.JSONDecodeError:
-                self._cache_data = {}
-
-    def _save_cache(self) -> None:
-        CACHE_DIR.mkdir(exist_ok=True)
-        existing_results = self._cache_data.get("results", {})
-        if isinstance(existing_results, dict):
-            existing_results.update(self._results)
-        else:
-            existing_results = self._results
-        data = {
-            "version": 1,
-            "timestamp": time.time(),
-            "results": existing_results,
-        }
-        CACHE_FILE.write_text(json.dumps(data, indent=2))
-
-    def _clear_cache(self) -> None:
-        if CACHE_FILE.exists():
-            CACHE_FILE.unlink()
-        self._cache_data = {}
