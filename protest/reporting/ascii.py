@@ -48,6 +48,10 @@ class AsciiReporter(PluginBase):
             for line in result.output.rstrip().splitlines():
                 print(f"    | {line}")
 
+    def on_test_skip(self, result: TestResult) -> None:
+        name = _format_test_name(result)
+        print(f"  -- {name} ({result.skip_reason})")
+
     def on_waiting_handlers(self, pending_count: int) -> None:
         print(f"\n.. Async handlers ({pending_count})")
 
@@ -61,7 +65,7 @@ class AsciiReporter(PluginBase):
             print(f"  OK {info.name} ({duration})")
 
     def on_session_complete(self, result: SessionResult) -> None:
-        total = result.passed + result.failed + result.errors
+        total = result.passed + result.failed + result.errors + result.skipped
 
         if result.failed == 0 and result.errors == 0:
             status = "OK ALL PASSED"
@@ -69,6 +73,8 @@ class AsciiReporter(PluginBase):
             status = "XX FAILURES"
 
         parts = [f"{result.passed}/{total} passed"]
+        if result.skipped:
+            parts.append(f"{result.skipped} skipped")
         if result.failed:
             parts.append(f"{result.failed} failed")
         if result.errors:

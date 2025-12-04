@@ -83,11 +83,15 @@ class ProTestSuite:
         return self._fixtures
 
     def test(
-        self, tags: list[str] | None = None
+        self,
+        tags: list[str] | None = None,
+        skip: bool | str = False,
     ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             if tags:
                 func._protest_tags = set(tags)  # type: ignore[attr-defined]
+            if skip:
+                func._protest_skip = skip if isinstance(skip, str) else "Skipped"  # type: ignore[attr-defined]
             self._tests.append(func)
             return func
 

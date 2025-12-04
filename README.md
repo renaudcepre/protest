@@ -6,6 +6,114 @@ Modern, async-first testing framework for Python 3.10+
 
 ---
 
+## Why ProTest?
+
+ProTest isn't just another test runner. It's built for **modern Python**: typed, async,
+and explicit.
+
+### Native I/O Concurrency
+
+Run HTTP tests in parallel for nearly free. No heavy processes, no RAM explosion—just
+asyncio.
+
+```bash
+protest tests:session -n 10
+```
+
+*pytest-xdist spawns processes. ProTest uses coroutines.*
+
+### Zero-Magic Injection (IDE-Ready)
+
+**Ctrl+Click works.** Your IDE knows every type. No guessing where fixtures come from.
+
+```python
+def test_user(db: Annotated[Database, Use(database)]): ...
+```
+
+### Smart Tagging (Tag Propagation)
+
+Tag a fixture once, and **every test using it inherits the tag automatically**—even
+through deep dependency chains.
+
+```python
+@session.fixture(tags=["database"])
+def db(): ...
+
+
+@session.fixture()
+def user_repo(db: Annotated[DB, Use(db)]): ...  # Inherits "database" tag
+
+
+@session.test()
+def test_users(repo: Annotated[Repo, Use(user_repo)]): ...  # Also tagged "database"
+```
+
+```bash
+protest tests:session --exclude-tag database  # Skips ALL tests touching DB
+```
+
+*No manual tagging. No forgotten markers.*
+
+### Infra vs Code Errors (Error ≠ Fail)
+
+Know instantly if your **code** failed or your **infrastructure** crashed.
+
+```
+✗ test_create_user: AssertionError       # Your bug - TEST FAILED
+⚠ test_with_db: [FIXTURE] ConnectionError  # Infra issue - SETUP ERROR
+```
+
+### Typed Parameterization (`From` + `ForEach`)
+
+No more string-matching that breaks when you rename arguments.
+
+```python
+# pytest: Rename "code" → runtime error, good luck
+@pytest.mark.parametrize("code", [200, 201])
+def test_status(code): ...
+
+
+# ProTest: Rename-safe, IDE-aware, type-checked
+CODES = ForEach([200, 201])
+
+
+@session.test()
+def test_status(code: Annotated[int, From(CODES)]): ...
+```
+
+### Tree-Based Scoping (Smart Teardown)
+
+Resources are cleaned up **as soon as they're no longer needed**, not at the end. Nested
+suites with predictive cleanup.
+
+```python
+session
+├── api_suite  # api_client cleaned when api_suite ends
+│   └── admin_suite  # admin_token cleaned when admin_suite ends
+└── unit_suite  # No DB loaded if no test needs it (lazy)
+```
+
+### Managed Factories (`@factory`)
+
+Create test data with automatic caching and cleanup. No manual teardown.
+
+```python
+@session.factory()
+def user(name: str):
+    user = User.create(name=name)
+    yield user
+    user.delete()  # Auto-cleanup for EACH created instance
+
+
+@session.test()
+async def test_users(user_factory: Annotated[FixtureFactory[User], Use(user)]):
+    alice = await user_factory(name="alice")  # Cached
+    bob = await user_factory(name="bob")  # New instance
+    # Both cleaned up automatically (LIFO)
+```
+
+---
+
 ## Quick Start
 
 ```python
@@ -81,6 +189,7 @@ pip install protest
 ```
 
 Or with uv:
+
 ```bash
 uv add protest
 ```
@@ -106,12 +215,14 @@ Main entry point. Orchestrates test execution.
 
 ```python
 session = ProTestSession(
-    concurrency=1,      # Default parallel workers
+    concurrency=1,  # Default parallel workers
     autouse=[fixture1]  # Auto-resolve these fixtures at session start
 )
 
+
 @session.test()
 def test_something(): ...
+
 
 session.include_suite(my_suite)
 session.use(my_plugin)
@@ -126,8 +237,10 @@ from protest import ProTestSuite
 
 api_suite = ProTestSuite(name="api", max_concurrency=8)
 
+
 @api_suite.test()
 async def test_endpoint(): ...
+
 
 session.include_suite(api_suite)
 ```
@@ -135,6 +248,7 @@ session.include_suite(api_suite)
 ### Fixtures
 
 Fixtures are scoped based on where they are defined:
+
 - `@session.fixture()` - Session scope (lives entire session)
 - `@suite.fixture()` - Suite scope (lives while suite runs)
 - Plain functions - Function scope (fresh per test)
@@ -144,13 +258,15 @@ Fixtures are scoped based on where they are defined:
 @session.fixture()
 async def database():
     db = await connect()
-    yield db                         # Teardown after yield
+    yield db  # Teardown after yield
     await db.close()
+
 
 # Suite-scoped fixture
 @api_suite.fixture()
 def api_config():
     return load_config()
+
 
 # Factory fixture - creates instances with automatic caching and teardown
 @session.factory()
@@ -159,10 +275,11 @@ def user(name: str, role: str = "guest"):
     yield user
     user.delete()  # Teardown called for each created instance
 
+
 # Usage: factory is injected, call it to create instances
 @session.test()
 async def test_multiple_users(
-    user_factory: Annotated[FixtureFactory[User], Use(user)]
+        user_factory: Annotated[FixtureFactory[User], Use(user)]
 ):
     alice = await user_factory(name="alice")
     bob = await user_factory(name="bob", role="admin")
@@ -177,10 +294,11 @@ Explicitly declare dependencies with `Annotated`:
 from typing import Annotated
 from protest import Use
 
+
 @session.test()
 def test_with_deps(
-    db: Annotated[Database, Use(database)],
-    user: Annotated[User, Use(get_user)],
+        db: Annotated[Database, Use(database)],
+        user: Annotated[User, Use(get_user)],
 ):
     ...
 ```
@@ -193,6 +311,7 @@ Use `ForEach` and `From` to run tests with multiple values:
 from protest import ForEach, From
 
 CODES = ForEach([200, 201, 204])
+
 
 @session.test()
 def test_success_codes(code: Annotated[int, From(CODES)]):
@@ -209,6 +328,7 @@ In pytest, parameterized fixtures hide the iteration from the test:
 def db(request):
     return connect(request.param)
 
+
 def test_queries(db): ...  # Magic: runs twice
 ```
 
@@ -219,22 +339,25 @@ from protest import FixtureFactory, ForEach, From
 
 ENGINES = ForEach(["postgres", "sqlite"])
 
+
 @session.factory()
 def database(engine_type: str):
     db = connect(engine_type)
     yield db
     db.close()
 
+
 @session.test()
 async def test_queries(
-    engine: Annotated[str, From(ENGINES)],
-    db_factory: Annotated[FixtureFactory[DB], Use(database)],
+        engine: Annotated[str, From(ENGINES)],
+        db_factory: Annotated[FixtureFactory[DB], Use(database)],
 ):
     db = await db_factory(engine_type=engine)  # Explicit wiring
     assert db.is_connected()
 ```
 
 Benefits:
+
 - **Visible**: `From(ENGINES)` shows the test runs multiple times
 - **Explicit**: You see exactly how the fixture is configured
 - **Flexible**: Other tests can use the same factory with fixed values:
@@ -247,14 +370,15 @@ async def test_postgres_only(db_factory: Annotated[..., Use(database)]):
 
 ### Scopes
 
-| Scope | Lifecycle | Use Case |
-|-------|-----------|----------|
-| `SESSION` | Created once, shared across all tests | DB connections, expensive resources |
-| `SUITE` | Created once per suite | Suite-specific config |
-| `FUNCTION` | Fresh instance per test | Isolated test data |
+| Scope      | Lifecycle                             | Use Case                            |
+|------------|---------------------------------------|-------------------------------------|
+| `SESSION`  | Created once, shared across all tests | DB connections, expensive resources |
+| `SUITE`    | Created once per suite                | Suite-specific config               |
+| `FUNCTION` | Fresh instance per test               | Isolated test data                  |
 
 **Rule:** A fixture can only depend on fixtures with equal or wider scope.
-`FUNCTION` can use `SUITE`/`SESSION`. `SUITE` can use `SESSION`. `SESSION` cannot use `FUNCTION`.
+`FUNCTION` can use `SUITE`/`SESSION`. `SUITE` can use `SESSION`. `SESSION` cannot use
+`FUNCTION`.
 
 ### Built-in Fixtures
 
@@ -263,6 +387,7 @@ async def test_postgres_only(db_factory: Annotated[..., Use(database)]):
 ```python
 from protest import caplog
 from protest.entities import LogCapture
+
 
 @session.test()
 def test_logging(logs: Annotated[LogCapture, Use(caplog)]):
@@ -281,6 +406,7 @@ Extend ProTest by subclassing `PluginBase`:
 from protest import PluginBase
 from protest.entities import SessionResult, TestResult
 
+
 class SlackNotifier(PluginBase):
     def setup(self, session):
         self.failures = []
@@ -292,10 +418,12 @@ class SlackNotifier(PluginBase):
         if self.failures:
             await send_slack_message(f"Failed: {self.failures}")
 
+
 session.use(SlackNotifier())
 ```
 
 **Available hooks:**
+
 - `setup(session)` - Called when plugin is registered
 - `on_collection_finish(items)` - Filter/sort collected tests
 - `on_session_start()` - Before any test runs
@@ -317,17 +445,16 @@ Cache stored in `.protest/cache.json`.
 
 ## Why Not pytest?
 
-|          | pytest             | ProTest                   |
-|----------|--------------------|---------------------------|
-| Fixtures | Implicit (by name) | Explicit (`Use(fixture)`) |
+|          | pytest             | ProTest                              |
+|----------|--------------------|--------------------------------------|
+| Fixtures | Implicit (by name) | Explicit (`Use(fixture)`)            |
 | Params   | Hidden in fixture  | Visible in test (`From()` + factory) |
-| Async    | Plugin required    | Native                    |
-| Parallel | Plugin required    | Built-in                  |
-| Cycles   | Runtime error      | Impossible by design      |
+| Async    | Plugin required    | Native                               |
+| Parallel | Plugin required    | Built-in                             |
+| Cycles   | Runtime error      | Impossible by design                 |
 
 pytest is battle-tested with a huge ecosystem. Use ProTest if you want FastAPI-style
 explicit dependencies and native async in your tests.
-
 
 ## License
 

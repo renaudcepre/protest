@@ -14,6 +14,7 @@ EXAMPLES=(
     "run examples.basic.factory_demo:session"
     "run examples.basic.nested_suites:session"
     "run examples.basic.parameterized_factory_demo:session"
+    "run examples.basic.skip_demo:session"
     "run examples.basic.parametrize_demo:session"
     "run examples.basic.parametrize_demo:session -n 10"
     "run examples.basic.demo:session --lf"

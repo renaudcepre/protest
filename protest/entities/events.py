@@ -12,12 +12,14 @@ class TestCounts:
     passed: int = 0
     failed: int = 0
     errored: int = 0
+    skipped: int = 0
 
     def __add__(self, other: TestCounts) -> TestCounts:
         return TestCounts(
             passed=self.passed + other.passed,
             failed=self.failed + other.failed,
             errored=self.errored + other.errored,
+            skipped=self.skipped + other.skipped,
         )
 
 
@@ -29,6 +31,7 @@ class TestResult:
     duration: float = 0
     output: str = ""
     is_fixture_error: bool = False
+    skip_reason: str | None = None
 
 
 @dataclass
@@ -36,6 +39,7 @@ class SessionResult:
     passed: int
     failed: int
     errors: int = 0
+    skipped: int = 0
     duration: float = 0
 
 
