@@ -1,8 +1,8 @@
-# Factories & Parameterized Tests
+# Factories
 
-Factories create configurable fixture instances. Combined with parameterization, they replace pytest's `@pytest.fixture(params=[...])` pattern.
+Factories create configurable fixture instances with automatic caching and teardown.
 
-## Factory Fixtures
+## Basic Usage
 
 A factory is a fixture that accepts arguments and can be called multiple times:
 
@@ -29,14 +29,12 @@ async def test_users(
 Key points:
 
 - Use `@session.factory()` or `@suite.factory()` for scoped factories
-- Use `@fixture()` with `managed=True` (default) for function-scoped factories
+- Use `@factory()` for function-scoped factories
 - The test receives a `FixtureFactory[T]`, not the value directly
 - Call the factory with `await` - it's always async
 - Each call can pass different arguments
 
-## Factory Features
-
-### Automatic Caching
+## Automatic Caching
 
 Same arguments return the same instance:
 
@@ -51,7 +49,7 @@ async def test_caching(user_factory: Annotated[FixtureFactory[dict], Use(user)])
     assert alice1 is not bob  # Different args = different instance
 ```
 
-### Automatic Teardown
+## Automatic Teardown
 
 Factories with `yield` get automatic cleanup in LIFO order:
 
@@ -65,7 +63,7 @@ def user(name: str, role: str = "guest"):
 
 If a test creates `alice` then `bob`, teardown runs `bob` first, then `alice`.
 
-### Dependencies
+## Dependencies
 
 Factories can depend on other fixtures:
 
@@ -83,105 +81,6 @@ def user(
     user = db.insert_user(name, role)
     yield user
     db.delete_user(user.id)
-```
-
-## Parameterized Tests
-
-Use `ForEach` and `From` to run tests with multiple values:
-
-```python
-from protest import ForEach, From
-
-HTTP_CODES = ForEach([200, 201, 204])
-
-@session.test()
-def test_success_codes(code: Annotated[int, From(HTTP_CODES)]):
-    assert code in range(200, 300)
-```
-
-This runs 3 tests: one for each code.
-
-### Custom IDs
-
-Provide readable names for test output:
-
-```python
-SCENARIOS = ForEach(
-    [{"user": "alice", "expect": 200}, {"user": "bob", "expect": 403}],
-    ids=lambda s: s["user"]
-)
-
-@session.test()
-def test_permissions(scenario: Annotated[dict, From(SCENARIOS)]):
-    # Output shows: test_permissions[alice], test_permissions[bob]
-    pass
-```
-
-### Cartesian Product
-
-Multiple `From` parameters create all combinations:
-
-```python
-USERS = ForEach(["alice", "bob"])
-METHODS = ForEach(["GET", "POST"])
-
-@session.test()
-def test_api(
-    user: Annotated[str, From(USERS)],
-    method: Annotated[str, From(METHODS)]
-):
-    # Runs 4 times: alice+GET, alice+POST, bob+GET, bob+POST
-    pass
-```
-
-## Parameterized Factories
-
-This is the ProTest alternative to pytest's parameterized fixtures.
-
-### The pytest way (implicit)
-
-```python
-# pytest - iteration hidden in fixture
-@pytest.fixture(params=["postgres", "sqlite"])
-def db(request):
-    return connect(request.param)
-
-def test_queries(db):  # Runs twice, but you can't tell by reading this
-    pass
-```
-
-### The ProTest way (explicit)
-
-```python
-ENGINES = ForEach(["postgres", "sqlite"])
-
-@session.factory()
-def database(engine_type: str):
-    db = connect(engine_type)
-    yield db
-    db.close()
-
-@session.test()
-async def test_queries(
-    engine: Annotated[str, From(ENGINES)],
-    db_factory: Annotated[FixtureFactory[DB], Use(database)]
-):
-    db = await db_factory(engine_type=engine)
-    assert db.is_connected()
-```
-
-Benefits:
-
-- **Visible**: `From(ENGINES)` shows the test runs multiple times
-- **Explicit**: You see exactly how the fixture is configured
-- **Flexible**: Other tests can use the same factory without the loop:
-
-```python
-@session.test()
-async def test_postgres_only(
-    db_factory: Annotated[FixtureFactory[DB], Use(database)]
-):
-    db = await db_factory(engine_type="postgres")  # No loop
 ```
 
 ## Error Handling

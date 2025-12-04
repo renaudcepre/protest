@@ -55,6 +55,7 @@ nav:
       - Sessions & Suites: core-concepts/sessions-and-suites.md
       - Tests: core-concepts/tests.md
       - Fixtures: core-concepts/fixtures.md
-      - Factories & Parameterized Tests: core-concepts/factories.md
+      - Factories: core-concepts/factories.md
+      - Parameterized Tests: core-concepts/parameterized-tests.md
       - Dependency Injection: core-concepts/dependency-injection.md
   - FAQ: faq.md
