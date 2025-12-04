@@ -8,7 +8,7 @@ from inspect import Parameter, signature
 from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
 from protest.core.fixture import is_generator_like
-from protest.di.decorators import METADATA_ATTR
+from protest.di.decorators import FixtureWrapper
 from protest.di.factory import FixtureFactory
 from protest.di.markers import Use
 from protest.di.proxy import SafeProxy
@@ -16,6 +16,7 @@ from protest.entities import Fixture, FixtureCallable, FixtureInfo, FixtureRegis
 from protest.events.types import Event
 from protest.exceptions import (
     AlreadyRegisteredError,
+    PlainFunctionError,
     ScopeMismatchError,
 )
 from protest.execution.async_bridge import ensure_async
@@ -41,6 +42,15 @@ class Resolver:
     """
 
     FUNCTION_SCOPE = "__function__"
+
+    @staticmethod
+    def _unwrap(
+        func: FixtureCallable,
+    ) -> tuple[FixtureCallable, FixtureRegistration | None]:
+        """Extract the actual function and registration from a FixtureWrapper."""
+        if isinstance(func, FixtureWrapper):
+            return func.func, func.registration
+        return func, None
 
     def __init__(self, event_bus: EventBus | None = None) -> None:
         self._registry: dict[FixtureCallable, Fixture] = {}
@@ -92,62 +102,78 @@ class Resolver:
         self._resolve_locks[func] = asyncio.Lock()
 
     def has_fixture(self, func: FixtureCallable) -> bool:
-        return func in self._registry
+        actual_func, _ = self._unwrap(func)
+        return actual_func in self._registry
 
     def get_fixture(self, func: FixtureCallable) -> Fixture | None:
-        return self._registry.get(func)
+        actual_func, _ = self._unwrap(func)
+        return self._registry.get(actual_func)
 
     def get_scope_path(self, func: FixtureCallable) -> str | None:
-        return self._scope_paths.get(func)
+        actual_func, _ = self._unwrap(func)
+        return self._scope_paths.get(actual_func)
 
     def get_dependencies(self, func: FixtureCallable) -> dict[str, FixtureCallable]:
-        return self._dependencies.get(func, {})
+        actual_func, _ = self._unwrap(func)
+        return self._dependencies.get(actual_func, {})
 
     def get_fixture_tags(self, func: FixtureCallable) -> set[str]:
         """Get tags declared on a fixture."""
-        fixture = self._registry.get(func)
+        actual_func, _ = self._unwrap(func)
+        fixture = self._registry.get(actual_func)
         return fixture.tags.copy() if fixture else set()
 
     def get_transitive_tags(self, func: FixtureCallable) -> set[str]:
         """Get all tags from a fixture and its dependencies (transitive)."""
-        return self._collect_transitive_tags(func, set())
+        actual_func, _ = self._unwrap(func)
+        return self._collect_transitive_tags(actual_func, set())
 
     def _collect_transitive_tags(
         self, func: FixtureCallable, visited: set[FixtureCallable]
     ) -> set[str]:
         """Recursively collect tags from fixture and all its dependencies."""
-        if func in visited:
+        actual_func, _ = self._unwrap(func)
+        if actual_func in visited:
             return set()
-        visited.add(func)
+        visited.add(actual_func)
 
         tags: set[str] = set()
-        fixture = self._registry.get(func)
+        fixture = self._registry.get(actual_func)
         if fixture:
             tags.update(fixture.tags)
 
-        for dep_func in self._dependencies.get(func, {}).values():
+        for dep_func in self._dependencies.get(actual_func, {}).values():
             tags.update(self._collect_transitive_tags(dep_func, visited))
 
         return tags
 
     def _ensure_registered(self, func: FixtureCallable) -> Fixture:
-        """Auto-register a fixture if not yet registered.
+        """Ensure a fixture is registered and return it.
 
-        Reads metadata from @fixture() or @factory() decorators if present.
-        Unregistered plain functions default to FUNCTION scope, not factory, no tags.
+        Accepts:
+        - FixtureWrapper: auto-registers if needed (function scope)
+        - Pre-registered functions: returns from registry
+        - Unregistered plain functions: raises PlainFunctionError
         """
-        if func not in self._registry:
-            reg = getattr(func, METADATA_ATTR, None) or FixtureRegistration(func=func)
+        if isinstance(func, FixtureWrapper):
+            actual_func = func.func
+            reg = func.registration
 
-            self.register(
-                func,
-                scope_path=self.FUNCTION_SCOPE,
-                is_factory=reg.is_factory,
-                cache=reg.cache,
-                managed=reg.managed,
-                tags=reg.tags,
-            )
-        return self._registry[func]
+            if actual_func not in self._registry:
+                self.register(
+                    actual_func,
+                    scope_path=self.FUNCTION_SCOPE,
+                    is_factory=reg.is_factory,
+                    cache=reg.cache,
+                    managed=reg.managed,
+                    tags=reg.tags,
+                )
+            return self._registry[actual_func]
+
+        if func in self._registry:
+            return self._registry[func]
+
+        raise PlainFunctionError(get_callable_name(func))
 
     async def resolve(
         self,
@@ -157,15 +183,15 @@ class Resolver:
         """Resolve a fixture recursively.
 
         Args:
-            target_func: The fixture function to resolve.
+            target_func: The fixture function (must be decorated with @fixture/@factory).
             current_path: Current execution context path (suite path for tests).
 
         Returns:
             The resolved fixture value.
         """
-        self._ensure_registered(target_func)
-        target_fixture = self._registry[target_func]
-        scope_path = self._scope_paths[target_func]
+        target_fixture = self._ensure_registered(target_func)
+        actual_func = target_fixture.func
+        scope_path = self._scope_paths[actual_func]
 
         if scope_path is None:
             return await self._resolve_session_scoped(target_fixture, current_path)
@@ -353,13 +379,15 @@ class Resolver:
         self, func: FixtureCallable, scope_path: str | None
     ) -> None:
         """Analyze function signature and store dependencies."""
-        func_signature = signature(func)
+        actual_func, _ = self._unwrap(func)
+        func_signature = signature(actual_func)
         dependencies: dict[str, FixtureCallable] = {}
         for param_name, param in func_signature.parameters.items():
             if dependency := self._extract_dependency_from_parameter(param):
+                dep_func, _ = self._unwrap(dependency)
                 self._ensure_registered(dependency)
-                self._validate_scope(func, scope_path, dependency)
-                dependencies[param_name] = dependency
+                self._validate_scope(func, scope_path, dep_func)
+                dependencies[param_name] = dep_func
         self._dependencies[func] = dependencies
 
     def _validate_scope(

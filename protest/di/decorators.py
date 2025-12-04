@@ -1,19 +1,32 @@
 """Free-standing decorators for function-scoped fixtures and factories."""
 
+import functools
 from collections.abc import Callable
-from typing import TypeVar
+from typing import Any, Generic, TypeVar
 
 from protest.core.collector import validate_no_from_params
 from protest.entities import FixtureRegistration
 
 FuncT = TypeVar("FuncT", bound=Callable[..., object])
 
-METADATA_ATTR = "_protest_registration"
+
+class FixtureWrapper(Generic[FuncT]):
+    """Wrapper that holds fixture metadata while remaining callable."""
+
+    __slots__ = ("__dict__", "__wrapped__", "func", "registration")
+
+    def __init__(self, func: FuncT, registration: FixtureRegistration) -> None:
+        self.func = func
+        self.registration = registration
+        functools.update_wrapper(self, func)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        return self.func(*args, **kwargs)
 
 
 def fixture(
     tags: list[str] | None = None,
-) -> Callable[[FuncT], FuncT]:
+) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
     """Decorator for function-scoped fixtures.
 
     Use this for fixtures that should be fresh per test and need tags.
@@ -29,16 +42,16 @@ def fixture(
             session.rollback()
     """
 
-    def decorator(func: FuncT) -> FuncT:
+    def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
         validate_no_from_params(func)
-        func._protest_registration = FixtureRegistration(  # type: ignore[attr-defined]
+        registration = FixtureRegistration(
             func=func,
             is_factory=False,
             cache=True,
             managed=True,
             tags=set(tags) if tags else set(),
         )
-        return func
+        return FixtureWrapper(func, registration)
 
     return decorator
 
@@ -47,7 +60,7 @@ def factory(
     cache: bool = True,
     managed: bool = True,
     tags: list[str] | None = None,
-) -> Callable[[FuncT], FuncT]:
+) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
     """Decorator for function-scoped factory fixtures.
 
     Use this for factories that should be fresh per test.
@@ -71,15 +84,15 @@ def factory(
             return UserFactory(db=db)
     """
 
-    def decorator(func: FuncT) -> FuncT:
+    def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
         validate_no_from_params(func)
-        func._protest_registration = FixtureRegistration(  # type: ignore[attr-defined]
+        registration = FixtureRegistration(
             func=func,
             is_factory=True,
             cache=cache,
             managed=managed,
             tags=set(tags) if tags else set(),
         )
-        return func
+        return FixtureWrapper(func, registration)
 
     return decorator

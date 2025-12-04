@@ -5,6 +5,7 @@ from typing import Annotated
 from protest import ForEach, From, ProTestSession, ProTestSuite
 from protest.core.collector import Collector
 from protest.core.runner import TestRunner
+from protest.entities import SessionResult, TestResult
 
 
 class TestXfailDecorator:
@@ -74,10 +75,10 @@ class TestXfailExecution:
         results: dict[str, int] = {}
 
         class CountingPlugin:
-            def on_session_complete(self, result: object) -> None:
-                results["xfailed"] = result.xfailed  # type: ignore[attr-defined]
-                results["xpassed"] = result.xpassed  # type: ignore[attr-defined]
-                results["failed"] = result.failed  # type: ignore[attr-defined]
+            def on_session_complete(self, result: SessionResult) -> None:
+                results["xfailed"] = result.xfailed
+                results["xpassed"] = result.xpassed
+                results["failed"] = result.failed
 
         session.use(CountingPlugin())
 
@@ -100,10 +101,10 @@ class TestXfailExecution:
         results: dict[str, int] = {}
 
         class CountingPlugin:
-            def on_session_complete(self, result: object) -> None:
-                results["xfailed"] = result.xfailed  # type: ignore[attr-defined]
-                results["xpassed"] = result.xpassed  # type: ignore[attr-defined]
-                results["passed"] = result.passed  # type: ignore[attr-defined]
+            def on_session_complete(self, result: SessionResult) -> None:
+                results["xfailed"] = result.xfailed
+                results["xpassed"] = result.xpassed
+                results["passed"] = result.passed
 
         session.use(CountingPlugin())
 
@@ -122,10 +123,10 @@ class TestXfailExecution:
 
     def test_xfail_emits_xfail_event(self) -> None:
         session = ProTestSession()
-        xfail_results: list[object] = []
+        xfail_results: list[TestResult] = []
 
         class XfailPlugin:
-            def on_test_xfail(self, result: object) -> None:
+            def on_test_xfail(self, result: TestResult) -> None:
                 xfail_results.append(result)
 
         session.use(XfailPlugin())
@@ -139,14 +140,14 @@ class TestXfailExecution:
 
         expected_result_count = 1
         assert len(xfail_results) == expected_result_count
-        assert xfail_results[0].xfail_reason == "My xfail reason"  # type: ignore[attr-defined]
+        assert xfail_results[0].xfail_reason == "My xfail reason"
 
     def test_xpass_emits_xpass_event(self) -> None:
         session = ProTestSession()
-        xpass_results: list[object] = []
+        xpass_results: list[TestResult] = []
 
         class XpassPlugin:
-            def on_test_xpass(self, result: object) -> None:
+            def on_test_xpass(self, result: TestResult) -> None:
                 xpass_results.append(result)
 
         session.use(XpassPlugin())
@@ -160,7 +161,7 @@ class TestXfailExecution:
 
         expected_result_count = 1
         assert len(xpass_results) == expected_result_count
-        assert xpass_results[0].xfail_reason == "Should fail"  # type: ignore[attr-defined]
+        assert xpass_results[0].xfail_reason == "Should fail"
 
     def test_xfail_does_not_affect_exit_code(self) -> None:
         session = ProTestSession()
@@ -202,8 +203,8 @@ class TestXfailWithParameterizedTests:
         results: dict[str, int] = {}
 
         class CountingPlugin:
-            def on_session_complete(self, result: object) -> None:
-                results["xfailed"] = result.xfailed  # type: ignore[attr-defined]
+            def on_session_complete(self, result: SessionResult) -> None:
+                results["xfailed"] = result.xfailed
 
         session.use(CountingPlugin())
 
@@ -230,9 +231,9 @@ class TestXfailWithSkip:
         results: dict[str, int] = {}
 
         class CountingPlugin:
-            def on_session_complete(self, result: object) -> None:
-                results["skipped"] = result.skipped  # type: ignore[attr-defined]
-                results["xfailed"] = result.xfailed  # type: ignore[attr-defined]
+            def on_session_complete(self, result: SessionResult) -> None:
+                results["skipped"] = result.skipped
+                results["xfailed"] = result.xfailed
 
         session.use(CountingPlugin())
 

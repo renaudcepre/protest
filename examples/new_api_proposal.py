@@ -5,7 +5,7 @@
 # Scope is determined by WHERE you decorate:
 #   @session.fixture()  -> Lives for entire session
 #   @suite.fixture()    -> Lives while suite runs
-#   def fn(): ...       -> Fresh instance per test (default)
+#   @fixture()          -> Fresh instance per test (function scope)
 #
 # ============================================================
 
@@ -13,6 +13,7 @@ from collections.abc import Callable
 from typing import Annotated
 
 from protest import ProTestSession, ProTestSuite, Use
+from protest.di.decorators import fixture
 
 # ============================================================
 # Example 1: Simple project (flat)
@@ -29,8 +30,9 @@ def database():
     db.close()
 
 
+@fixture()
 def fresh_user():
-    """Function-scoped (default): fresh instance per test."""
+    """Function-scoped: fresh instance per test."""
     return User(name="alice")
 
 
@@ -77,6 +79,7 @@ def admin_user():
     return User(role="admin")
 
 
+@fixture()
 def user_payload():
     """Function-scoped: fresh per test."""
     return {"name": "alice", "email": "alice@test.com"}
@@ -144,6 +147,7 @@ unit_suite.add_suite(payments_unit)
 # --- tests/unit/users/test_create.py ---
 
 
+@fixture()
 def user_factory():
     """Fresh factory per test."""
 
@@ -153,6 +157,7 @@ def user_factory():
     return create
 
 
+@fixture()
 def mock_email_service():
     """Fresh mock per test."""
     return Mock(spec=EmailService)
@@ -208,6 +213,7 @@ def browser():
     driver.quit()
 
 
+@fixture()
 def checkout_page(b: Annotated[Chrome, Use(browser)]):
     """Fresh page state per test."""
     b.get("/checkout")
@@ -286,6 +292,7 @@ async def async_database():
     await db.close()
 
 
+@fixture()
 async def async_user():
     """Fresh per test, async."""
     return await User.create(name="alice")
@@ -301,18 +308,13 @@ async def test_async_create(
 
 
 # ============================================================
-# Summary: API Changes
+# Summary: API
 # ============================================================
 #
-# BEFORE (current):
-#   @fixture(scope=Scope.SESSION)
-#   @fixture(scope=Scope.SUITE)
-#   @fixture(scope=Scope.FUNCTION)  # or just @fixture()
-#
-# AFTER (proposed):
+# Tree-based scoping:
 #   @session.fixture()   -> Session scope
 #   @suite.fixture()     -> Suite scope (lives while suite runs)
-#   def fn(): ...        -> Function scope (fresh per test)
+#   @fixture()           -> Function scope (fresh per test)
 #
 # BENEFITS:
 #   - No Scope enum to remember
@@ -320,5 +322,6 @@ async def test_async_create(
 #   - Nested suites naturally supported
 #   - Fixture inheritance through tree
 #   - Cleaner teardown (follows tree structure)
+#   - Explicit: all fixtures must be decorated
 #
 # ============================================================

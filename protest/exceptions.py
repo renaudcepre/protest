@@ -52,3 +52,11 @@ class ParameterizedFixtureError(ProTestError):
             f"From() is only allowed in tests, not fixtures. "
             f"Use a factory instead and let the test control parameterization."
         )
+
+
+class PlainFunctionError(ProTestError):
+    def __init__(self, func_name: str):
+        super().__init__(
+            f"Function '{func_name}' must be decorated with @fixture() or @factory(). "
+            f"Plain functions are not allowed as fixtures."
+        )

@@ -5,6 +5,7 @@ from typing import Annotated
 from protest import ForEach, From, ProTestSession, ProTestSuite
 from protest.core.collector import Collector
 from protest.core.runner import TestRunner
+from protest.entities import SessionResult, TestResult
 
 
 class TestSkipDecorator:
@@ -86,10 +87,10 @@ class TestSkipExecution:
         results: dict[str, int] = {}
 
         class CountingPlugin:
-            def on_session_complete(self, result: object) -> None:
-                results["passed"] = result.passed  # type: ignore[attr-defined]
-                results["skipped"] = result.skipped  # type: ignore[attr-defined]
-                results["failed"] = result.failed  # type: ignore[attr-defined]
+            def on_session_complete(self, result: SessionResult) -> None:
+                results["passed"] = result.passed
+                results["skipped"] = result.skipped
+                results["failed"] = result.failed
 
         session.use(CountingPlugin())
 
@@ -110,10 +111,10 @@ class TestSkipExecution:
 
     def test_skipped_test_emits_skip_event(self) -> None:
         session = ProTestSession()
-        skip_results: list[object] = []
+        skip_results: list[TestResult] = []
 
         class SkipPlugin:
-            def on_test_skip(self, result: object) -> None:
+            def on_test_skip(self, result: TestResult) -> None:
                 skip_results.append(result)
 
         session.use(SkipPlugin())
@@ -125,8 +126,9 @@ class TestSkipExecution:
         runner = TestRunner(session)
         runner.run()
 
-        assert len(skip_results) == 1
-        assert skip_results[0].skip_reason == "My reason"  # type: ignore[attr-defined]
+        expected_skip_count = 1
+        assert len(skip_results) == expected_skip_count
+        assert skip_results[0].skip_reason == "My reason"
 
 
 class TestSkipWithParameterizedTests:
@@ -150,8 +152,8 @@ class TestSkipWithParameterizedTests:
         results: dict[str, int] = {}
 
         class CountingPlugin:
-            def on_session_complete(self, result: object) -> None:
-                results["skipped"] = result.skipped  # type: ignore[attr-defined]
+            def on_session_complete(self, result: SessionResult) -> None:
+                results["skipped"] = result.skipped
 
         session.use(CountingPlugin())
 

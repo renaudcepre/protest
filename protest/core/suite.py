@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from protest.core.session import ProTestSession
 
 from protest.core.collector import validate_no_from_params
+from protest.di.decorators import FixtureWrapper
 from protest.entities import FixtureRegistration, TestRegistration
 from protest.utils import normalize_reason
 
@@ -105,22 +106,21 @@ class ProTestSuite:
     def fixture(
         self,
         tags: list[str] | None = None,
-    ) -> Callable[[FuncT], FuncT]:
+    ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
         """Register a fixture scoped to this suite."""
 
-        def decorator(func: FuncT) -> FuncT:
+        def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
             validate_no_from_params(func)
             fixture_tags = set(tags) if tags else set()
-            self._fixtures.append(
-                FixtureRegistration(
-                    func=func,
-                    is_factory=False,
-                    cache=True,
-                    managed=True,
-                    tags=fixture_tags,
-                )
+            registration = FixtureRegistration(
+                func=func,
+                is_factory=False,
+                cache=True,
+                managed=True,
+                tags=fixture_tags,
             )
-            return func
+            self._fixtures.append(registration)
+            return FixtureWrapper(func, registration)
 
         return decorator
 
@@ -129,22 +129,21 @@ class ProTestSuite:
         cache: bool = True,
         managed: bool = True,
         tags: list[str] | None = None,
-    ) -> Callable[[FuncT], FuncT]:
+    ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
         """Register a factory fixture scoped to this suite."""
 
-        def decorator(func: FuncT) -> FuncT:
+        def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
             validate_no_from_params(func)
             fixture_tags = set(tags) if tags else set()
-            self._fixtures.append(
-                FixtureRegistration(
-                    func=func,
-                    is_factory=True,
-                    cache=cache,
-                    managed=managed,
-                    tags=fixture_tags,
-                )
+            registration = FixtureRegistration(
+                func=func,
+                is_factory=True,
+                cache=cache,
+                managed=managed,
+                tags=fixture_tags,
             )
-            return func
+            self._fixtures.append(registration)
+            return FixtureWrapper(func, registration)
 
         return decorator
 
