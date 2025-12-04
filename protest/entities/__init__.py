@@ -4,6 +4,7 @@ from protest.entities.core import (
     FixtureRegistration,
     TestItem,
     TestOutcome,
+    TestRegistration,
 )
 from protest.entities.events import (
     FixtureInfo,
@@ -26,6 +27,7 @@ __all__ = [
     "TestCounts",
     "TestItem",
     "TestOutcome",
+    "TestRegistration",
     "TestResult",
     "TestStartInfo",
 ]

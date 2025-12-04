@@ -5,7 +5,7 @@ from itertools import groupby, product
 from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
 from protest.di.markers import ForEach, From, Use
-from protest.entities import FixtureCallable, TestItem
+from protest.entities import FixtureCallable, TestItem, TestRegistration
 from protest.exceptions import ParameterizedFixtureError
 
 if TYPE_CHECKING:
@@ -46,35 +46,6 @@ def _extract_use_fixtures(func: Callable[..., Any]) -> list[FixtureCallable]:
     return fixtures
 
 
-def _expand_test(
-    func: Callable[..., Any], suite: ProTestSuite | None
-) -> list[TestItem]:
-    """Expand a test function into multiple TestItems based on From() params."""
-    from_params = _extract_from_params(func)
-
-    if not from_params:
-        return [TestItem(func=func, suite=suite)]
-
-    param_names = list(from_params.keys())
-    sources = [from_params[name] for name in param_names]
-
-    items: list[TestItem] = []
-    for combination in product(*sources):
-        case_kwargs = dict(zip(param_names, combination, strict=True))
-        case_ids = [sources[idx].get_id(val) for idx, val in enumerate(combination)]
-
-        items.append(
-            TestItem(
-                func=func,
-                suite=suite,
-                case_kwargs=case_kwargs,
-                case_ids=case_ids,
-            )
-        )
-
-    return items
-
-
 class Collector:
     """Collects tests from a session, recursively traversing nested suites."""
 
@@ -87,8 +58,8 @@ class Collector:
 
         items: list[TestItem] = []
 
-        for test_func in session.tests:
-            items.extend(self._expand_test_with_tags(test_func, suite=None))
+        for reg in session.tests:
+            items.extend(self._expand_registration(reg, suite=None))
 
         for suite in session.suites:
             items.extend(self._collect_from_suite(suite))
@@ -128,40 +99,34 @@ class Collector:
         return tags
 
     def _compute_test_tags(
-        self, func: Callable[..., Any], suite: ProTestSuite | None
+        self, reg: TestRegistration, suite: ProTestSuite | None
     ) -> set[str]:
         """Compute all tags for a test: explicit + suite + fixture (transitive)."""
-        tags: set[str] = set()
-
-        explicit_tags = getattr(func, "_protest_tags", None)
-        if explicit_tags:
-            tags.update(explicit_tags)
+        tags = reg.tags.copy()
 
         if suite:
             tags.update(suite.all_tags)
 
-        for fixture_func in _extract_use_fixtures(func):
+        for fixture_func in _extract_use_fixtures(reg.func):
             tags.update(self._get_transitive_fixture_tags(fixture_func))
 
         return tags
 
-    def _expand_test_with_tags(
-        self, func: Callable[..., Any], suite: ProTestSuite | None
+    def _expand_registration(
+        self, reg: TestRegistration, suite: ProTestSuite | None
     ) -> list[TestItem]:
-        """Expand a test function into TestItems with computed tags."""
-        tags = self._compute_test_tags(func, suite)
-        skip_reason = getattr(func, "_protest_skip", None)
-        xfail_reason = getattr(func, "_protest_xfail", None)
-        from_params = _extract_from_params(func)
+        """Expand a TestRegistration into TestItems with computed tags."""
+        tags = self._compute_test_tags(reg, suite)
+        from_params = _extract_from_params(reg.func)
 
         if not from_params:
             return [
                 TestItem(
-                    func=func,
+                    func=reg.func,
                     suite=suite,
                     tags=tags,
-                    skip_reason=skip_reason,
-                    xfail_reason=xfail_reason,
+                    skip_reason=reg.skip_reason,
+                    xfail_reason=reg.xfail_reason,
                 )
             ]
 
@@ -175,13 +140,13 @@ class Collector:
 
             items.append(
                 TestItem(
-                    func=func,
+                    func=reg.func,
                     suite=suite,
                     tags=tags.copy(),
                     case_kwargs=case_kwargs,
                     case_ids=case_ids,
-                    skip_reason=skip_reason,
-                    xfail_reason=xfail_reason,
+                    skip_reason=reg.skip_reason,
+                    xfail_reason=reg.xfail_reason,
                 )
             )
 
@@ -191,8 +156,8 @@ class Collector:
         """Recursively collect tests from suite and its children."""
         items: list[TestItem] = []
 
-        for test_func in suite.tests:
-            items.extend(self._expand_test_with_tags(test_func, suite))
+        for reg in suite.tests:
+            items.extend(self._expand_registration(reg, suite))
 
         for child in suite.suites:
             items.extend(self._collect_from_suite(child))

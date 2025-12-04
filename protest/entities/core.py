@@ -16,6 +16,16 @@ FixtureCallable: TypeAlias = "Callable[..., Any]"
 
 
 @dataclass
+class TestRegistration:
+    """Registration info for a test function."""
+
+    func: Callable[..., Any]
+    tags: set[str] = field(default_factory=set)
+    skip_reason: str | None = None
+    xfail_reason: str | None = None
+
+
+@dataclass
 class FixtureRegistration:
     """Registration info for a fixture before it's added to the resolver."""
 
