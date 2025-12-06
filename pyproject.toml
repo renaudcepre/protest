@@ -89,6 +89,15 @@ asyncio_default_fixture_loop_scope = "function"
 log_cli = true
 log_cli_level = "INFO"
 log_cli_format = "[%(levelname)7s] %(name)20s - %(message)s"
+filterwarnings = [
+    "ignore:cannot collect test class 'TestItem':pytest.PytestCollectionWarning",
+    "ignore:cannot collect test class 'TestRunner':pytest.PytestCollectionWarning",
+    "ignore:cannot collect test class 'TestResult':pytest.PytestCollectionWarning",
+    "ignore:cannot collect test class 'TestCounts':pytest.PytestCollectionWarning",
+    "ignore:cannot collect test class 'TestStartInfo':pytest.PytestCollectionWarning",
+    "ignore:cannot collect test class 'TestCacheEntry':pytest.PytestCollectionWarning",
+    "ignore:cannot collect test class 'TestExecutionContext':pytest.PytestCollectionWarning",
+]
 
 [project.scripts]
 protest = "protest.cli.main:main"
