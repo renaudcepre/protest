@@ -47,11 +47,14 @@ class CachePlugin(PluginBase):
             self._cache.save()
 
     def _filter_last_failed(self, items: list[TestItem]) -> list[TestItem]:
-        """Keep only tests that failed in the last run."""
+        """Keep only tests that failed in the last run.
+
+        If no failed tests exist in cache, returns all items.
+        If failed tests exist but none match current items, returns empty list.
+        """
         if self._cache is None:
             return items
         failed_ids = self._cache.get_failed_node_ids()
         if not failed_ids:
             return items
-        filtered = [item for item in items if item.node_id in failed_ids]
-        return filtered if filtered else items
+        return [item for item in items if item.node_id in failed_ids]

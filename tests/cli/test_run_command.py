@@ -157,3 +157,89 @@ class TestRunFilterCombinations:
         )
         second_run.assert_failure()
         assert "0/1" in second_run.stdout
+
+
+class TestRunSuiteFilter:
+    """Tests for suite filtering via ::SuiteName target syntax."""
+
+    def test_suite_filter_basic(self, run_protest: Callable[..., CLIResult]) -> None:
+        """::SuiteName runs only tests in that suite."""
+        result = run_protest("run", "suites_session:session::API")
+        result.assert_success()
+        expected_count = 4
+        assert f"{expected_count}/{expected_count} passed" in result.stdout
+
+    def test_suite_filter_nested(self, run_protest: Callable[..., CLIResult]) -> None:
+        """::Parent::Child runs only tests in nested suite."""
+        result = run_protest("run", "suites_session:session::API::Users")
+        result.assert_success()
+        expected_count = 2
+        assert f"{expected_count}/{expected_count} passed" in result.stdout
+
+    def test_suite_filter_collect_only(
+        self, run_protest: Callable[..., CLIResult]
+    ) -> None:
+        """--collect-only with suite filter shows filtered tests."""
+        result = run_protest(
+            "run", "suites_session:session::API::Users", "--collect-only"
+        )
+        result.assert_success()
+        result.assert_output_contains("test_users_list")
+        result.assert_output_contains("test_users_create")
+        assert "test_standalone" not in result.stdout
+        assert "test_orders" not in result.stdout
+
+
+class TestRunKeywordFilter:
+    """Tests for keyword filtering via -k flag."""
+
+    def test_keyword_filter_basic(self, run_protest: Callable[..., CLIResult]) -> None:
+        """-k pattern runs matching tests."""
+        result = run_protest("run", "suites_session:session", "-k", "users")
+        result.assert_success()
+        expected_count = 2
+        assert f"{expected_count}/{expected_count} passed" in result.stdout
+
+    def test_keyword_filter_multiple(
+        self, run_protest: Callable[..., CLIResult]
+    ) -> None:
+        """Multiple -k flags use OR logic."""
+        result = run_protest(
+            "run", "suites_session:session", "-k", "users", "-k", "orders"
+        )
+        result.assert_success()
+        expected_count = 3
+        assert f"{expected_count}/{expected_count} passed" in result.stdout
+
+    def test_keyword_filter_collect_only(
+        self, run_protest: Callable[..., CLIResult]
+    ) -> None:
+        """--collect-only with keyword filter shows matching tests."""
+        result = run_protest(
+            "run", "suites_session:session", "-k", "users", "--collect-only"
+        )
+        result.assert_success()
+        result.assert_output_contains("test_users_list")
+        result.assert_output_contains("test_users_create")
+        assert "test_orders" not in result.stdout
+        assert "test_standalone" not in result.stdout
+
+
+class TestRunSuiteAndKeywordCombined:
+    """Tests combining suite and keyword filters."""
+
+    def test_suite_and_keyword(self, run_protest: Callable[..., CLIResult]) -> None:
+        """::SuiteName -k pattern intersect."""
+        result = run_protest("run", "suites_session:session::API", "-k", "users")
+        result.assert_success()
+        expected_count = 2
+        assert f"{expected_count}/{expected_count} passed" in result.stdout
+
+    def test_suite_keyword_and_tag(self, run_protest: Callable[..., CLIResult]) -> None:
+        """::SuiteName -k pattern -t tag all intersect."""
+        result = run_protest(
+            "run", "tagged_session:session::API", "-k", "api", "-t", "slow"
+        )
+        result.assert_success()
+        expected_count = 1
+        assert f"{expected_count}/{expected_count} passed" in result.stdout

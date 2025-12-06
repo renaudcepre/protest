@@ -19,6 +19,7 @@ from protest.di.resolver import Resolver
 from protest.entities import FixtureRegistration, TestRegistration
 from protest.events.bus import EventBus
 from protest.events.types import Event
+from protest.filters import KeywordFilterPlugin, SuiteFilterPlugin
 from protest.tags.plugin import TagFilterPlugin
 from protest.utils import normalize_reason
 
@@ -70,7 +71,10 @@ class ProTestSession:
         self._autouse = autouse or []
         self._cache_storage = CacheStorage()
         self._cache_plugin: CachePlugin | None = None
+        self._cache_plugin_registered: bool = False
         self._tag_filter_plugin: TagFilterPlugin | None = None
+        self._suite_filter_plugin: SuiteFilterPlugin | None = None
+        self._keyword_filter_plugin: KeywordFilterPlugin | None = None
         self._exitfirst: bool = False
         self._capture: bool = True
 
@@ -78,7 +82,6 @@ class ProTestSession:
             self.use(_get_default_reporter())
         if default_cache:
             self._cache_plugin = CachePlugin()
-            self.use(self._cache_plugin)
         if include_tags or exclude_tags:
             self._tag_filter_plugin = TagFilterPlugin(include_tags, exclude_tags)
             self.use(self._tag_filter_plugin)
@@ -123,6 +126,9 @@ class ProTestSession:
         if self._cache_plugin is not None:
             self._cache_plugin._last_failed = last_failed
             self._cache_plugin._cache_clear = cache_clear
+            if not self._cache_plugin_registered:
+                self.use(self._cache_plugin)
+                self._cache_plugin_registered = True
 
     def configure_tags(
         self,
@@ -138,6 +144,26 @@ class ProTestSession:
         else:
             self._tag_filter_plugin._include_tags = include_tags or set()
             self._tag_filter_plugin._exclude_tags = exclude_tags or set()
+
+    def configure_suite_filter(self, suite_filter: str | None = None) -> None:
+        """Configure suite filtering (::SuiteName target syntax)."""
+        if not suite_filter:
+            return
+        if self._suite_filter_plugin is None:
+            self._suite_filter_plugin = SuiteFilterPlugin(suite_filter)
+            self.use(self._suite_filter_plugin)
+        else:
+            self._suite_filter_plugin._suite_filter = suite_filter
+
+    def configure_keyword_filter(self, patterns: list[str] | None = None) -> None:
+        """Configure keyword filtering (-k patterns)."""
+        if not patterns:
+            return
+        if self._keyword_filter_plugin is None:
+            self._keyword_filter_plugin = KeywordFilterPlugin(patterns)
+            self.use(self._keyword_filter_plugin)
+        else:
+            self._keyword_filter_plugin._patterns = patterns
 
     @property
     def resolver(self) -> Resolver:
