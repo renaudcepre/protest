@@ -49,6 +49,10 @@ class RichReporter(PluginBase):
             self.console.print(
                 f"  [yellow]⚠[/] {name}: [bold yellow]\\[FIXTURE][/] {result.error}"
             )
+        elif isinstance(result.error, TimeoutError) and result.timeout is not None:
+            self.console.print(
+                f"  [red]⏱[/] {name}: [bold red]TIMEOUT[/] (exceeded {result.timeout}s)"
+            )
         else:
             self.console.print(f"  [red]✗[/] {name}: {result.error}")
 

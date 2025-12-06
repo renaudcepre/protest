@@ -127,6 +127,7 @@ class Collector:
                     tags=tags,
                     skip_reason=reg.skip_reason,
                     xfail_reason=reg.xfail_reason,
+                    timeout=reg.timeout,
                 )
             ]
 
@@ -147,6 +148,7 @@ class Collector:
                     case_ids=case_ids,
                     skip_reason=reg.skip_reason,
                     xfail_reason=reg.xfail_reason,
+                    timeout=reg.timeout,
                 )
             )
 

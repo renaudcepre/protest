@@ -23,6 +23,7 @@ class TestRegistration:
     tags: set[str] = field(default_factory=set)
     skip_reason: str | None = None
     xfail_reason: str | None = None
+    timeout: float | None = None
 
 
 @dataclass
@@ -60,6 +61,7 @@ class TestItem:
     case_ids: list[str] = field(default_factory=list)
     skip_reason: str | None = None
     xfail_reason: str | None = None
+    timeout: float | None = None
 
     @property
     def test_name(self) -> str:
