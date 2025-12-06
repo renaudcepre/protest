@@ -29,6 +29,14 @@ EXAMPLES=(
     "run parallel_demo:session --app-dir examples"
     "run parallel_demo:session --app-dir examples -n 10"
     "run examples.basic.factory_demo:session -x"
+    "run filtering_demo:session --app-dir examples"
+    "run filtering_demo:session::API --app-dir examples"
+    "run filtering_demo:session::API::Users --app-dir examples"
+    "run filtering_demo:session --app-dir examples -k create"
+    "run filtering_demo:session --app-dir examples -k create -k delete"
+    "run filtering_demo:session --app-dir examples -t slow"
+    "run filtering_demo:session --app-dir examples --no-tag slow"
+    "run filtering_demo:session::API --app-dir examples -k user -t slow"
 )
 
 FAILED=0

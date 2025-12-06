@@ -34,6 +34,8 @@ def run_session(  # noqa: PLR0913
     include_tags: set[str] | None = None,
     exclude_tags: set[str] | None = None,
     capture: bool = True,
+    suite_filter: str | None = None,
+    keyword_patterns: list[str] | None = None,
 ) -> bool:
     """Run a test session and return success status.
 
@@ -48,6 +50,8 @@ def run_session(  # noqa: PLR0913
         include_tags: Only run tests with these tags (OR logic).
         exclude_tags: Exclude tests with these tags.
         capture: Capture stdout/stderr during tests (default: True).
+        suite_filter: Only run tests in this suite (::SuiteName syntax).
+        keyword_patterns: Only run tests matching these patterns (-k flag).
 
     Returns:
         True if all tests passed, False otherwise.
@@ -58,8 +62,10 @@ def run_session(  # noqa: PLR0913
         session.concurrency = concurrency
     session.exitfirst = exitfirst
     session.capture = capture
-    session.configure_cache(last_failed=last_failed, cache_clear=cache_clear)
+    session.configure_suite_filter(suite_filter)
+    session.configure_keyword_filter(keyword_patterns)
     session.configure_tags(include_tags=include_tags, exclude_tags=exclude_tags)
+    session.configure_cache(last_failed=last_failed, cache_clear=cache_clear)
 
     runner = TestRunner(session)
     return runner.run()
@@ -69,6 +75,8 @@ def collect_tests(
     session: ProTestSession,
     include_tags: set[str] | None = None,
     exclude_tags: set[str] | None = None,
+    suite_filter: str | None = None,
+    keyword_patterns: list[str] | None = None,
 ) -> list[TestItem]:
     """Collect tests from a session without running them.
 
@@ -76,6 +84,8 @@ def collect_tests(
         session: The ProTestSession to collect from.
         include_tags: Only include tests with these tags.
         exclude_tags: Exclude tests with these tags.
+        suite_filter: Only include tests in this suite.
+        keyword_patterns: Only include tests matching these patterns.
 
     Returns:
         List of collected TestItem objects.
@@ -85,6 +95,8 @@ def collect_tests(
     from protest.core.collector import Collector  # noqa: PLC0415
     from protest.events.types import Event  # noqa: PLC0415
 
+    session.configure_suite_filter(suite_filter)
+    session.configure_keyword_filter(keyword_patterns)
     session.configure_tags(include_tags=include_tags, exclude_tags=exclude_tags)
 
     collector = Collector()

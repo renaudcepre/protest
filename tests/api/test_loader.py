@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from protest import LoadError, ProTestSession, load_session
+from protest.loader import parse_target
 
 
 def unique_module_name() -> str:
@@ -124,3 +125,59 @@ session = ProTestSession()
         finally:
             module_file.unlink()
             sys.modules.pop(module_name, None)
+
+
+class TestParseTargetSimple:
+    def test_simple_target_no_suite(self) -> None:
+        session_target, suite_filter = parse_target("demo:session")
+        assert session_target == "demo:session"
+        assert suite_filter is None
+
+    def test_nested_module_target(self) -> None:
+        session_target, suite_filter = parse_target("pkg.tests:session")
+        assert session_target == "pkg.tests:session"
+        assert suite_filter is None
+
+    def test_target_without_colon(self) -> None:
+        session_target, suite_filter = parse_target("just_module")
+        assert session_target == "just_module"
+        assert suite_filter is None
+
+
+class TestParseTargetWithSuite:
+    def test_target_with_single_suite(self) -> None:
+        session_target, suite_filter = parse_target("demo:session::API")
+        assert session_target == "demo:session"
+        assert suite_filter == "API"
+
+    def test_target_with_nested_suite(self) -> None:
+        session_target, suite_filter = parse_target("demo:session::API::Users")
+        assert session_target == "demo:session"
+        assert suite_filter == "API::Users"
+
+    def test_target_with_deeply_nested_suite(self) -> None:
+        session_target, suite_filter = parse_target("demo:session::API::Users::Perms")
+        assert session_target == "demo:session"
+        assert suite_filter == "API::Users::Perms"
+
+    def test_nested_module_with_suite(self) -> None:
+        session_target, suite_filter = parse_target("pkg.tests:session::Suite")
+        assert session_target == "pkg.tests:session"
+        assert suite_filter == "Suite"
+
+
+class TestParseTargetEdgeCases:
+    def test_empty_target(self) -> None:
+        session_target, suite_filter = parse_target("")
+        assert session_target == ""
+        assert suite_filter is None
+
+    def test_double_colon_without_single_colon(self) -> None:
+        session_target, suite_filter = parse_target("module::Suite")
+        assert session_target == "module::Suite"
+        assert suite_filter is None
+
+    def test_multiple_colons_in_module_path(self) -> None:
+        session_target, suite_filter = parse_target("a:b:c::Suite")
+        assert session_target == "a:b:c"
+        assert suite_filter == "Suite"

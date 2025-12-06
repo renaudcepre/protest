@@ -279,6 +279,28 @@ class TestCachePluginFiltering:
         expected_filtered_count = 2
         assert len(filtered) == expected_filtered_count
 
+    def test_filter_returns_empty_if_failures_exist_but_no_match(
+        self, temp_session: ProTestSession, cache_file: Path
+    ) -> None:
+        """If cache has failures but no items match, return empty list (no fallback)."""
+        write_cache(
+            cache_file,
+            {
+                "version": 1,
+                "results": {
+                    "mod::old_failing": {"status": "failed", "duration": 1.0},
+                },
+            },
+        )
+        plugin = CachePlugin(last_failed=True)
+        plugin.setup(temp_session)
+
+        items = [make_test_item("mod::new_test"), make_test_item("mod::another_new")]
+
+        filtered = plugin.on_collection_finish(items)
+
+        assert filtered == []
+
     def test_filter_returns_all_if_cache_empty(
         self, temp_session: ProTestSession
     ) -> None:

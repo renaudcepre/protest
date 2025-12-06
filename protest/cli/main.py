@@ -10,6 +10,8 @@ if TYPE_CHECKING:
 HELP_EPILOG = """
 Examples:
   protest run demo:session              Run all tests
+  protest run demo:session::API         Run tests in API suite only
+  protest run demo:session -k login     Run tests matching 'login'
   protest run demo:session -n 4         Run with 4 concurrent workers
   protest run demo:session --lf         Re-run only failed tests
   protest run demo:session --collect-only   List tests without running
@@ -185,6 +187,14 @@ def _handle_run_command() -> None:
         action="store_true",
         help="Disable stdout/stderr capture (show print output)",
     )
+    parser.add_argument(
+        "-k",
+        "--keyword",
+        dest="keywords",
+        action="append",
+        default=[],
+        help="Run only tests matching pattern (substring, can be used multiple times, OR logic)",
+    )
 
     args = parser.parse_args(sys.argv[2:])
 
@@ -199,6 +209,7 @@ def _handle_run_command() -> None:
         exclude_tags=set(args.exclude_tags) if args.exclude_tags else None,
         exitfirst=args.exitfirst,
         capture=not args.no_capture,
+        keywords=args.keywords if args.keywords else None,
     )
 
 
@@ -213,19 +224,26 @@ def run_tests(  # noqa: PLR0913
     exclude_tags: set[str] | None = None,
     exitfirst: bool = False,
     capture: bool = True,
+    keywords: list[str] | None = None,
 ) -> None:
     from protest.api import collect_tests, run_session
-    from protest.loader import LoadError, load_session
+    from protest.loader import LoadError, load_session, parse_target
+
+    session_target, suite_filter = parse_target(target)
 
     try:
-        session = load_session(target, app_dir)
+        session = load_session(session_target, app_dir)
     except LoadError as exc:
         print(f"Error: {exc}")
         sys.exit(1)
 
     if collect_only:
         items = collect_tests(
-            session, include_tags=include_tags, exclude_tags=exclude_tags
+            session,
+            include_tags=include_tags,
+            exclude_tags=exclude_tags,
+            suite_filter=suite_filter,
+            keyword_patterns=keywords,
         )
         print(f"Collected {len(items)} test(s):\n")
         for item in items:
@@ -241,6 +259,8 @@ def run_tests(  # noqa: PLR0913
         include_tags=include_tags,
         exclude_tags=exclude_tags,
         capture=capture,
+        suite_filter=suite_filter,
+        keyword_patterns=keywords,
     )
     sys.exit(0 if success else 1)
 

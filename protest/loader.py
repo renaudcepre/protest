@@ -18,6 +18,37 @@ class LoadError(Exception):
     """Error loading a session from a module."""
 
 
+def parse_target(target: str) -> tuple[str, str | None]:
+    """Parse extended target format into session target and optional suite filter.
+
+    Args:
+        target: Target string like 'module:session' or 'module:session::SuiteName'
+
+    Returns:
+        Tuple of (session_target, suite_filter).
+        suite_filter is None if no '::' suffix present.
+
+    Examples:
+        'demo:session' -> ('demo:session', None)
+        'demo:session::API' -> ('demo:session', 'API')
+        'demo:session::API::Users' -> ('demo:session', 'API::Users')
+    """
+    if "::" not in target:
+        return target, None
+
+    colon_idx = target.find(":")
+    if colon_idx == -1:
+        return target, None
+
+    double_colon_idx = target.find("::", colon_idx + 1)
+    if double_colon_idx == -1:
+        return target, None
+
+    session_target = target[:double_colon_idx]
+    suite_filter = target[double_colon_idx + 2 :]
+    return session_target, suite_filter
+
+
 def load_session(target: str, app_dir: str = ".") -> ProTestSession:
     """Load a ProTestSession from a module path.
 

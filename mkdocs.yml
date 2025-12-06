@@ -58,4 +58,5 @@ nav:
       - Factories: core-concepts/factories.md
       - Parameterized Tests: core-concepts/parameterized-tests.md
       - Dependency Injection: core-concepts/dependency-injection.md
+  - CLI Reference: cli.md
   - FAQ: faq.md

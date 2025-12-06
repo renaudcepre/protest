@@ -9,27 +9,50 @@ protest run <module>:<session>
 - `<module>` - Python module path (e.g., `tests`, `myapp.tests`)
 - `<session>` - Name of the `ProTestSession` variable in that module
 
-## Common Options
+## Filtering Tests
 
-### Parallelism
+ProTest provides multiple ways to filter which tests run. All filters can be combined.
 
-Run tests concurrently:
+### By Suite
 
-```bash
-protest run tests:session -n 4      # 4 workers
-protest run tests:session -n 8      # 8 workers
-```
-
-### Exit on First Failure
-
-Stop immediately when a test fails:
+Run only tests in a specific suite using `::SuiteName` syntax:
 
 ```bash
-protest run tests:session -x
-protest run tests:session --exitfirst
+# Run tests in the "API" suite (and its children)
+protest run tests:session::API
+
+# Run tests in the nested "Users" suite under "API"
+protest run tests:session::API::Users
 ```
 
-### Re-run Failed Tests
+### By Keyword (-k)
+
+Run tests whose name contains a substring:
+
+```bash
+# Run tests containing "login" in their name
+protest run tests:session -k login
+
+# Multiple patterns use OR logic
+protest run tests:session -k login -k logout
+```
+
+### By Tags (-t, --tag)
+
+Run only tests with specific tags:
+
+```bash
+protest run tests:session --tag slow
+protest run tests:session -t integration -t api   # OR logic
+```
+
+Exclude tests with specific tags:
+
+```bash
+protest run tests:session --no-tag flaky
+```
+
+### Re-run Failed Tests (--lf)
 
 Only run tests that failed in the previous run:
 
@@ -44,19 +67,48 @@ Clear the failure cache:
 protest run tests:session --cache-clear
 ```
 
-### Filter by Tags
+### Combining Filters
 
-Run only tests with specific tags:
+All filters compose as intersection:
 
 ```bash
-protest run tests:session --tag slow
-protest run tests:session -t integration -t api   # OR logic
+# Suite + keyword
+protest run tests:session::API -k users
+
+# Suite + keyword + tag
+protest run tests:session::API -k users -t slow
+
+# All filters together
+protest run tests:session::API -k login -t integration --lf
 ```
 
-Exclude tests with specific tags:
+## Execution Options
+
+### Parallelism (-n)
+
+Run tests concurrently:
 
 ```bash
-protest run tests:session --no-tag flaky
+protest run tests:session -n 4      # 4 workers
+protest run tests:session -n 8      # 8 workers
+```
+
+### Exit on First Failure (-x)
+
+Stop immediately when a test fails:
+
+```bash
+protest run tests:session -x
+protest run tests:session --exitfirst
+```
+
+### Disable Output Capture (-s)
+
+Show print statements and logs during test execution:
+
+```bash
+protest run tests:session -s
+protest run tests:session --no-capture
 ```
 
 ### Collect Without Running
@@ -82,7 +134,7 @@ protest run tests:session --app-dir src
 | 0 | All tests passed |
 | 1 | One or more tests failed or errored |
 
-## List Tags
+## Tags Command
 
 See all tags declared in a session:
 
