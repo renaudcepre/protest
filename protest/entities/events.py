@@ -37,6 +37,7 @@ class TestResult:
     is_fixture_error: bool = False
     skip_reason: str | None = None
     xfail_reason: str | None = None
+    timeout: float | None = None
 
 
 @dataclass(frozen=True)

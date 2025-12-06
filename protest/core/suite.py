@@ -89,14 +89,18 @@ class ProTestSuite:
         tags: list[str] | None = None,
         skip: bool | str = False,
         xfail: bool | str = False,
+        timeout: float | None = None,
     ) -> Callable[[FuncT], FuncT]:
         def decorator(func: FuncT) -> FuncT:
+            if timeout is not None and timeout < 0:
+                raise ValueError(f"timeout must be non-negative, got {timeout}")
             self._tests.append(
                 TestRegistration(
                     func=func,
                     tags=set(tags) if tags else set(),
                     skip_reason=normalize_reason(skip, "Skipped"),
                     xfail_reason=normalize_reason(xfail, "Expected failure"),
+                    timeout=timeout,
                 )
             )
             return func

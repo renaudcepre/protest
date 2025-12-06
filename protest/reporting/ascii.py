@@ -41,6 +41,8 @@ class AsciiReporter(PluginBase):
         name = _format_test_name(result)
         if result.is_fixture_error:
             print(f"  !! {name}:  {result.error}")
+        elif isinstance(result.error, TimeoutError) and result.timeout is not None:
+            print(f"  TO {name}: TIMEOUT (exceeded {result.timeout}s)")
         else:
             print(f"  XX {name}: {result.error}")
 

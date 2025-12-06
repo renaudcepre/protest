@@ -91,6 +91,49 @@ Suite
   ✓ test_function_name (0.01s)
 ```
 
+## Timeout
+
+Limit test execution time with the `timeout` parameter (in seconds):
+
+```python
+@session.test(timeout=5.0)
+async def test_api_call():
+    """Fails if takes longer than 5 seconds."""
+    await slow_api_call()
+
+@suite.test(timeout=0.5)
+def test_sync():
+    """Works with sync tests too."""
+    time.sleep(1)  # Will timeout
+```
+
+### Behavior
+
+- Timeout applies to the test body only (after fixture setup, before teardown)
+- On timeout, the test fails with `TimeoutError`
+- Sync tests: the executor thread continues but the test is marked as failed
+- Negative timeout raises `ValueError` at decoration time
+
+### With xfail
+
+If a test is expected to timeout:
+
+```python
+@session.test(xfail="Known slow", timeout=0.1)
+async def test_slow_operation():
+    await very_slow_operation()  # XFAIL, not FAIL
+```
+
+### With skip
+
+Skipped tests never run, so timeout doesn't apply:
+
+```python
+@session.test(skip="Not ready", timeout=0.001)
+async def test_not_ready():
+    await something()  # Never executed
+```
+
 ## Output Capture
 
 stdout and stderr are captured during test execution. If a test fails, the captured output is displayed in the error report.

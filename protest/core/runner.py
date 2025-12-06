@@ -41,6 +41,7 @@ class _TestExecutionResult:
     is_fixture_error: bool = False
     skip_reason: str | None = None
     xfail_reason: str | None = None
+    timeout: float | None = None
 
 
 class TestRunner:
@@ -228,6 +229,7 @@ class TestRunner:
                 name=exec_result.test_name,
                 node_id=exec_result.node_id,
                 skip_reason=exec_result.skip_reason,
+                timeout=exec_result.timeout,
             )
             return TestOutcome(result, TestCounts(skipped=1), Event.TEST_SKIP)
 
@@ -239,6 +241,7 @@ class TestRunner:
                     duration=exec_result.duration,
                     output=exec_result.output,
                     xfail_reason=exec_result.xfail_reason,
+                    timeout=exec_result.timeout,
                 )
                 return TestOutcome(result, TestCounts(xpassed=1), Event.TEST_XPASS)
             result = TestResult(
@@ -246,6 +249,7 @@ class TestRunner:
                 node_id=exec_result.node_id,
                 duration=exec_result.duration,
                 output=exec_result.output,
+                timeout=exec_result.timeout,
             )
             return TestOutcome(result, TestCounts(passed=1), Event.TEST_PASS)
 
@@ -257,6 +261,7 @@ class TestRunner:
                 duration=exec_result.duration,
                 output=exec_result.output,
                 is_fixture_error=True,
+                timeout=exec_result.timeout,
             )
             return TestOutcome(result, TestCounts(errored=1), Event.TEST_FAIL)
 
@@ -268,6 +273,7 @@ class TestRunner:
                 duration=exec_result.duration,
                 output=exec_result.output,
                 xfail_reason=exec_result.xfail_reason,
+                timeout=exec_result.timeout,
             )
             return TestOutcome(result, TestCounts(xfailed=1), Event.TEST_XFAIL)
 
@@ -277,6 +283,7 @@ class TestRunner:
             error=exec_result.error,
             duration=exec_result.duration,
             output=exec_result.output,
+            timeout=exec_result.timeout,
         )
         return TestOutcome(result, TestCounts(failed=1), Event.TEST_FAIL)
 
@@ -324,7 +331,15 @@ class TestRunner:
         is_fixture_error = False
 
         try:
-            await ensure_async(item.func, **kwargs)
+            if item.timeout is not None:
+                await asyncio.wait_for(
+                    ensure_async(item.func, **kwargs),
+                    timeout=item.timeout,
+                )
+            else:
+                await ensure_async(item.func, **kwargs)
+        except asyncio.TimeoutError:
+            error = asyncio.TimeoutError(f"Test exceeded timeout of {item.timeout}s")
         except FixtureError as exc:
             error = exc.original
             is_fixture_error = True
@@ -340,5 +355,6 @@ class TestRunner:
                 error=error,
                 is_fixture_error=is_fixture_error,
                 xfail_reason=item.xfail_reason if not is_fixture_error else None,
+                timeout=item.timeout,
             )
         )
