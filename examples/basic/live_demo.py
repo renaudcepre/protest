@@ -1,8 +1,11 @@
 import asyncio
+import logging
 import time
 from typing import Annotated
 
 from protest import ProTestSession, ProTestSuite, Use
+
+log = logging.getLogger(__name__)
 
 session = ProTestSession(concurrency=10)
 
@@ -31,27 +34,46 @@ def auth_service():
 
 @api_suite.test()
 async def test_api_health():
-    await asyncio.sleep(0.5)
+    log.info("Checking API health endpoint...")
+    await asyncio.sleep(0.3)
+    log.info("API is healthy")
+    await asyncio.sleep(0.2)
 
 
 @api_suite.test()
 async def test_api_users():
-    await asyncio.sleep(0.7)
+    log.info("Fetching users list...")
+    await asyncio.sleep(0.3)
+    log.info("Processing 150 users")
+    await asyncio.sleep(0.4)
 
 
 @api_suite.test()
 async def test_api_products():
-    await asyncio.sleep(0.6)
+    log.info("Loading product catalog...")
+    await asyncio.sleep(0.3)
+    log.info("Found 42 products")
+    await asyncio.sleep(0.3)
 
 
 @api_suite.test()
 async def test_api_orders():
-    await asyncio.sleep(0.8)
+    log.info("Querying orders...")
+    await asyncio.sleep(0.2)
+    log.info("Validating order #12345")
+    await asyncio.sleep(0.3)
+    log.info("Order validated successfully")
+    await asyncio.sleep(0.3)
 
 
 @api_suite.test()
 async def test_api_payments():
-    await asyncio.sleep(1.0)
+    log.info("Initializing payment gateway...")
+    await asyncio.sleep(0.3)
+    log.info("Processing payment...")
+    await asyncio.sleep(0.4)
+    log.info("Payment confirmed")
+    await asyncio.sleep(0.3)
 
 
 @api_suite.test()
@@ -62,27 +84,36 @@ async def test_api_validation():
 
 @db_suite.test()
 async def test_db_connection(db: Annotated[dict, Use(db_connection)]):
+    log.info("Testing connection pool...")
     await asyncio.sleep(0.3)
     assert db["connected"]
 
 
 @db_suite.test()
 async def test_db_query(db: Annotated[dict, Use(db_connection)]):
-    await asyncio.sleep(0.5)
+    log.info("Executing SELECT * FROM users")
+    await asyncio.sleep(0.3)
+    log.info("Query returned 250 rows")
+    await asyncio.sleep(0.2)
 
 
 @db_suite.test()
 async def test_db_insert(db: Annotated[dict, Use(db_connection)]):
+    log.info("INSERT INTO users VALUES (...)")
     await asyncio.sleep(0.4)
 
 
 @db_suite.test()
 async def test_db_update(db: Annotated[dict, Use(db_connection)]):
-    await asyncio.sleep(0.6)
+    log.info("UPDATE users SET status='active'")
+    await asyncio.sleep(0.3)
+    log.info("Updated 15 rows")
+    await asyncio.sleep(0.3)
 
 
 @db_suite.test()
 async def test_db_delete(db: Annotated[dict, Use(db_connection)]):
+    log.info("DELETE FROM sessions WHERE expired=true")
     await asyncio.sleep(0.35)
 
 
@@ -93,17 +124,26 @@ async def test_db_slow_operation(db: Annotated[dict, Use(db_connection)]):
 
 @auth_suite.test()
 async def test_auth_login(auth: Annotated[dict, Use(auth_service)]):
-    await asyncio.sleep(0.5)
+    log.info("Validating credentials...")
+    await asyncio.sleep(0.2)
+    log.info("Generating JWT token")
+    await asyncio.sleep(0.3)
 
 
 @auth_suite.test()
 async def test_auth_logout(auth: Annotated[dict, Use(auth_service)]):
+    log.info("Invalidating session...")
     await asyncio.sleep(0.4)
 
 
 @auth_suite.test()
 async def test_auth_register(auth: Annotated[dict, Use(auth_service)]):
-    await asyncio.sleep(0.7)
+    log.info("Checking email uniqueness...")
+    await asyncio.sleep(0.2)
+    log.info("Hashing password (bcrypt)")
+    await asyncio.sleep(0.3)
+    log.info("Sending verification email")
+    await asyncio.sleep(0.2)
 
 
 @auth_suite.test()

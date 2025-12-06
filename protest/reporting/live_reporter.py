@@ -1,14 +1,19 @@
+import logging
 import os
 import time
 from dataclasses import dataclass, field
 from enum import Enum
 
-from rich.console import Console, Group, RenderableType
-from rich.live import Live
-from rich.padding import Padding
-from rich.spinner import Spinner
-from rich.table import Table
-from rich.text import Text
+from rich.console import (  # type: ignore[import-not-found]
+    Console,
+    Group,
+    RenderableType,
+)
+from rich.live import Live  # type: ignore[import-not-found]
+from rich.padding import Padding  # type: ignore[import-not-found]
+from rich.spinner import Spinner  # type: ignore[import-not-found]
+from rich.table import Table  # type: ignore[import-not-found]
+from rich.text import Text  # type: ignore[import-not-found]
 
 from protest.entities import (
     HandlerInfo,
@@ -17,6 +22,7 @@ from protest.entities import (
     TestResult,
     TestStartInfo,
 )
+from protest.execution.capture import set_log_callback
 from protest.plugin import PluginBase
 
 
@@ -63,6 +69,7 @@ PHASE_LABELS = {
 }
 
 MIN_DURATION_THRESHOLD = 0.001
+PHASE_DISPLAY_THRESHOLD = 0.1
 
 
 def _format_duration(seconds: float) -> str:
@@ -104,6 +111,7 @@ class LiveReporter(PluginBase):
         self._active_tests: dict[str, ActiveTest] = {}
         self._test_order: list[str] = []
         self._suite_teardowns: dict[str, SuiteTeardown] = {}
+        self._last_logs: dict[str, str] = {}
         self._current_suite: str | None = None
         self._passed = 0
         self._failed = 0
@@ -164,20 +172,25 @@ class LiveReporter(PluginBase):
             if self._is_finished(test.phase):
                 status_col = Text.from_markup(f"  {PHASE_LABELS[test.phase]}")
                 info_col = Text(test.result_info, style="dim")
+                table.add_row(status_col, name_col, info_col)
             elif self._is_running(test.phase):
                 status_col = Padding(Spinner("dots", style="cyan"), (0, 0, 0, 2))
                 phase_duration = time.perf_counter() - test.phase_start_time
-                if phase_duration < 0.1:
+                if phase_duration < PHASE_DISPLAY_THRESHOLD:
                     info_col = Text.from_markup(PHASE_LABELS[test.phase])
                 else:
                     info_col = Text.from_markup(
                         f"{PHASE_LABELS[test.phase]} {_format_duration(phase_duration)}",
                     )
+                table.add_row(status_col, name_col, info_col)
+
+                if last_log := self._last_logs.get(node_id):
+                    log_text = Text(f"→ {last_log}", style="dim", overflow="ellipsis")
+                    table.add_row(Text(""), log_text, Text(""))
             else:
                 status_col = Text.from_markup(f"  {PHASE_LABELS[test.phase]}")
                 info_col = Text("")
-
-            table.add_row(status_col, name_col, info_col)
+                table.add_row(status_col, name_col, info_col)
 
         return table
 
@@ -196,7 +209,7 @@ class LiveReporter(PluginBase):
             )
         else:
             elapsed = time.perf_counter() - teardown.start_time
-            if elapsed < 0.1:
+            if elapsed < PHASE_DISPLAY_THRESHOLD:
                 info = Text("teardown", style="yellow")
             else:
                 info = Text(f"teardown {_format_duration(elapsed)}", style="yellow")
@@ -278,10 +291,17 @@ class LiveReporter(PluginBase):
 
         return items
 
+    def _on_log(self, node_id: str, record: logging.LogRecord) -> None:
+        """Handle a log record from a test."""
+        self._last_logs[node_id] = record.getMessage()
+        if self._is_live_mode:
+            self._refresh()
+
     def on_session_start(self) -> None:
         self._start_time = time.perf_counter()
 
         if self._is_live_mode:
+            set_log_callback(self._on_log)
             self._live = Live(
                 self._build_display(),
                 console=self._console,
@@ -351,6 +371,7 @@ class LiveReporter(PluginBase):
         if test := self._active_tests.get(node_id):
             test.phase = phase
             test.result_info = info
+        self._last_logs.pop(node_id, None)
 
     def on_test_pass(self, result: TestResult) -> None:
         self._passed += 1
@@ -457,6 +478,8 @@ class LiveReporter(PluginBase):
             self._console.print(f"  [green]✓[/] {info.name} [dim]({duration})[/]")
 
     def on_session_complete(self, result: SessionResult) -> None:
+        set_log_callback(None)
+
         if self._is_live_mode and self._live is not None:
             self._refresh()
             self._live.stop()

@@ -1,6 +1,7 @@
 import io
 import logging
 import sys
+from collections.abc import Callable
 from contextvars import ContextVar, Token
 from logging import LogRecord
 from typing import TextIO
@@ -12,6 +13,30 @@ _capture_buffer: ContextVar[io.StringIO | None] = ContextVar(
 _log_records: ContextVar[list[LogRecord] | None] = ContextVar(
     "log_records", default=None
 )
+
+_current_node_id: ContextVar[str | None] = ContextVar("current_node_id", default=None)
+
+
+class _LogCallbackHolder:
+    callback: Callable[[str, LogRecord], None] | None = None
+
+
+_log_callback_holder = _LogCallbackHolder()
+
+
+def set_log_callback(callback: Callable[[str, LogRecord], None] | None) -> None:
+    """Set a callback to be notified when a log is emitted during a test."""
+    _log_callback_holder.callback = callback
+
+
+def set_current_node_id(node_id: str | None) -> Token[str | None]:
+    """Set the current test's node_id for log tracking."""
+    return _current_node_id.set(node_id)
+
+
+def reset_current_node_id(token: Token[str | None]) -> None:
+    """Reset the current test's node_id using the token."""
+    _current_node_id.reset(token)
 
 
 class TaskAwareStream:
@@ -39,6 +64,10 @@ class TaskAwareLogHandler(logging.Handler):
         records = _log_records.get()
         if records is not None:
             records.append(record)
+
+        node_id = _current_node_id.get()
+        if node_id and _log_callback_holder.callback:
+            _log_callback_holder.callback(node_id, record)
 
 
 class GlobalCapturePatch:
