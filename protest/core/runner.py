@@ -6,12 +6,9 @@ from dataclasses import dataclass
 from inspect import signature
 from typing import Any
 
-from protest.core.collector import (
-    Collector,
-    chunk_by_suite,
-    get_last_chunk_index_per_suite,
-)
+from protest.core.collector import Collector
 from protest.core.session import ProTestSession
+from protest.core.tracker import SuiteTracker
 from protest.di.resolver import Resolver
 from protest.entities import (
     SessionResult,
@@ -47,8 +44,8 @@ class _TestExecutionResult:
 class TestRunner:
     """Executes tests with parallel support and fixture lifecycle management.
 
-    Handles chunking by suite, concurrent execution within chunks,
-    and proper teardown of SUITE-scoped fixtures between suites.
+    Runs all tests in parallel (cross-suite) and automatically triggers
+    suite fixture teardown when all tests of a suite complete.
     """
 
     def __init__(self, session: ProTestSession) -> None:
@@ -60,7 +57,6 @@ class TestRunner:
 
     async def _main_loop(self) -> bool:
         """The main async loop for running tests."""
-        total_counts = TestCounts()
         session_start = time.perf_counter()
 
         collector = Collector()
@@ -70,11 +66,13 @@ class TestRunner:
             Event.COLLECTION_FINISH, items
         )
 
-        chunks = chunk_by_suite(items)
-        last_chunk_per_suite = get_last_chunk_index_per_suite(chunks)
-
         await self._session.events.emit(Event.SESSION_START)
 
+        tracker = SuiteTracker.from_items(items)
+        semaphore = asyncio.Semaphore(self._session.concurrency)
+        suite_semaphores = self._build_suite_semaphores(items)
+
+        total_counts = TestCounts()
         capture_ctx = (
             GlobalCapturePatch() if self._session.capture else contextlib.nullcontext()
         )
@@ -82,44 +80,20 @@ class TestRunner:
             async with self._session:
                 await self._session.resolve_autouse()
 
-                current_suite_path: str | None = None
+                started_suites: set[str] = set()
+                for item in items:
+                    if item.suite and item.suite.full_path not in started_suites:
+                        await self._session.events.emit(
+                            Event.SUITE_START, item.suite.full_path
+                        )
+                        started_suites.add(item.suite.full_path)
 
-                for chunk_idx, chunk in enumerate(chunks):
-                    suite = chunk[0].suite
-                    suite_path = suite.full_path if suite else None
+                total_counts = await self._run_all_parallel(
+                    items, semaphore, suite_semaphores, tracker
+                )
 
-                    if suite_path != current_suite_path:
-                        if current_suite_path is not None:
-                            await self._session.events.emit(
-                                Event.SUITE_END, current_suite_path
-                            )
-                        current_suite_path = suite_path
-                        if current_suite_path is not None:
-                            await self._session.events.emit(
-                                Event.SUITE_START, current_suite_path
-                            )
-
-                    concurrency = self._session.concurrency
-                    if suite and suite.max_concurrency:
-                        concurrency = min(concurrency, suite.max_concurrency)
-                    semaphore = asyncio.Semaphore(concurrency)
-
-                    chunk_counts = await self._run_chunk_parallel(chunk, semaphore)
-                    total_counts = total_counts + chunk_counts
-
-                    if self._session.exitfirst and (
-                        chunk_counts.failed or chunk_counts.errored
-                    ):
-                        break
-
-                    if (
-                        suite_path is not None
-                        and last_chunk_per_suite.get(suite_path) == chunk_idx
-                    ):
-                        await self._session.resolver.teardown_suite(suite_path)
-
-                if current_suite_path is not None:
-                    await self._session.events.emit(Event.SUITE_END, current_suite_path)
+                for suite_path in reversed(list(started_suites)):
+                    await self._session.events.emit(Event.SUITE_END, suite_path)
 
         session_duration = time.perf_counter() - session_start
         session_result = SessionResult(
@@ -144,44 +118,104 @@ class TestRunner:
             and total_counts.xpassed == 0
         )
 
-    async def _run_chunk_parallel(
+    def _build_suite_semaphores(
+        self, items: list[TestItem]
+    ) -> dict[str | None, asyncio.Semaphore]:
+        """Build per-suite semaphores for max_concurrency."""
+        semaphores: dict[str | None, asyncio.Semaphore] = {}
+        seen_suites: set[str | None] = set()
+
+        for item in items:
+            suite_path = item.suite.full_path if item.suite else None
+            if suite_path in seen_suites:
+                continue
+            seen_suites.add(suite_path)
+
+            if item.suite and item.suite.max_concurrency:
+                max_conc = min(item.suite.max_concurrency, self._session.concurrency)
+                semaphores[suite_path] = asyncio.Semaphore(max_conc)
+
+        return semaphores
+
+    async def _run_all_parallel(
         self,
-        chunk: list[TestItem],
-        semaphore: asyncio.Semaphore,
+        items: list[TestItem],
+        global_semaphore: asyncio.Semaphore,
+        suite_semaphores: dict[str | None, asyncio.Semaphore],
+        tracker: SuiteTracker,
     ) -> TestCounts:
-        """Run a chunk of tests in parallel with concurrency control."""
-        if not chunk:
+        """Run all tests in parallel with cross-suite execution."""
+        if not items:
             return TestCounts()
 
-        async def run_one(item: TestItem) -> TestOutcome:
+        stop_flag = asyncio.Event() if self._session.exitfirst else None
+
+        async def run_one(item: TestItem) -> TestOutcome | None:
+            suite_path = item.suite.full_path if item.suite else None
+            suite_sem = suite_semaphores.get(suite_path)
+
             test_name = get_callable_name(item.func)
             node_id = item.node_id
             start_info = TestStartInfo(name=test_name, node_id=node_id)
             await self._session.events.emit(Event.TEST_START, start_info)
 
-            async with semaphore:
-                with CaptureCurrentTest() as buffer:
-                    async with TestExecutionContext(
-                        self._session.resolver, item.suite_path
-                    ) as ctx:
-                        outcome = await self._run_test(item, ctx, buffer)
+            async with global_semaphore:
+                if stop_flag and stop_flag.is_set():
+                    return None
+
+                if suite_sem:
+                    async with suite_sem:
+                        if stop_flag and stop_flag.is_set():
+                            return None
+                        outcome = await self._execute_test(item, start_info)
+                else:
+                    outcome = await self._execute_test(item, start_info)
+
+                if stop_flag and (outcome.counts.failed or outcome.counts.errored):
+                    stop_flag.set()
 
             await self._session.events.emit(outcome.event, outcome.result)
+
+            if suite_path and await tracker.mark_completed(suite_path):
+                await self._teardown_suite(suite_path)
+            elif suite_path is None:
+                await tracker.mark_completed(None)
+
             return outcome
 
-        tasks = [asyncio.create_task(run_one(item)) for item in chunk]
+        tasks = [asyncio.create_task(run_one(item)) for item in items]
 
-        if self._session.exitfirst:
-            return await self._run_with_exitfirst(tasks)
+        if self._session.exitfirst and stop_flag:
+            return await self._run_with_exitfirst(tasks, stop_flag)
 
         outcomes = await asyncio.gather(*tasks)
         total = TestCounts()
         for outcome in outcomes:
-            total = total + outcome.counts
+            if outcome:
+                total = total + outcome.counts
         return total
 
+    async def _execute_test(
+        self, item: TestItem, start_info: TestStartInfo
+    ) -> TestOutcome:  # pyright: ignore[reportReturnType]
+        """Execute a single test with capture and context."""
+        await self._session.events.emit(Event.TEST_ACQUIRED, start_info)
+        with CaptureCurrentTest() as buffer:
+            async with TestExecutionContext(
+                self._session.resolver, item.suite_path
+            ) as ctx:
+                return await self._run_test(item, ctx, buffer, start_info)
+
+    async def _teardown_suite(self, suite_path: str) -> None:
+        """Teardown suite fixtures after all its tests complete."""
+        await self._session.events.emit(Event.SUITE_TEARDOWN_START, suite_path)
+        await self._session.resolver.teardown_suite(suite_path)
+        await self._session.events.emit(Event.SUITE_TEARDOWN_DONE, suite_path)
+
     async def _run_with_exitfirst(
-        self, tasks: list[asyncio.Task[TestOutcome]]
+        self,
+        tasks: list[asyncio.Task[TestOutcome | None]],
+        stop_flag: asyncio.Event,
     ) -> TestCounts:
         """Run tasks and cancel remaining on first failure."""
         total = TestCounts()
@@ -193,9 +227,12 @@ class TestRunner:
             )
             for task in done:
                 outcome = task.result()
+                if outcome is None:
+                    continue
                 total = total + outcome.counts
 
                 if outcome.counts.failed or outcome.counts.errored:
+                    stop_flag.set()
                     for remaining in pending:
                         remaining.cancel()
                     for remaining in pending:
@@ -292,10 +329,11 @@ class TestRunner:
         item: TestItem,
         ctx: TestExecutionContext,
         buffer: io.StringIO,
+        start_info: TestStartInfo,
     ) -> TestOutcome:
         """Run a single test and return outcome (event emitted by caller)."""
-        test_name = get_callable_name(item.func)
-        node_id = item.node_id
+        test_name = start_info.name
+        node_id = start_info.node_id
 
         if item.skip_reason:
             return self._build_outcome(
@@ -305,9 +343,6 @@ class TestRunner:
                     skip_reason=item.skip_reason,
                 )
             )
-
-        start_info = TestStartInfo(name=test_name, node_id=node_id)
-        await self._session.events.emit(Event.TEST_START, start_info)
 
         start = time.perf_counter()
 
@@ -345,6 +380,8 @@ class TestRunner:
             is_fixture_error = True
         except Exception as exc:
             error = exc
+
+        await self._session.events.emit(Event.TEST_TEARDOWN_START, start_info)
 
         return self._build_outcome(
             _TestExecutionResult(

@@ -44,13 +44,25 @@ class PluginBase:
         """Called before a suite's tests run."""
 
     def on_suite_end(self, name: str) -> None | Awaitable[None]:
-        """Called after a suite's tests and SUITE teardown."""
+        """Called after a suite's tests complete."""
+
+    def on_suite_teardown_start(self, name: str) -> None | Awaitable[None]:
+        """Called before suite fixture teardown begins."""
+
+    def on_suite_teardown_done(self, name: str) -> None | Awaitable[None]:
+        """Called after suite fixture teardown completes."""
 
     def on_test_start(self, info: TestStartInfo) -> None | Awaitable[None]:
-        """Called when a test begins (before fixtures)."""
+        """Called when a test begins (waiting for execution slot)."""
+
+    def on_test_acquired(self, info: TestStartInfo) -> None | Awaitable[None]:
+        """Called when test acquires execution slot (entering setup phase)."""
 
     def on_test_setup_done(self, info: TestStartInfo) -> None | Awaitable[None]:
         """Called after fixtures resolved, before test execution."""
+
+    def on_test_teardown_start(self, info: TestStartInfo) -> None | Awaitable[None]:
+        """Called after test body, before fixture teardown."""
 
     def on_test_pass(self, result: TestResult) -> None | Awaitable[None]:
         """Called when a test passes."""

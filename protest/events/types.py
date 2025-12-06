@@ -12,8 +12,12 @@ class Event(Enum):
     SESSION_COMPLETE = "session_complete"
     SUITE_START = "suite_start"
     SUITE_END = "suite_end"
+    SUITE_TEARDOWN_START = "suite_teardown_start"
+    SUITE_TEARDOWN_DONE = "suite_teardown_done"
     TEST_START = "test_start"
+    TEST_ACQUIRED = "test_acquired"
     TEST_SETUP_DONE = "test_setup_done"
+    TEST_TEARDOWN_START = "test_teardown_start"
     TEST_PASS = "test_pass"  # noqa: S105
     TEST_FAIL = "test_fail"
     TEST_SKIP = "test_skip"
