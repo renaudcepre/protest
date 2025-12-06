@@ -97,3 +97,63 @@ class TestRunCapture:
         result = run_protest("run", "print_session:session")
         result.assert_success()
         assert "VISIBLE_OUTPUT_FROM_TEST" not in result.stdout
+
+
+class TestRunFilterCombinations:
+    """Tests combining --lf, -x, and tag filters via CLI."""
+
+    def test_lf_with_tag_cli(self, run_protest: Callable[..., CLIResult]) -> None:
+        """--lf --tag: intersection of failed and tagged tests."""
+        first_run = run_protest("run", "tagged_failing_session:session")
+        first_run.assert_failure()
+
+        second_run = run_protest(
+            "run", "tagged_failing_session:session", "--lf", "-t", "fast"
+        )
+        second_run.assert_failure()
+        assert "test_fast_fail" in second_run.stdout
+        assert "test_slow_fail" not in second_run.stdout
+
+    def test_lf_with_exclude_tag_cli(
+        self, run_protest: Callable[..., CLIResult]
+    ) -> None:
+        """--lf --exclude-tag: failed tests without excluded tag."""
+        first_run = run_protest("run", "tagged_failing_session:session")
+        first_run.assert_failure()
+
+        second_run = run_protest(
+            "run", "tagged_failing_session:session", "--lf", "--no-tag", "slow"
+        )
+        second_run.assert_failure()
+        assert "test_fast_fail" in second_run.stdout
+        assert "test_slow_fail" not in second_run.stdout
+
+    def test_lf_exitfirst_cli(self, run_protest: Callable[..., CLIResult]) -> None:
+        """--lf -x: stop on first failure among last-failed tests."""
+        first_run = run_protest("run", "tagged_failing_session:session")
+        first_run.assert_failure()
+
+        second_run = run_protest("run", "tagged_failing_session:session", "--lf", "-x")
+        second_run.assert_failure()
+        assert "0/1" in second_run.stdout
+
+    def test_tag_exitfirst_cli(self, run_protest: Callable[..., CLIResult]) -> None:
+        """--tag -x: stop on first failure among tagged tests."""
+        result = run_protest(
+            "run", "tagged_failing_session:session", "-t", "slow", "-x"
+        )
+        result.assert_failure()
+        assert "0/1" in result.stdout
+
+    def test_all_three_combined_cli(
+        self, run_protest: Callable[..., CLIResult]
+    ) -> None:
+        """--lf --tag -x: failed + tagged + stop on first failure."""
+        first_run = run_protest("run", "tagged_failing_session:session")
+        first_run.assert_failure()
+
+        second_run = run_protest(
+            "run", "tagged_failing_session:session", "--lf", "-t", "slow", "-x"
+        )
+        second_run.assert_failure()
+        assert "0/1" in second_run.stdout
