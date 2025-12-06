@@ -27,11 +27,11 @@ FuncT = TypeVar("FuncT", bound="Callable[..., object]")
 
 
 def _get_default_reporter() -> PluginBase:
-    """Get the best available reporter (Rich if installed, else Ascii)."""
+    """Get the best available reporter (LiveReporter if Rich installed, else Ascii)."""
     try:
-        from protest.reporting.rich_reporter import RichReporter
+        from protest.reporting.live_reporter import LiveReporter
 
-        return RichReporter()
+        return LiveReporter()
     except ImportError:
         from protest.reporting.ascii import AsciiReporter
 
