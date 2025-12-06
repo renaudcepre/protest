@@ -1,13 +1,32 @@
-from protest.entities import HandlerInfo, SessionResult, TestResult
+from pathlib import Path
+
+from protest.entities import HandlerInfo, SessionResult, TestItem, TestResult
 from protest.plugin import PluginBase
 
+_MIN_NODE_ID_PARTS = 2
 
-def _format_test_name(result: TestResult) -> str:
-    """Format test name with case_ids if present."""
+
+def _extract_suite_from_node_id(node_id: str) -> str | None:
+    """Extract suite path from node_id like 'module::Suite::test_name'."""
+    parts = node_id.split("::")
+    if len(parts) >= _MIN_NODE_ID_PARTS:
+        suite_parts = parts[1:-1]
+        if suite_parts:
+            return "::".join(suite_parts)
+    return None
+
+
+def _format_test_name(result: TestResult, include_suite: bool = False) -> str:
+    """Format test name with optional suite prefix and case_ids."""
+    name = result.name
+    if include_suite:
+        suite = _extract_suite_from_node_id(result.node_id)
+        if suite:
+            name = f"{suite}::{name}"
     if "[" in result.node_id:
         suffix = result.node_id[result.node_id.index("[") :]
-        return f"{result.name}{suffix}"
-    return result.name
+        return f"{name}{suffix}"
+    return name
 
 
 MIN_DURATION_THRESHOLD = 0.001
@@ -25,20 +44,28 @@ def _format_duration(seconds: float) -> str:
 class AsciiReporter(PluginBase):
     """Plain ASCII reporter. No colors, no emojis. Works everywhere."""
 
+    def __init__(self) -> None:
+        self._is_parallel = False
+
+    def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
+        self._is_parallel = len(items) > 1
+        return items
+
     def on_session_start(self) -> None:
         print(">> Starting session")
         print()
 
     def on_suite_start(self, name: str) -> None:
-        print(f"[] {name}")
+        if not self._is_parallel:
+            print(f"[] {name}")
 
     def on_test_pass(self, result: TestResult) -> None:
-        name = _format_test_name(result)
+        name = _format_test_name(result, include_suite=self._is_parallel)
         duration = _format_duration(result.duration)
         print(f"  OK {name} ({duration})")
 
     def on_test_fail(self, result: TestResult) -> None:
-        name = _format_test_name(result)
+        name = _format_test_name(result, include_suite=self._is_parallel)
         if result.is_fixture_error:
             print(f"  !! {name}:  {result.error}")
         elif isinstance(result.error, TimeoutError) and result.timeout is not None:
@@ -51,16 +78,16 @@ class AsciiReporter(PluginBase):
                 print(f"    | {line}")
 
     def on_test_skip(self, result: TestResult) -> None:
-        name = _format_test_name(result)
+        name = _format_test_name(result, include_suite=self._is_parallel)
         print(f"  -- {name} ({result.skip_reason})")
 
     def on_test_xfail(self, result: TestResult) -> None:
-        name = _format_test_name(result)
+        name = _format_test_name(result, include_suite=self._is_parallel)
         duration = _format_duration(result.duration)
         print(f"  xf {name} ({result.xfail_reason}) ({duration})")
 
     def on_test_xpass(self, result: TestResult) -> None:
-        name = _format_test_name(result)
+        name = _format_test_name(result, include_suite=self._is_parallel)
         duration = _format_duration(result.duration)
         print(f"  XP {name} UNEXPECTED PASS ({duration})")
 
@@ -105,3 +132,8 @@ class AsciiReporter(PluginBase):
 
         duration = f"{result.duration:.2f}s"
         print(f"\n{status} | {' | '.join(parts)} | {duration}")
+
+        log_file = Path(".protest/last_run.log")
+        stdout_file = Path(".protest/last_run_stdout")
+        if log_file.exists() or stdout_file.exists():
+            print("Full output: .protest/last_run.log, .protest/last_run_stdout")

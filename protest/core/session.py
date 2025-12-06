@@ -20,6 +20,7 @@ from protest.entities import FixtureRegistration, TestRegistration
 from protest.events.bus import EventBus
 from protest.events.types import Event
 from protest.filters import KeywordFilterPlugin, SuiteFilterPlugin
+from protest.reporting.log_file import LogFilePlugin
 from protest.tags.plugin import TagFilterPlugin
 from protest.utils import normalize_reason
 
@@ -27,7 +28,17 @@ FuncT = TypeVar("FuncT", bound="Callable[..., object]")
 
 
 def _get_default_reporter() -> PluginBase:
-    """Get the best available reporter (LiveReporter if Rich installed, else Ascii)."""
+    """Get the best available reporter (LiveReporter if Rich installed, else Ascii).
+
+    Respects NO_COLOR env var (https://no-color.org/).
+    """
+    import os
+
+    if os.environ.get("NO_COLOR"):
+        from protest.reporting.ascii import AsciiReporter
+
+        return AsciiReporter()
+
     try:
         from protest.reporting.live_reporter import LiveReporter
 
@@ -59,6 +70,7 @@ class ProTestSession:
         autouse: list[FixtureCallable] | None = None,
         default_reporter: bool = True,
         default_cache: bool = True,
+        default_log_file: bool = True,
         include_tags: set[str] | None = None,
         exclude_tags: set[str] | None = None,
     ) -> None:
@@ -72,6 +84,8 @@ class ProTestSession:
         self._cache_storage = CacheStorage()
         self._cache_plugin: CachePlugin | None = None
         self._cache_plugin_registered: bool = False
+        self._log_file_plugin: LogFilePlugin | None = None
+        self._log_file_enabled: bool = default_log_file
         self._tag_filter_plugin: TagFilterPlugin | None = None
         self._suite_filter_plugin: SuiteFilterPlugin | None = None
         self._keyword_filter_plugin: KeywordFilterPlugin | None = None
@@ -164,6 +178,13 @@ class ProTestSession:
             self.use(self._keyword_filter_plugin)
         else:
             self._keyword_filter_plugin._patterns = patterns
+
+    def configure_log_file(self, enabled: bool = True) -> None:
+        """Configure log file output (.protest/last_run.log)."""
+        self._log_file_enabled = enabled
+        if enabled and self._log_file_plugin is None:
+            self._log_file_plugin = LogFilePlugin()
+            self.use(self._log_file_plugin)
 
     @property
     def resolver(self) -> Resolver:

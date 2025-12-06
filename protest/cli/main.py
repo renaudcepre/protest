@@ -195,6 +195,12 @@ def _handle_run_command() -> None:
         default=[],
         help="Run only tests matching pattern (substring, can be used multiple times, OR logic)",
     )
+    parser.add_argument(
+        "--no-log-file",
+        dest="no_log_file",
+        action="store_true",
+        help="Disable writing to .protest/last_run.log",
+    )
 
     args = parser.parse_args(sys.argv[2:])
 
@@ -210,6 +216,7 @@ def _handle_run_command() -> None:
         exitfirst=args.exitfirst,
         capture=not args.no_capture,
         keywords=args.keywords if args.keywords else None,
+        log_file=not args.no_log_file,
     )
 
 
@@ -225,6 +232,7 @@ def run_tests(  # noqa: PLR0913
     exitfirst: bool = False,
     capture: bool = True,
     keywords: list[str] | None = None,
+    log_file: bool = True,
 ) -> None:
     from protest.api import collect_tests, run_session
     from protest.loader import LoadError, load_session, parse_target
@@ -261,6 +269,7 @@ def run_tests(  # noqa: PLR0913
         capture=capture,
         suite_filter=suite_filter,
         keyword_patterns=keywords,
+        log_file=log_file,
     )
     sys.exit(0 if success else 1)
 

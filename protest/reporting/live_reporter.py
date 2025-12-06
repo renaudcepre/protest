@@ -3,6 +3,7 @@ import os
 import time
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
 
 from rich.console import (  # type: ignore[import-not-found]
     Console,
@@ -22,7 +23,7 @@ from protest.entities import (
     TestResult,
     TestStartInfo,
 )
-from protest.execution.capture import set_log_callback
+from protest.execution.capture import add_log_callback, remove_log_callback
 from protest.plugin import PluginBase
 
 
@@ -112,6 +113,7 @@ class LiveReporter(PluginBase):
         self._test_order: list[str] = []
         self._suite_teardowns: dict[str, SuiteTeardown] = {}
         self._last_logs: dict[str, str] = {}
+        self._collected_items: dict[str, TestItem] = {}
         self._current_suite: str | None = None
         self._passed = 0
         self._failed = 0
@@ -150,11 +152,13 @@ class LiveReporter(PluginBase):
 
     def _build_active_tests_table(self) -> Table:
         terminal_width = self._console.size.width
-        table_width = min(terminal_width, 100)
+        table_width = min(terminal_width, 140)
         table = Table(show_header=False, box=None, padding=(0, 1), width=table_width)
         table.add_column("status", width=4, no_wrap=True)
-        table.add_column("name", ratio=3, no_wrap=True, overflow="ellipsis")
-        table.add_column("info", ratio=1, justify="right", no_wrap=True)
+        table.add_column("name", ratio=2, no_wrap=True, overflow="ellipsis")
+        table.add_column(
+            "info", ratio=1, justify="right", no_wrap=True, overflow="ellipsis"
+        )
 
         current_suite: str | None = "__unset__"
 
@@ -182,11 +186,10 @@ class LiveReporter(PluginBase):
                     info_col = Text.from_markup(
                         f"{PHASE_LABELS[test.phase]} {_format_duration(phase_duration)}",
                     )
-                table.add_row(status_col, name_col, info_col)
 
                 if last_log := self._last_logs.get(node_id):
-                    log_text = Text(f"→ {last_log}", style="dim", overflow="ellipsis")
-                    table.add_row(Text(""), log_text, Text(""))
+                    name_col.append(f" → {last_log}", style="dim")
+                table.add_row(status_col, name_col, info_col)
             else:
                 status_col = Text.from_markup(f"  {PHASE_LABELS[test.phase]}")
                 info_col = Text("")
@@ -275,20 +278,7 @@ class LiveReporter(PluginBase):
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
         self._is_parallel = len(items) > 1
         self._is_live_mode = self._should_use_live_mode()
-
-        if self._is_live_mode:
-            now = time.perf_counter()
-            for item in items:
-                self._test_order.append(item.node_id)
-                self._active_tests[item.node_id] = ActiveTest(
-                    node_id=item.node_id,
-                    name=item.test_name,
-                    phase=TestPhase.PENDING,
-                    start_time=now,
-                    suite_path=item.suite_path,
-                    phase_start_time=now,
-                )
-
+        self._collected_items = {item.node_id: item for item in items}
         return items
 
     def _on_log(self, node_id: str, record: logging.LogRecord) -> None:
@@ -301,7 +291,7 @@ class LiveReporter(PluginBase):
         self._start_time = time.perf_counter()
 
         if self._is_live_mode:
-            set_log_callback(self._on_log)
+            add_log_callback(self._on_log)
             self._live = Live(
                 self._build_display(),
                 console=self._console,
@@ -336,7 +326,21 @@ class LiveReporter(PluginBase):
             self._refresh()
 
     def on_test_start(self, info: TestStartInfo) -> None:
-        if test := self._active_tests.get(info.node_id):
+        if info.node_id not in self._active_tests:
+            now = time.perf_counter()
+            item = self._collected_items.get(info.node_id)
+            suite_path = item.suite_path if item else None
+            self._test_order.append(info.node_id)
+            self._active_tests[info.node_id] = ActiveTest(
+                node_id=info.node_id,
+                name=info.name,
+                phase=TestPhase.WAITING,
+                start_time=now,
+                suite_path=suite_path,
+                phase_start_time=now,
+            )
+        else:
+            test = self._active_tests[info.node_id]
             test.phase = TestPhase.WAITING
             test.phase_start_time = time.perf_counter()
 
@@ -478,12 +482,14 @@ class LiveReporter(PluginBase):
             self._console.print(f"  [green]✓[/] {info.name} [dim]({duration})[/]")
 
     def on_session_complete(self, result: SessionResult) -> None:
-        set_log_callback(None)
+        if self._is_live_mode:
+            remove_log_callback(self._on_log)
 
         if self._is_live_mode and self._live is not None:
             self._refresh()
             self._live.stop()
             self._live = None
+            self._print_log_file_hint()
             return
 
         total = (
@@ -514,3 +520,12 @@ class LiveReporter(PluginBase):
 
         duration = f"{result.duration:.2f}s"
         self._console.print(f"\n{status} | {' | '.join(parts)} | {duration}")
+        self._print_log_file_hint()
+
+    def _print_log_file_hint(self) -> None:
+        log_file = Path(".protest/last_run.log")
+        stdout_file = Path(".protest/last_run_stdout")
+        if log_file.exists() or stdout_file.exists():
+            self._console.print(
+                "[dim]Full output: .protest/last_run.log, .protest/last_run_stdout[/]"
+            )
