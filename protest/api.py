@@ -36,6 +36,7 @@ def run_session(  # noqa: PLR0913
     capture: bool = True,
     suite_filter: str | None = None,
     keyword_patterns: list[str] | None = None,
+    log_file: bool = True,
 ) -> bool:
     """Run a test session and return success status.
 
@@ -52,6 +53,7 @@ def run_session(  # noqa: PLR0913
         capture: Capture stdout/stderr during tests (default: True).
         suite_filter: Only run tests in this suite (::SuiteName syntax).
         keyword_patterns: Only run tests matching these patterns (-k flag).
+        log_file: Write output to .protest/last_run.log (default: True).
 
     Returns:
         True if all tests passed, False otherwise.
@@ -66,6 +68,7 @@ def run_session(  # noqa: PLR0913
     session.configure_keyword_filter(keyword_patterns)
     session.configure_tags(include_tags=include_tags, exclude_tags=exclude_tags)
     session.configure_cache(last_failed=last_failed, cache_clear=cache_clear)
+    session.configure_log_file(enabled=log_file)
 
     runner = TestRunner(session)
     return runner.run()

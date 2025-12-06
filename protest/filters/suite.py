@@ -20,6 +20,8 @@ class SuiteFilterPlugin(PluginBase):
     def _matches_suite(self, item: TestItem) -> bool:
         if item.suite_path is None:
             return False
-        return item.suite_path == self._suite_filter or item.suite_path.startswith(
-            f"{self._suite_filter}::"
+        suite_lower = item.suite_path.lower()
+        filter_lower = self._suite_filter.lower() if self._suite_filter else ""
+        return suite_lower == filter_lower or suite_lower.startswith(
+            f"{filter_lower}::"
         )

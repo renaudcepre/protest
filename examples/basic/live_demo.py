@@ -10,6 +10,9 @@ log = logging.getLogger(__name__)
 session = ProTestSession(concurrency=10)
 
 api_suite = ProTestSuite("API", max_concurrency=4)
+api_users_suite = ProTestSuite("Users", max_concurrency=2)
+api_suite.add_suite(api_users_suite)
+
 db_suite = ProTestSuite("Database", max_concurrency=1)
 auth_suite = ProTestSuite("Auth", max_concurrency=2)
 
@@ -36,6 +39,7 @@ def auth_service():
 async def test_api_health():
     log.info("Checking API health endpoint...")
     await asyncio.sleep(0.3)
+    print("Health check response: {'status': 'ok'}")
     log.info("API is healthy")
     await asyncio.sleep(0.2)
 
@@ -93,6 +97,7 @@ async def test_db_connection(db: Annotated[dict, Use(db_connection)]):
 async def test_db_query(db: Annotated[dict, Use(db_connection)]):
     log.info("Executing SELECT * FROM users")
     await asyncio.sleep(0.3)
+    print("Query result: [{'id': 1, 'name': 'Alice'}, {'id': 2, 'name': 'Bob'}]")
     log.info("Query returned 250 rows")
     await asyncio.sleep(0.2)
 
@@ -126,6 +131,7 @@ async def test_db_slow_operation(db: Annotated[dict, Use(db_connection)]):
 async def test_auth_login(auth: Annotated[dict, Use(auth_service)]):
     log.info("Validating credentials...")
     await asyncio.sleep(0.2)
+    print("Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
     log.info("Generating JWT token")
     await asyncio.sleep(0.3)
 
@@ -165,6 +171,28 @@ async def test_auth_2fa():
 async def test_auth_session_timeout():
     await asyncio.sleep(0.4)
     raise AssertionError("Session doesn't timeout correctly")
+
+
+@api_users_suite.test()
+async def test_list_users():
+    log.info("Fetching all users...")
+    await asyncio.sleep(0.3)
+    print("Found 42 users")
+    log.info("Users loaded")
+
+
+@api_users_suite.test()
+async def test_get_user():
+    log.info("Fetching user by ID...")
+    await asyncio.sleep(0.2)
+    log.info("User found: alice@example.com")
+
+
+@api_users_suite.test()
+async def test_create_user():
+    log.info("Creating new user...")
+    await asyncio.sleep(0.4)
+    print("User created: {'id': 123, 'name': 'Bob'}")
 
 
 @session.test()

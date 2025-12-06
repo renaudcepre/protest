@@ -16,17 +16,37 @@ _log_records: ContextVar[list[LogRecord] | None] = ContextVar(
 
 _current_node_id: ContextVar[str | None] = ContextVar("current_node_id", default=None)
 
+_log_callbacks: list[Callable[[str, LogRecord], None]] = []
+_stdout_callbacks: list[Callable[[str, str], None]] = []
 
-class _LogCallbackHolder:
-    callback: Callable[[str, LogRecord], None] | None = None
+
+def add_log_callback(callback: Callable[[str, LogRecord], None]) -> None:
+    """Add a callback to be notified when a log is emitted during a test."""
+    _log_callbacks.append(callback)
 
 
-_log_callback_holder = _LogCallbackHolder()
+def remove_log_callback(callback: Callable[[str, LogRecord], None]) -> None:
+    """Remove a log callback."""
+    if callback in _log_callbacks:
+        _log_callbacks.remove(callback)
 
 
 def set_log_callback(callback: Callable[[str, LogRecord], None] | None) -> None:
-    """Set a callback to be notified when a log is emitted during a test."""
-    _log_callback_holder.callback = callback
+    """Set a single callback (legacy API, replaces all existing callbacks)."""
+    _log_callbacks.clear()
+    if callback is not None:
+        _log_callbacks.append(callback)
+
+
+def add_stdout_callback(callback: Callable[[str, str], None]) -> None:
+    """Add a callback for stdout/stderr writes. Args: (node_id, data)."""
+    _stdout_callbacks.append(callback)
+
+
+def remove_stdout_callback(callback: Callable[[str, str], None]) -> None:
+    """Remove a stdout callback."""
+    if callback in _stdout_callbacks:
+        _stdout_callbacks.remove(callback)
 
 
 def set_current_node_id(node_id: str | None) -> Token[str | None]:
@@ -46,6 +66,10 @@ class TaskAwareStream:
     def write(self, data: str) -> int:
         buffer = _capture_buffer.get()
         if buffer is not None:
+            node_id = _current_node_id.get()
+            if node_id and _stdout_callbacks:
+                for callback in _stdout_callbacks:
+                    callback(node_id, data)
             return buffer.write(data)
         return self._original.write(data)
 
@@ -66,8 +90,9 @@ class TaskAwareLogHandler(logging.Handler):
             records.append(record)
 
         node_id = _current_node_id.get()
-        if node_id and _log_callback_holder.callback:
-            _log_callback_holder.callback(node_id, record)
+        if node_id and _log_callbacks:
+            for callback in _log_callbacks:
+                callback(node_id, record)
 
 
 class GlobalCapturePatch:

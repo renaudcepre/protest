@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from rich.console import Console  # type: ignore[import-not-found]
 
 from protest.entities import HandlerInfo, SessionResult, TestResult
@@ -117,3 +119,10 @@ class RichReporter(PluginBase):
 
         duration = f"{result.duration:.2f}s"
         self.console.print(f"\n{status} │ {' │ '.join(parts)} │ {duration}")
+
+        log_file = Path(".protest/last_run.log")
+        stdout_file = Path(".protest/last_run_stdout")
+        if log_file.exists() or stdout_file.exists():
+            self.console.print(
+                "[dim]Full output: .protest/last_run.log, .protest/last_run_stdout[/]"
+            )
