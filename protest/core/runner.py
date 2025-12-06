@@ -21,7 +21,12 @@ from protest.entities import (
 from protest.events.types import Event
 from protest.exceptions import FixtureError
 from protest.execution.async_bridge import ensure_async
-from protest.execution.capture import CaptureCurrentTest, GlobalCapturePatch
+from protest.execution.capture import (
+    CaptureCurrentTest,
+    GlobalCapturePatch,
+    reset_current_node_id,
+    set_current_node_id,
+)
 from protest.execution.context import TestExecutionContext
 from protest.utils import get_callable_name
 
@@ -197,14 +202,19 @@ class TestRunner:
 
     async def _execute_test(
         self, item: TestItem, start_info: TestStartInfo
-    ) -> TestOutcome:  # pyright: ignore[reportReturnType]
+    ) -> TestOutcome:
         """Execute a single test with capture and context."""
         await self._session.events.emit(Event.TEST_ACQUIRED, start_info)
-        with CaptureCurrentTest() as buffer:
-            async with TestExecutionContext(
-                self._session.resolver, item.suite_path
-            ) as ctx:
-                return await self._run_test(item, ctx, buffer, start_info)
+        node_id_token = set_current_node_id(start_info.node_id)
+        try:
+            with CaptureCurrentTest() as buffer:
+                async with TestExecutionContext(
+                    self._session.resolver, item.suite_path
+                ) as ctx:
+                    outcome = await self._run_test(item, ctx, buffer, start_info)
+            return outcome  # pyright: ignore[reportPossiblyUnboundVariable]
+        finally:
+            reset_current_node_id(node_id_token)
 
     async def _teardown_suite(self, suite_path: str) -> None:
         """Teardown suite fixtures after all its tests complete."""
