@@ -44,9 +44,12 @@ class TestGetReporter:
         assert isinstance(reporter, RichReporter)
 
     def test_tty_returns_live(self) -> None:
-        with patch("rich.console.Console") as mock_console:
-            mock_console.return_value.is_terminal = True
-            reporter = get_reporter()
+        # Clear CI env var to test TTY behavior (CI would force RichReporter)
+        env_without_ci = {k: v for k, v in os.environ.items() if k != "CI"}
+        with patch.dict(os.environ, env_without_ci, clear=True):
+            with patch("rich.console.Console") as mock_console:
+                mock_console.return_value.is_terminal = True
+                reporter = get_reporter()
 
         from protest.reporting.live_reporter import LiveReporter
 
