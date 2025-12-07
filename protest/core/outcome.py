@@ -24,6 +24,7 @@ class TestExecutionResult:
 
     test_name: str
     node_id: str
+    suite_path: str | None = None
     duration: float = 0
     output: str = ""
     error: Exception | None = None
@@ -79,6 +80,7 @@ class OutcomeBuilder:
         result = TestResult(
             name=exec_result.test_name,
             node_id=exec_result.node_id,
+            suite_path=exec_result.suite_path,
             skip_reason=exec_result.skip_reason,
             timeout=exec_result.timeout,
         )
@@ -88,6 +90,7 @@ class OutcomeBuilder:
         result = TestResult(
             name=exec_result.test_name,
             node_id=exec_result.node_id,
+            suite_path=exec_result.suite_path,
             duration=exec_result.duration,
             output=exec_result.output,
             timeout=exec_result.timeout,
@@ -98,6 +101,7 @@ class OutcomeBuilder:
         result = TestResult(
             name=exec_result.test_name,
             node_id=exec_result.node_id,
+            suite_path=exec_result.suite_path,
             duration=exec_result.duration,
             output=exec_result.output,
             xfail_reason=exec_result.xfail_reason,
@@ -109,6 +113,7 @@ class OutcomeBuilder:
         result = TestResult(
             name=exec_result.test_name,
             node_id=exec_result.node_id,
+            suite_path=exec_result.suite_path,
             error=exec_result.error,
             duration=exec_result.duration,
             output=exec_result.output,
@@ -121,6 +126,7 @@ class OutcomeBuilder:
         result = TestResult(
             name=exec_result.test_name,
             node_id=exec_result.node_id,
+            suite_path=exec_result.suite_path,
             error=exec_result.error,
             duration=exec_result.duration,
             output=exec_result.output,
@@ -133,6 +139,7 @@ class OutcomeBuilder:
         result = TestResult(
             name=exec_result.test_name,
             node_id=exec_result.node_id,
+            suite_path=exec_result.suite_path,
             error=exec_result.error,
             duration=exec_result.duration,
             output=exec_result.output,

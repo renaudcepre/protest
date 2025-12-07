@@ -270,6 +270,7 @@ class TestRunner:
                 TestExecutionResult(
                     test_name=test_name,
                     node_id=node_id,
+                    suite_path=item.suite_path,
                     skip_reason=item.skip_reason,
                 )
             )
@@ -283,6 +284,7 @@ class TestRunner:
                 TestExecutionResult(
                     test_name=test_name,
                     node_id=node_id,
+                    suite_path=item.suite_path,
                     duration=time.perf_counter() - start,
                     output=buffer.getvalue(),
                     error=exc,
@@ -317,6 +319,7 @@ class TestRunner:
             TestExecutionResult(
                 test_name=test_name,
                 node_id=node_id,
+                suite_path=item.suite_path,
                 duration=time.perf_counter() - start,
                 output=buffer.getvalue(),
                 error=error,
