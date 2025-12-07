@@ -55,6 +55,18 @@ class AsciiReporter(PluginBase):
         print(">> Starting session")
         print()
 
+    def on_session_setup_start(self) -> None:
+        print("  session setup...")
+
+    def on_session_setup_done(self, duration: float) -> None:
+        print(f"  session setup done ({_format_duration(duration)})")
+
+    def on_session_teardown_start(self) -> None:
+        print("  session teardown...")
+
+    def on_session_teardown_done(self, duration: float) -> None:
+        print(f"  session teardown done ({_format_duration(duration)})")
+
     def on_suite_start(self, name: str) -> None:
         if not self._is_parallel:
             print(f"[] {name}")

@@ -3,11 +3,24 @@ import logging
 import time
 from typing import Annotated
 
-from protest import ProTestSession, ProTestSuite, Use
+from protest import ForEach, From, ProTestSession, ProTestSuite, Use
 
 log = logging.getLogger(__name__)
 
 session = ProTestSession(concurrency=10)
+
+
+@session.fixture()
+def global_config():
+    """Session-level fixture with slow setup/teardown."""
+    log.info("Setting up global config...")
+    time.sleep(1.2)
+    log.info("Global config ready")
+    yield {"env": "test", "debug": True}
+    log.info("Tearing down global config...")
+    time.sleep(1.2)
+    log.info("Global config cleaned up")
+
 
 api_suite = ProTestSuite("API", max_concurrency=4)
 api_users_suite = ProTestSuite("Users", max_concurrency=2)
@@ -196,15 +209,45 @@ async def test_create_user():
 
 
 @session.test()
-async def test_standalone_quick():
+async def test_standalone_quick(cfg: Annotated[dict, Use(global_config)]):
+    assert cfg["env"] == "test"
     await asyncio.sleep(0.3)
 
 
 @session.test()
-async def test_standalone_medium():
+async def test_standalone_medium(cfg: Annotated[dict, Use(global_config)]):
     await asyncio.sleep(0.5)
 
 
 @session.test()
-async def test_standalone_slow():
+async def test_standalone_slow(cfg: Annotated[dict, Use(global_config)]):
     await asyncio.sleep(0.8)
+
+
+STATUS_CODES = ForEach(
+    [(200, "ok"), (201, "created"), (204, "no_content"), (404, "not_found")],
+    ids=lambda x: str(x[0]),
+)
+
+
+@api_suite.test()
+async def test_api_status_codes(
+    case: Annotated[tuple[int, str], From(STATUS_CODES)],
+):
+    status_code, expected = case
+    log.info(f"Testing status {status_code}...")
+    await asyncio.sleep(0.2)
+    assert expected in ["ok", "created", "no_content", "not_found"]
+
+
+TABLES = ForEach(["users", "orders", "products"])
+
+
+@db_suite.test()
+async def test_db_table_exists(
+    db: Annotated[dict, Use(db_connection)],
+    table: Annotated[str, From(TABLES)],
+):
+    log.info(f"Checking table {table}...")
+    await asyncio.sleep(0.25)
+    assert db["connected"]

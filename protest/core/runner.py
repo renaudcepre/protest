@@ -68,7 +68,13 @@ class TestRunner:
         )
         with capture_ctx:
             async with self._session:
+                await self._session.events.emit(Event.SESSION_SETUP_START)
+                setup_start = time.perf_counter()
                 await self._session.resolve_autouse()
+                setup_duration = time.perf_counter() - setup_start
+                await self._session.events.emit(
+                    Event.SESSION_SETUP_DONE, setup_duration
+                )
 
                 started_suites: set[str] = set()
                 for item in items:

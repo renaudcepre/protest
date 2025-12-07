@@ -31,6 +31,18 @@ class PluginBase:
     def on_session_start(self) -> None | Awaitable[None]:
         """Called before any test runs."""
 
+    def on_session_setup_start(self) -> None | Awaitable[None]:
+        """Called before session fixtures are resolved."""
+
+    def on_session_setup_done(self, duration: float) -> None | Awaitable[None]:
+        """Called after session fixtures are resolved."""
+
+    def on_session_teardown_start(self) -> None | Awaitable[None]:
+        """Called before session fixture teardown begins."""
+
+    def on_session_teardown_done(self, duration: float) -> None | Awaitable[None]:
+        """Called after session fixture teardown completes."""
+
     def on_session_end(self, result: SessionResult) -> None | Awaitable[None]:
         """Tests done. Async handlers (Slack, etc.) start here."""
 
