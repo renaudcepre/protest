@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from protest.events.types import Event
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestCounts:
     passed: int = 0
     failed: int = 0
@@ -27,7 +27,7 @@ class TestCounts:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestResult:
     name: str
     node_id: str = ""
@@ -40,7 +40,7 @@ class TestResult:
     timeout: float | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SessionResult:
     passed: int
     failed: int
@@ -51,13 +51,13 @@ class SessionResult:
     duration: float = 0
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class TestStartInfo:
     name: str
     node_id: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class HandlerInfo:
     name: str
     event: Event
@@ -66,7 +66,7 @@ class HandlerInfo:
     error: Exception | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class FixtureInfo:
     name: str
     scope: str

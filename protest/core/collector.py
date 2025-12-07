@@ -54,6 +54,7 @@ class Collector:
         self._fixture_deps: dict[FixtureCallable, list[FixtureCallable]] = {}
 
     def collect(self, session: ProTestSession) -> list[TestItem]:
+        """Collect all tests from session and nested suites into TestItems."""
         self._build_fixture_index(session)
 
         items: list[TestItem] = []

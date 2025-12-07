@@ -15,7 +15,7 @@ from protest.utils import get_callable_name
 FixtureCallable: TypeAlias = "Callable[..., Any]"
 
 
-@dataclass
+@dataclass(slots=True)
 class TestRegistration:
     """Registration info for a test function."""
 
@@ -26,7 +26,7 @@ class TestRegistration:
     timeout: float | None = None
 
 
-@dataclass
+@dataclass(slots=True)
 class FixtureRegistration:
     """Registration info for a fixture before it's added to the resolver."""
 
@@ -37,7 +37,7 @@ class FixtureRegistration:
     tags: set[str] = field(default_factory=set)
 
 
-@dataclass
+@dataclass(slots=True)
 class Fixture:
     func: FixtureCallable
     is_factory: bool = False
@@ -52,7 +52,7 @@ class Fixture:
         self.is_cached = False
 
 
-@dataclass
+@dataclass(slots=True)
 class TestItem:
     func: Callable[..., Any]
     suite: ProTestSuite | None
@@ -86,7 +86,7 @@ class TestItem:
         return base
 
 
-@dataclass
+@dataclass(slots=True)
 class TestOutcome:
     result: TestResult
     counts: TestCounts

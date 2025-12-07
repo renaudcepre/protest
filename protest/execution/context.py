@@ -102,19 +102,19 @@ class TestExecutionContext:
         return result
 
     async def _emit_fixture_setup_async(self, name: str) -> None:
-        if self._parent._event_bus is None:
+        if self._parent.event_bus is None:
             return
 
-        await self._parent._event_bus.emit(
+        await self._parent.event_bus.emit(
             Event.FIXTURE_SETUP, FixtureInfo(name=name, scope="function")
         )
 
     async def _emit_fixture_teardown_async(self, name: str, start_time: float) -> None:
-        if self._parent._event_bus is None:
+        if self._parent.event_bus is None:
             return
 
         duration = time.perf_counter() - start_time
-        await self._parent._event_bus.emit(
+        await self._parent.event_bus.emit(
             Event.FIXTURE_TEARDOWN,
             FixtureInfo(name=name, scope="function", duration=duration),
         )

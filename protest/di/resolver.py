@@ -5,7 +5,7 @@ import inspect
 import time
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from inspect import Parameter, signature
-from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, Final, get_args, get_origin
 
 from protest.core.fixture import is_generator_like
 from protest.di.decorators import FixtureWrapper
@@ -41,7 +41,7 @@ class Resolver:
     (a special marker meaning fresh instance per test).
     """
 
-    FUNCTION_SCOPE = "__function__"
+    FUNCTION_SCOPE: Final[str] = "<function_scope>"
 
     @staticmethod
     def _unwrap(
@@ -61,6 +61,10 @@ class Resolver:
         self._path_caches: dict[str, dict[FixtureCallable, Any]] = {}
         self._path_exit_stacks: dict[str, AsyncExitStack] = {}
         self._event_bus = event_bus
+
+    @property
+    def event_bus(self) -> EventBus | None:
+        return self._event_bus
 
     def register(  # noqa: PLR0913
         self,
@@ -102,18 +106,22 @@ class Resolver:
         self._resolve_locks[func] = asyncio.Lock()
 
     def has_fixture(self, func: FixtureCallable) -> bool:
+        """Check if a fixture is registered."""
         actual_func, _ = self._unwrap(func)
         return actual_func in self._registry
 
     def get_fixture(self, func: FixtureCallable) -> Fixture | None:
+        """Return the Fixture for a function, or None if not registered."""
         actual_func, _ = self._unwrap(func)
         return self._registry.get(actual_func)
 
     def get_scope_path(self, func: FixtureCallable) -> str | None:
+        """Return the scope path for a fixture (None=session, FUNCTION_SCOPE, or suite path)."""
         actual_func, _ = self._unwrap(func)
         return self._scope_paths.get(actual_func)
 
     def get_dependencies(self, func: FixtureCallable) -> dict[str, FixtureCallable]:
+        """Return the dependencies of a fixture as {param_name: fixture_func}."""
         actual_func, _ = self._unwrap(func)
         return self._dependencies.get(actual_func, {})
 

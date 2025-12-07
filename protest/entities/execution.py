@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from logging import LogRecord
 
 
-@dataclass
+@dataclass(slots=True)
 class LogCapture:
     _records: list[LogRecord] = field(default_factory=list)
 
