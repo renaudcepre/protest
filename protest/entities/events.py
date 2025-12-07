@@ -31,6 +31,7 @@ class TestCounts:
 class TestResult:
     name: str
     node_id: str = ""
+    suite_path: str | None = None
     error: Exception | None = None
     duration: float = 0
     output: str = ""

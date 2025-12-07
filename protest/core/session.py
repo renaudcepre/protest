@@ -20,33 +20,12 @@ from protest.entities import FixtureRegistration, TestRegistration
 from protest.events.bus import EventBus
 from protest.events.types import Event
 from protest.filters import KeywordFilterPlugin, SuiteFilterPlugin
+from protest.reporting.factory import get_reporter
 from protest.reporting.log_file import LogFilePlugin
 from protest.tags.plugin import TagFilterPlugin
 from protest.utils import normalize_reason
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
-
-
-def _get_default_reporter() -> PluginBase:
-    """Get the best available reporter (LiveReporter if Rich installed, else Ascii).
-
-    Respects NO_COLOR env var (https://no-color.org/).
-    """
-    import os
-
-    if os.environ.get("NO_COLOR"):
-        from protest.reporting.ascii import AsciiReporter
-
-        return AsciiReporter()
-
-    try:
-        from protest.reporting.live_reporter import LiveReporter
-
-        return LiveReporter()
-    except ImportError:
-        from protest.reporting.ascii import AsciiReporter
-
-        return AsciiReporter()
 
 
 class ProTestSession:
@@ -93,7 +72,7 @@ class ProTestSession:
         self._capture: bool = True
 
         if default_reporter:
-            self.use(_get_default_reporter())
+            self.use(get_reporter())
         if default_cache:
             self._cache_plugin = CachePlugin()
         if include_tags or exclude_tags:

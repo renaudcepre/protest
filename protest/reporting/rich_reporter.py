@@ -32,51 +32,62 @@ class RichReporter(PluginBase):
 
     def __init__(self) -> None:
         self.console = Console(highlight=False)
+        self._printed_suites: set[str | None] = set()
 
     def on_session_start(self) -> None:
-        self.console.print("[bold cyan]🚀 Starting session[/]")
-        self.console.print()
+        pass
 
     def on_suite_start(self, name: str) -> None:
-        self.console.print(f"[cyan]📦 {name}[/]")
+        pass
+
+    def _print_suite_header_if_needed(self, suite_path: str | None) -> None:
+        if suite_path not in self._printed_suites:
+            self._printed_suites.add(suite_path)
+            if suite_path:
+                self.console.print(f"[cyan]       ◈ {suite_path}[/]")
 
     def on_test_pass(self, result: TestResult) -> None:
+        self._print_suite_header_if_needed(result.suite_path)
         name = _format_test_name(result)
         duration = _format_duration(result.duration)
-        self.console.print(f"  [green]✓[/] {name} [dim]({duration})[/]")
+        self.console.print(f"   [green]✓[/]   {name} [dim]({duration})[/]")
 
     def on_test_fail(self, result: TestResult) -> None:
+        self._print_suite_header_if_needed(result.suite_path)
         name = _format_test_name(result)
         if result.is_fixture_error:
             self.console.print(
-                f"  [yellow]⚠[/] {name}: [bold yellow]\\[FIXTURE][/] {result.error}"
+                f"   [yellow]⚠[/]   {name}: [bold yellow]\\[FIXTURE][/] {result.error}"
             )
         elif isinstance(result.error, TimeoutError) and result.timeout is not None:
             self.console.print(
-                f"  [red]⏱[/] {name}: [bold red]TIMEOUT[/] (exceeded {result.timeout}s)"
+                f"   [red]⏱[/]   {name}: [bold red]TIMEOUT[/] (exceeded {result.timeout}s)"
             )
         else:
-            self.console.print(f"  [red]✗[/] {name}: {result.error}")
+            self.console.print(f"   [red]✗[/]   {name}: {result.error}")
 
         if result.output:
             for line in result.output.rstrip().splitlines():
-                self.console.print(f"[dim]    │ {line}[/]")
+                self.console.print(f"[dim]       │ {line}[/]")
 
     def on_test_skip(self, result: TestResult) -> None:
+        self._print_suite_header_if_needed(result.suite_path)
         name = _format_test_name(result)
-        self.console.print(f"  [yellow]○[/] {name} [dim]({result.skip_reason})[/]")
+        self.console.print(f"   [yellow]○[/]   {name} [dim]({result.skip_reason})[/]")
 
     def on_test_xfail(self, result: TestResult) -> None:
+        self._print_suite_header_if_needed(result.suite_path)
         name = _format_test_name(result)
         duration = _format_duration(result.duration)
         self.console.print(
-            f"  [green]✗[/] {name} [dim]({result.xfail_reason}) ({duration})[/]"
+            f"   [green]✗[/]   {name} [dim]({result.xfail_reason}) ({duration})[/]"
         )
 
     def on_test_xpass(self, result: TestResult) -> None:
+        self._print_suite_header_if_needed(result.suite_path)
         name = _format_test_name(result)
         duration = _format_duration(result.duration)
-        self.console.print(f"  [red]⚡[/] {name} [red]XPASS[/] [dim]({duration})[/]")
+        self.console.print(f"   [red]⚡[/]   {name} [red]XPASS[/] [dim]({duration})[/]")
 
     def on_waiting_handlers(self, pending_count: int) -> None:
         self.console.print(f"\n[cyan]⏳ Async handlers ({pending_count})[/]")
