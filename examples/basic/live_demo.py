@@ -22,12 +22,12 @@ def global_config():
     log.info("Global config cleaned up")
 
 
-api_suite = ProTestSuite("API", max_concurrency=4)
-api_users_suite = ProTestSuite("Users", max_concurrency=2)
+api_suite = ProTestSuite("API")
+api_users_suite = ProTestSuite("Users")
 api_suite.add_suite(api_users_suite)
 
-db_suite = ProTestSuite("Database", max_concurrency=1)
-auth_suite = ProTestSuite("Auth", max_concurrency=2)
+db_suite = ProTestSuite("Database")
+auth_suite = ProTestSuite("Auth")
 
 session.add_suite(api_suite)
 session.add_suite(db_suite)

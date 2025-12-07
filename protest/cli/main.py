@@ -202,17 +202,6 @@ def _handle_run_command() -> None:
         help="Disable writing to .protest/last_run.log",
     )
     parser.add_argument(
-        "--live",
-        action="store_true",
-        help="Force live display mode (interactive terminal)",
-    )
-    parser.add_argument(
-        "--no-live",
-        dest="no_live",
-        action="store_true",
-        help="Force sequential display mode (CI/logs)",
-    )
-    parser.add_argument(
         "--no-color",
         dest="no_color",
         action="store_true",
@@ -234,8 +223,6 @@ def _handle_run_command() -> None:
         capture=not args.no_capture,
         keywords=args.keywords if args.keywords else None,
         log_file=not args.no_log_file,
-        force_live=args.live,
-        force_no_live=args.no_live,
         force_no_color=args.no_color,
     )
 
@@ -253,8 +240,6 @@ def run_tests(  # noqa: PLR0913
     capture: bool = True,
     keywords: list[str] | None = None,
     log_file: bool = True,
-    force_live: bool = False,
-    force_no_live: bool = False,
     force_no_color: bool = False,
 ) -> None:
     from protest.api import collect_tests, run_session
@@ -293,8 +278,6 @@ def run_tests(  # noqa: PLR0913
         suite_filter=suite_filter,
         keyword_patterns=keywords,
         log_file=log_file,
-        force_live=force_live,
-        force_no_live=force_no_live,
         force_no_color=force_no_color,
     )
     sys.exit(0 if success else 1)

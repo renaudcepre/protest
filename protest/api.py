@@ -37,8 +37,6 @@ def run_session(  # noqa: PLR0913
     suite_filter: str | None = None,
     keyword_patterns: list[str] | None = None,
     log_file: bool = True,
-    force_live: bool = False,
-    force_no_live: bool = False,
     force_no_color: bool = False,
 ) -> bool:
     """Run a test session and return success status.
@@ -57,8 +55,6 @@ def run_session(  # noqa: PLR0913
         suite_filter: Only run tests in this suite (::SuiteName syntax).
         keyword_patterns: Only run tests matching these patterns (-k flag).
         log_file: Write output to .protest/last_run.log (default: True).
-        force_live: Force live display mode (--live flag).
-        force_no_live: Force sequential display mode (--no-live flag).
         force_no_color: Disable colors (--no-color flag).
 
     Returns:
@@ -67,8 +63,8 @@ def run_session(  # noqa: PLR0913
     from protest.core.runner import TestRunner  # noqa: PLC0415
     from protest.reporting.factory import get_reporter  # noqa: PLC0415
 
-    if force_live or force_no_live or force_no_color:
-        reporter = get_reporter(force_live, force_no_live, force_no_color)
+    if force_no_color:
+        reporter = get_reporter(force_no_color=force_no_color)
         session.use(reporter)
 
     if concurrency is not None:

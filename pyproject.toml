@@ -88,10 +88,6 @@ ignore = [
     "PLC0415", # imports after patch context
     "SIM117",  # nested with for patch clarity
 ]
-"tests/reporting/test_live_reporter.py" = [
-    "PLC0415", # imports inside test
-    "SIM117",  # nested with for patch clarity
-]
 
 
 [tool.pytest.ini_options]

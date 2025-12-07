@@ -2,12 +2,11 @@ from pathlib import Path
 
 from rich.console import Console  # type: ignore[import-not-found]
 
-from protest.entities import HandlerInfo, SessionResult, TestResult
+from protest.entities import HandlerInfo, SessionResult, TestItem, TestResult
 from protest.plugin import PluginBase
 
 
 def _format_test_name(result: TestResult) -> str:
-    """Format test name with case_ids if present."""
     if "[" in result.node_id:
         suffix = result.node_id[result.node_id.index("[") :]
         escaped_suffix = suffix.replace("[", "\\[")
@@ -19,7 +18,6 @@ MIN_DURATION_THRESHOLD = 0.001
 
 
 def _format_duration(seconds: float) -> str:
-    """Format duration: ms for fast, s for slow."""
     if seconds < MIN_DURATION_THRESHOLD:
         return "<1ms"
     if seconds < 1:
@@ -28,22 +26,25 @@ def _format_duration(seconds: float) -> str:
 
 
 class RichReporter(PluginBase):
-    """Rich console reporter with colors and emojis."""
+    """Rich console reporter with colors."""
 
     def __init__(self) -> None:
         self.console = Console(highlight=False)
         self._printed_suites: set[str | None] = set()
+        self._total_tests = 0
+
+    def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
+        self._total_tests = len(items)
+        return items
 
     def on_session_start(self) -> None:
         pass
 
     def on_session_setup_start(self) -> None:
-        self.console.print("[cyan]  session setup...[/]")
+        pass
 
     def on_session_setup_done(self, duration: float) -> None:
-        self.console.print(
-            f"[dim]  session setup done ({_format_duration(duration)})[/]"
-        )
+        pass
 
     def on_session_teardown_start(self) -> None:
         self.console.print("[yellow]  session teardown...[/]")
@@ -71,6 +72,7 @@ class RichReporter(PluginBase):
     def on_test_fail(self, result: TestResult) -> None:
         self._print_suite_header_if_needed(result.suite_path)
         name = _format_test_name(result)
+
         if result.is_fixture_error:
             self.console.print(
                 f"   [yellow]⚠[/]   {name}: [bold yellow]\\[FIXTURE][/] {result.error}"
@@ -126,7 +128,6 @@ class RichReporter(PluginBase):
             + result.xfailed
             + result.xpassed
         )
-
         if result.failed == 0 and result.errors == 0 and result.xpassed == 0:
             status = "[bold green]✓ ALL PASSED[/]"
         else:
