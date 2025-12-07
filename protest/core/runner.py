@@ -2,11 +2,11 @@ import asyncio
 import contextlib
 import io
 import time
-from dataclasses import dataclass
 from inspect import signature
 from typing import Any
 
 from protest.core.collector import Collector
+from protest.core.outcome import OutcomeBuilder, TestExecutionResult
 from protest.core.session import ProTestSession
 from protest.core.tracker import SuiteTracker
 from protest.di.resolver import Resolver
@@ -15,7 +15,6 @@ from protest.entities import (
     TestCounts,
     TestItem,
     TestOutcome,
-    TestResult,
     TestStartInfo,
 )
 from protest.events.types import Event
@@ -31,21 +30,6 @@ from protest.execution.context import TestExecutionContext
 from protest.utils import get_callable_name
 
 
-@dataclass
-class _TestExecutionResult:
-    """Internal result of test execution before outcome determination."""
-
-    test_name: str
-    node_id: str
-    duration: float = 0
-    output: str = ""
-    error: Exception | None = None
-    is_fixture_error: bool = False
-    skip_reason: str | None = None
-    xfail_reason: str | None = None
-    timeout: float | None = None
-
-
 class TestRunner:
     """Executes tests with parallel support and fixture lifecycle management.
 
@@ -55,6 +39,7 @@ class TestRunner:
 
     def __init__(self, session: ProTestSession) -> None:
         self._session = session
+        self._outcome_builder = OutcomeBuilder()
 
     def run(self) -> bool:
         """Run the test session synchronously. Returns True if all tests passed."""
@@ -269,71 +254,6 @@ class TestRunner:
 
         return kwargs
 
-    def _build_outcome(self, exec_result: _TestExecutionResult) -> TestOutcome:
-        """Build TestOutcome based on test execution results."""
-        if exec_result.skip_reason:
-            result = TestResult(
-                name=exec_result.test_name,
-                node_id=exec_result.node_id,
-                skip_reason=exec_result.skip_reason,
-                timeout=exec_result.timeout,
-            )
-            return TestOutcome(result, TestCounts(skipped=1), Event.TEST_SKIP)
-
-        if exec_result.error is None:
-            if exec_result.xfail_reason:
-                result = TestResult(
-                    name=exec_result.test_name,
-                    node_id=exec_result.node_id,
-                    duration=exec_result.duration,
-                    output=exec_result.output,
-                    xfail_reason=exec_result.xfail_reason,
-                    timeout=exec_result.timeout,
-                )
-                return TestOutcome(result, TestCounts(xpassed=1), Event.TEST_XPASS)
-            result = TestResult(
-                name=exec_result.test_name,
-                node_id=exec_result.node_id,
-                duration=exec_result.duration,
-                output=exec_result.output,
-                timeout=exec_result.timeout,
-            )
-            return TestOutcome(result, TestCounts(passed=1), Event.TEST_PASS)
-
-        if exec_result.is_fixture_error:
-            result = TestResult(
-                name=exec_result.test_name,
-                node_id=exec_result.node_id,
-                error=exec_result.error,
-                duration=exec_result.duration,
-                output=exec_result.output,
-                is_fixture_error=True,
-                timeout=exec_result.timeout,
-            )
-            return TestOutcome(result, TestCounts(errored=1), Event.TEST_FAIL)
-
-        if exec_result.xfail_reason:
-            result = TestResult(
-                name=exec_result.test_name,
-                node_id=exec_result.node_id,
-                error=exec_result.error,
-                duration=exec_result.duration,
-                output=exec_result.output,
-                xfail_reason=exec_result.xfail_reason,
-                timeout=exec_result.timeout,
-            )
-            return TestOutcome(result, TestCounts(xfailed=1), Event.TEST_XFAIL)
-
-        result = TestResult(
-            name=exec_result.test_name,
-            node_id=exec_result.node_id,
-            error=exec_result.error,
-            duration=exec_result.duration,
-            output=exec_result.output,
-            timeout=exec_result.timeout,
-        )
-        return TestOutcome(result, TestCounts(failed=1), Event.TEST_FAIL)
-
     async def _run_test(
         self,
         item: TestItem,
@@ -346,8 +266,8 @@ class TestRunner:
         node_id = start_info.node_id
 
         if item.skip_reason:
-            return self._build_outcome(
-                _TestExecutionResult(
+            return self._outcome_builder.build(
+                TestExecutionResult(
                     test_name=test_name,
                     node_id=node_id,
                     skip_reason=item.skip_reason,
@@ -359,8 +279,8 @@ class TestRunner:
         try:
             kwargs = await self._resolve_test_kwargs(item, ctx)
         except Exception as exc:
-            return self._build_outcome(
-                _TestExecutionResult(
+            return self._outcome_builder.build(
+                TestExecutionResult(
                     test_name=test_name,
                     node_id=node_id,
                     duration=time.perf_counter() - start,
@@ -393,8 +313,8 @@ class TestRunner:
 
         await self._session.events.emit(Event.TEST_TEARDOWN_START, start_info)
 
-        return self._build_outcome(
-            _TestExecutionResult(
+        return self._outcome_builder.build(
+            TestExecutionResult(
                 test_name=test_name,
                 node_id=node_id,
                 duration=time.perf_counter() - start,
