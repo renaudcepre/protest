@@ -16,6 +16,8 @@ _log_records: ContextVar[list[LogRecord] | None] = ContextVar(
 
 _current_node_id: ContextVar[str | None] = ContextVar("current_node_id", default=None)
 
+_session_teardown: dict[str, io.StringIO | None] = {"buffer": None}
+
 _log_callbacks: list[Callable[[str, LogRecord], None]] = []
 _stdout_callbacks: list[Callable[[str, str], None]] = []
 
@@ -59,6 +61,17 @@ def reset_current_node_id(token: Token[str | None]) -> None:
     _current_node_id.reset(token)
 
 
+def set_session_teardown_capture(enabled: bool) -> None:
+    """Enable/disable session teardown capture buffer."""
+    _session_teardown["buffer"] = io.StringIO() if enabled else None
+
+
+def get_session_teardown_output() -> str:
+    """Get captured session teardown output."""
+    buffer = _session_teardown["buffer"]
+    return buffer.getvalue() if buffer is not None else ""
+
+
 class TaskAwareStream:
     def __init__(self, original_stream: TextIO) -> None:
         self._original = original_stream
@@ -71,6 +84,9 @@ class TaskAwareStream:
                 for callback in _stdout_callbacks:
                     callback(node_id, data)
             return buffer.write(data)
+        session_buffer = _session_teardown["buffer"]
+        if session_buffer is not None:
+            return session_buffer.write(data)
         return self._original.write(data)
 
     def flush(self) -> None:
