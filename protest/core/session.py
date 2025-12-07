@@ -315,10 +315,17 @@ class ProTestSession:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:
+        import time
+
+        from protest.events.types import Event
         from protest.execution.capture import set_session_teardown_capture
 
+        await self.events.emit(Event.SESSION_TEARDOWN_START)
+        teardown_start = time.perf_counter()
         set_session_teardown_capture(True)
         try:
             return await self._resolver.__aexit__(exc_type, exc_val, exc_tb)
         finally:
             set_session_teardown_capture(False)
+            teardown_duration = time.perf_counter() - teardown_start
+            await self.events.emit(Event.SESSION_TEARDOWN_DONE, teardown_duration)

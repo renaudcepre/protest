@@ -37,6 +37,22 @@ class RichReporter(PluginBase):
     def on_session_start(self) -> None:
         pass
 
+    def on_session_setup_start(self) -> None:
+        self.console.print("[cyan]  session setup...[/]")
+
+    def on_session_setup_done(self, duration: float) -> None:
+        self.console.print(
+            f"[dim]  session setup done ({_format_duration(duration)})[/]"
+        )
+
+    def on_session_teardown_start(self) -> None:
+        self.console.print("[yellow]  session teardown...[/]")
+
+    def on_session_teardown_done(self, duration: float) -> None:
+        self.console.print(
+            f"[dim]  session teardown done ({_format_duration(duration)})[/]"
+        )
+
     def on_suite_start(self, name: str) -> None:
         pass
 

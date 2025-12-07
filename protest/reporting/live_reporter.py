@@ -115,6 +115,10 @@ class LiveReporter(PluginBase):
         self._xfailed = 0
         self._xpassed = 0
         self._start_time: float = 0
+        self._session_teardown_started: bool = False
+        self._session_teardown_done: bool = False
+        self._session_teardown_duration: float = 0
+        self._teardown_start_time: float = 0
 
     def _is_finished(self, phase: TestPhase) -> bool:
         return phase in (
@@ -241,10 +245,31 @@ class LiveReporter(PluginBase):
             f"{status} | {' | '.join(parts)} | {_format_duration(elapsed)}"
         )
 
+    def _build_session_setup_line(self) -> RenderableType | None:
+        return None
+
+    def _build_session_teardown_line(self) -> RenderableType | None:
+        if not self._session_teardown_started:
+            return None
+        if self._session_teardown_done:
+            return Text.from_markup(
+                f"  [dim]session teardown ({_format_duration(self._session_teardown_duration)})[/]"
+            )
+        elapsed = time.perf_counter() - self._teardown_start_time
+        if elapsed < PHASE_DISPLAY_THRESHOLD:
+            return Text.from_markup("  [yellow]session teardown[/]")
+        return Text.from_markup(
+            f"  [yellow]session teardown[/] [dim]({_format_duration(elapsed)})[/]"
+        )
+
     def _build_display(self) -> RenderableType:
         elements: list[RenderableType] = []
+        if setup_line := self._build_session_setup_line():
+            elements.append(setup_line)
         if self._active_tests:
             elements.append(self._build_active_tests_table())
+        if teardown_line := self._build_session_teardown_line():
+            elements.append(teardown_line)
         elements.append(self._build_summary_line())
         return Group(*elements)
 
@@ -270,6 +295,22 @@ class LiveReporter(PluginBase):
             transient=False,
         )
         self._live.start()
+
+    def on_session_setup_start(self) -> None:
+        pass
+
+    def on_session_setup_done(self, duration: float) -> None:
+        pass
+
+    def on_session_teardown_start(self) -> None:
+        self._session_teardown_started = True
+        self._teardown_start_time = time.perf_counter()
+        self._refresh()
+
+    def on_session_teardown_done(self, duration: float) -> None:
+        self._session_teardown_done = True
+        self._session_teardown_duration = duration
+        self._refresh()
 
     def on_suite_start(self, name: str) -> None:
         self._refresh()
