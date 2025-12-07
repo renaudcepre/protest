@@ -336,4 +336,10 @@ class ProTestSession:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:
-        return await self._resolver.__aexit__(exc_type, exc_val, exc_tb)
+        from protest.execution.capture import set_session_teardown_capture
+
+        set_session_teardown_capture(True)
+        try:
+            return await self._resolver.__aexit__(exc_type, exc_val, exc_tb)
+        finally:
+            set_session_teardown_capture(False)

@@ -81,19 +81,26 @@ def _format_duration(seconds: float) -> str:
     return f"{seconds:.2f}s"
 
 
-def _format_test_name(result: TestResult) -> str:
+def _format_test_name(result: TestResult, escape_markup: bool = True) -> str:
+    """Format test name with case_ids suffix.
+
+    Args:
+        escape_markup: If True, escape brackets for Rich markup strings.
+                      If False, return raw text (for Text() objects).
+    """
     if "[" in result.node_id:
         suffix = result.node_id[result.node_id.index("[") :]
-        escaped_suffix = suffix.replace("[", "\\[")
-        return f"{result.name}{escaped_suffix}"
+        if escape_markup:
+            suffix = suffix.replace("[", "\\[")
+        return f"{result.name}{suffix}"
     return result.name
 
 
 def _format_active_test_name(test: ActiveTest) -> str:
+    """Format test name for Text() objects (no markup escaping needed)."""
     if "[" in test.node_id:
         suffix = test.node_id[test.node_id.index("[") :]
-        escaped_suffix = suffix.replace("[", "\\[")
-        return f"{test.name}{escaped_suffix}"
+        return f"{test.name}{suffix}"
     return test.name
 
 
