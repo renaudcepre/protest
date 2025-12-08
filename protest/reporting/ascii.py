@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from protest.entities import HandlerInfo, SessionResult, TestItem, TestResult
+from protest.entities import (
+    FixtureInfo,
+    HandlerInfo,
+    SessionResult,
+    TestItem,
+    TestResult,
+)
 from protest.plugin import PluginBase
 
 _MIN_NODE_ID_PARTS = 2
@@ -60,6 +66,10 @@ class AsciiReporter(PluginBase):
 
     def on_session_setup_done(self, duration: float) -> None:
         print(f"  session setup done ({_format_duration(duration)})")
+
+    def on_fixture_setup(self, info: FixtureInfo) -> None:
+        if info.autouse:
+            print(f"  autouse: {info.name} ({info.scope})")
 
     def on_session_teardown_start(self) -> None:
         print("  session teardown...")

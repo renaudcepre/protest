@@ -61,6 +61,8 @@ class Resolver:
         self._path_caches: dict[str, dict[FixtureCallable, Any]] = {}
         self._path_exit_stacks: dict[str, AsyncExitStack] = {}
         self._event_bus = event_bus
+        self._suite_autouse: dict[str, list[FixtureCallable]] = {}
+        self._autouse_fixtures: set[FixtureCallable] = set()
 
     @property
     def event_bus(self) -> EventBus | None:
@@ -74,6 +76,7 @@ class Resolver:
         cache: bool = True,
         managed: bool = True,
         tags: set[str] | None = None,
+        autouse: bool = False,
     ) -> None:
         """Register a fixture at a specific scope path.
 
@@ -89,6 +92,7 @@ class Resolver:
             managed: If True (default), factory fixtures are wrapped in FixtureFactory.
                      If False, the fixture returns its own callable (legacy/class pattern).
             tags: Tags for this fixture (propagated to tests using it).
+            autouse: Whether this fixture should be auto-resolved at scope start.
         """
         if func in self._registry:
             raise AlreadyRegisteredError(get_callable_name(func))
@@ -104,6 +108,13 @@ class Resolver:
         self._analyze_and_store_dependencies(func, scope_path)
         self._registry[func] = fixture
         self._resolve_locks[func] = asyncio.Lock()
+
+        if autouse:
+            self._autouse_fixtures.add(func)
+            if scope_path is not None and scope_path != self.FUNCTION_SCOPE:
+                if scope_path not in self._suite_autouse:
+                    self._suite_autouse[scope_path] = []
+                self._suite_autouse[scope_path].append(func)
 
     def has_fixture(self, func: FixtureCallable) -> bool:
         """Check if a fixture is registered."""
@@ -315,9 +326,10 @@ class Resolver:
         fixture_name = get_callable_name(fixture.func)
         scope_path = self._scope_paths.get(fixture.func)
         scope = self._format_scope(scope_path)
+        is_autouse = fixture.func in self._autouse_fixtures
 
         start_time = time.perf_counter()
-        await self._emit_fixture_setup_async(fixture_name, scope)
+        await self._emit_fixture_setup_async(fixture_name, scope, is_autouse)
 
         if is_generator_like(fixture.func):
             if inspect.isasyncgenfunction(fixture.func):
@@ -328,23 +340,29 @@ class Resolver:
                 result = exit_stack.enter_context(sync_cm)
 
             exit_stack.push_async_callback(
-                self._emit_fixture_teardown_async, fixture_name, scope, start_time
+                self._emit_fixture_teardown_async,
+                fixture_name,
+                scope,
+                start_time,
+                is_autouse,
             )
         else:
             result = await ensure_async(fixture.func, **kwargs)
 
         return result
 
-    async def _emit_fixture_setup_async(self, name: str, scope: str) -> None:
+    async def _emit_fixture_setup_async(
+        self, name: str, scope: str, autouse: bool
+    ) -> None:
         if self._event_bus is None:
             return
 
         await self._event_bus.emit(
-            Event.FIXTURE_SETUP, FixtureInfo(name=name, scope=scope)
+            Event.FIXTURE_SETUP, FixtureInfo(name=name, scope=scope, autouse=autouse)
         )
 
     async def _emit_fixture_teardown_async(
-        self, name: str, scope: str, start_time: float
+        self, name: str, scope: str, start_time: float, autouse: bool
     ) -> None:
         if self._event_bus is None:
             return
@@ -352,8 +370,18 @@ class Resolver:
         duration = time.perf_counter() - start_time
         await self._event_bus.emit(
             Event.FIXTURE_TEARDOWN,
-            FixtureInfo(name=name, scope=scope, duration=duration),
+            FixtureInfo(name=name, scope=scope, duration=duration, autouse=autouse),
         )
+
+    async def resolve_suite_autouse(self, suite_path: str) -> None:
+        """Resolve all autouse fixtures for a suite."""
+        for fixture_func in self._suite_autouse.get(suite_path, []):
+            await self.resolve(fixture_func, current_path=suite_path)
+
+    def is_autouse(self, func: FixtureCallable) -> bool:
+        """Check if a fixture is marked as autouse."""
+        actual_func, _ = self._unwrap(func)
+        return actual_func in self._autouse_fixtures
 
     async def teardown_path(self, scope_path: str) -> None:
         """Teardown all fixtures for a given scope path."""

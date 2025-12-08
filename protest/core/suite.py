@@ -135,6 +135,32 @@ class ProTestSuite:
 
         return decorator
 
+    def autouse(
+        self,
+        tags: list[str] | None = None,
+    ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
+        """Register an autouse fixture scoped to this suite.
+
+        Autouse fixtures are resolved when the suite starts (before its first test).
+        They can depend on session fixtures or parent suite fixtures.
+        """
+
+        def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
+            validate_no_from_params(func)
+            fixture_tags = set(tags) if tags else set()
+            registration = FixtureRegistration(
+                func=func,
+                is_factory=False,
+                cache=True,
+                managed=True,
+                tags=fixture_tags,
+                autouse=True,
+            )
+            self._fixtures.append(registration)
+            return FixtureWrapper(func, registration)
+
+        return decorator
+
     def factory(
         self,
         cache: bool = True,

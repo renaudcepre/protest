@@ -202,17 +202,16 @@ class TestAutouse:
     """Tests for autouse fixtures."""
 
     @pytest.mark.asyncio
-    async def test_autouse_fixtures_resolved_at_session_start(self) -> None:
-        """Autouse fixtures are resolved when session starts."""
+    async def test_session_autouse_resolved_at_session_start(self) -> None:
+        """Session autouse fixtures are resolved when session starts."""
         setup_done = False
+        session = ProTestSession()
 
-        @fixture()
+        @session.autouse()
         def setup_database() -> str:
             nonlocal setup_done
             setup_done = True
             return "initialized"
-
-        session = ProTestSession(autouse=[setup_database])
 
         assert setup_done is False
 
@@ -221,26 +220,112 @@ class TestAutouse:
             assert setup_done is True
 
     @pytest.mark.asyncio
-    async def test_autouse_with_dependencies(self) -> None:
-        """Autouse fixtures can have dependencies."""
+    async def test_session_autouse_with_dependencies(self) -> None:
+        """Session autouse fixtures can have dependencies on session fixtures."""
         log: list[str] = []
+        session = ProTestSession()
 
-        @fixture()
+        @session.fixture()
         def database() -> str:
             log.append("database")
             return "db"
 
-        @fixture()
+        @session.autouse()
         def init_tables(db: Annotated[str, Use(database)]) -> str:
             log.append(f"tables_on_{db}")
             return "tables"
-
-        session = ProTestSession(autouse=[init_tables])
 
         async with session:
             await session.resolve_autouse()
 
         assert log == ["database", "tables_on_db"]
+
+    @pytest.mark.asyncio
+    async def test_suite_autouse_resolved_when_suite_starts(self) -> None:
+        """Suite autouse fixtures are resolved when suite starts."""
+        log: list[str] = []
+        session = ProTestSession()
+        suite = ProTestSuite("TestSuite")
+        session.add_suite(suite)
+
+        @suite.autouse()
+        def suite_setup() -> str:
+            log.append("suite_setup")
+            return "setup"
+
+        async with session:
+            assert log == []
+            await session.resolver.resolve_suite_autouse("TestSuite")
+            assert log == ["suite_setup"]
+
+    @pytest.mark.asyncio
+    async def test_suite_autouse_can_use_session_fixture(self) -> None:
+        """Suite autouse fixtures can depend on session fixtures."""
+        log: list[str] = []
+        session = ProTestSession()
+        suite = ProTestSuite("TestSuite")
+        session.add_suite(suite)
+
+        @session.fixture()
+        def database() -> str:
+            log.append("database")
+            return "db"
+
+        @suite.autouse()
+        def suite_init(db: Annotated[str, Use(database)]) -> str:
+            log.append(f"suite_init_{db}")
+            return "init"
+
+        async with session:
+            await session.resolve_autouse()
+            await session.resolver.resolve_suite_autouse("TestSuite")
+
+        assert log == ["database", "suite_init_db"]
+
+    @pytest.mark.asyncio
+    async def test_suite_autouse_teardown_with_suite(self) -> None:
+        """Suite autouse fixtures are torn down with the suite."""
+        teardown_log: list[str] = []
+        session = ProTestSession()
+        suite = ProTestSuite("TestSuite")
+        session.add_suite(suite)
+
+        @suite.autouse()
+        def suite_resource() -> Generator[str, None, None]:
+            yield "resource"
+            teardown_log.append("torn_down")
+
+        async with session:
+            await session.resolver.resolve_suite_autouse("TestSuite")
+            assert teardown_log == []
+            await session.resolver.teardown_suite("TestSuite")
+            assert teardown_log == ["torn_down"]
+
+    @pytest.mark.asyncio
+    async def test_nested_suite_autouse_order(self) -> None:
+        """Nested suite autouse: parent resolved before child."""
+        log: list[str] = []
+        session = ProTestSession()
+        parent = ProTestSuite("Parent")
+        child = ProTestSuite("Child")
+        parent.add_suite(child)
+        session.add_suite(parent)
+
+        @parent.autouse()
+        def parent_setup() -> str:
+            log.append("parent_setup")
+            return "parent"
+
+        @child.autouse()
+        def child_setup() -> str:
+            log.append("child_setup")
+            return "child"
+
+        async with session:
+            await session.resolver.resolve_suite_autouse("Parent")
+            await session.resolver.resolve_suite_autouse("Parent::Child")
+
+        assert log == ["parent_setup", "child_setup"]
 
 
 class TestSuiteTeardown:

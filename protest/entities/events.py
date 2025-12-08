@@ -72,3 +72,4 @@ class FixtureInfo:
     name: str
     scope: str
     duration: float = 0
+    autouse: bool = False
