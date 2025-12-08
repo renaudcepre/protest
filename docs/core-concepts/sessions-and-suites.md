@@ -54,6 +54,7 @@ async def test_endpoint():
 ```python
 api_suite = ProTestSuite(
     "API",
+    description="Integration tests for REST API",  # Optional documentation
     max_concurrency=2,          # Cap parallelism for this suite
     tags=["integration"],       # Tags inherited by all tests in suite
 )
