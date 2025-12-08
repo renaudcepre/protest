@@ -35,10 +35,10 @@ class ProTestSession:
     Use as async context manager to ensure proper fixture teardown.
 
     Fixtures registered with @session.fixture() live for the entire session.
+    Use @session.autouse() for fixtures that should be resolved at session start.
 
     Args:
         concurrency: Number of parallel test workers (default: 1).
-        autouse: Fixtures to auto-resolve at session start before any test runs.
         default_reporter: If True (default), adds RichReporter (or AsciiReporter fallback).
         default_cache: If True (default), adds CachePlugin for --lf support.
     """
@@ -46,7 +46,6 @@ class ProTestSession:
     def __init__(
         self,
         concurrency: int = 1,
-        autouse: list[FixtureCallable] | None = None,
         default_reporter: bool = True,
         default_cache: bool = True,
         default_log_file: bool = True,
@@ -59,7 +58,7 @@ class ProTestSession:
         self._tests: list[TestRegistration] = []
         self._fixtures: list[FixtureRegistration] = []
         self._concurrency = max(1, concurrency)
-        self._autouse = autouse or []
+        self._autouse_fixtures: list[FixtureCallable] = []
         self._cache_storage = CacheStorage()
         self._cache_plugin: CachePlugin | None = None
         self._cache_plugin_registered: bool = False
@@ -79,13 +78,9 @@ class ProTestSession:
             self._tag_filter_plugin = TagFilterPlugin(include_tags, exclude_tags)
             self.use(self._tag_filter_plugin)
 
-    @property
-    def autouse(self) -> list[FixtureCallable]:
-        return self._autouse
-
     async def resolve_autouse(self) -> None:
-        """Resolve all autouse fixtures at session start."""
-        for fixture_func in self._autouse:
+        """Resolve all session autouse fixtures at session start."""
+        for fixture_func in self._autouse_fixtures:
             await self._resolver.resolve(fixture_func)
 
     @property
@@ -234,6 +229,32 @@ class ProTestSession:
 
         return decorator
 
+    def autouse(
+        self,
+        tags: list[str] | None = None,
+    ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
+        """Register an autouse fixture scoped to the session.
+
+        Autouse fixtures are resolved at session start before any test runs.
+        They can have dependencies on other session fixtures.
+        """
+
+        def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
+            validate_no_from_params(func)
+            fixture_tags = set(tags) if tags else set()
+            registration = FixtureRegistration(
+                func=func,
+                is_factory=False,
+                cache=True,
+                managed=True,
+                tags=fixture_tags,
+                autouse=True,
+            )
+            self._fixtures.append(registration)
+            return FixtureWrapper(func, registration)
+
+        return decorator
+
     def factory(
         self,
         cache: bool = True,
@@ -284,6 +305,7 @@ class ProTestSession:
 
     def _register_fixtures(self) -> None:
         """Register all fixtures from session and suites into resolver."""
+        self._autouse_fixtures.clear()
         for reg in self._fixtures:
             self._resolver.register(
                 reg.func,
@@ -292,7 +314,10 @@ class ProTestSession:
                 cache=reg.cache,
                 managed=reg.managed,
                 tags=reg.tags,
+                autouse=reg.autouse,
             )
+            if reg.autouse:
+                self._autouse_fixtures.append(reg.func)
         self._register_suite_fixtures(self._suites)
 
     def _register_suite_fixtures(self, suites: list[ProTestSuite]) -> None:
@@ -306,6 +331,7 @@ class ProTestSession:
                     cache=reg.cache,
                     managed=reg.managed,
                     tags=reg.tags,
+                    autouse=reg.autouse,
                 )
             self._register_suite_fixtures(suite.suites)
 

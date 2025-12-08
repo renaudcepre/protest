@@ -15,6 +15,18 @@ session.use(FakeSlackNotifier(delay=0.5))
 
 
 # =============================================================================
+# SESSION AUTOUSE FIXTURES (auto-resolved at session start)
+# =============================================================================
+
+
+@session.autouse()
+def logging_setup() -> Generator[None, None, None]:
+    print("    [SESSION autouse] logging configured")
+    yield
+    print("    [SESSION autouse] logging shutdown")
+
+
+# =============================================================================
 # SESSION-SCOPED FIXTURES (created once, shared across all suites)
 # =============================================================================
 
@@ -42,6 +54,18 @@ def cache(cfg: Annotated[dict[str, str], Use(config)]) -> str:
 
 session.add_suite(api_suite)
 session.add_suite(unit_suite)
+
+
+# =============================================================================
+# API SUITE AUTOUSE FIXTURES (auto-resolved when suite starts)
+# =============================================================================
+
+
+@api_suite.autouse()
+def api_env_setup() -> Generator[None, None, None]:
+    print("    [SUITE autouse] API environment configured")
+    yield
+    print("    [SUITE autouse] API environment cleaned")
 
 
 # =============================================================================

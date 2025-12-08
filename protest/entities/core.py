@@ -35,6 +35,7 @@ class FixtureRegistration:
     cache: bool = True
     managed: bool = True
     tags: set[str] = field(default_factory=set)
+    autouse: bool = False
 
 
 @dataclass(slots=True)

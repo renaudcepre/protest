@@ -25,6 +25,8 @@ from protest.execution.capture import (
     GlobalCapturePatch,
     reset_current_node_id,
     set_current_node_id,
+    set_session_setup_capture,
+    set_session_teardown_capture,
 )
 from protest.execution.context import TestExecutionContext
 from protest.utils import get_callable_name
@@ -40,6 +42,8 @@ class TestRunner:
     def __init__(self, session: ProTestSession) -> None:
         self._session = session
         self._outcome_builder = OutcomeBuilder()
+        self._started_suites: set[str] = set()
+        self._suite_start_lock: asyncio.Lock | None = None
 
     def run(self) -> bool:
         """Run the test session synchronously. Returns True if all tests passed."""
@@ -70,25 +74,27 @@ class TestRunner:
             async with self._session:
                 await self._session.events.emit(Event.SESSION_SETUP_START)
                 setup_start = time.perf_counter()
-                await self._session.resolve_autouse()
+                set_session_setup_capture(True)
+                try:
+                    await self._session.resolve_autouse()
+                finally:
+                    set_session_setup_capture(False)
                 setup_duration = time.perf_counter() - setup_start
                 await self._session.events.emit(
                     Event.SESSION_SETUP_DONE, setup_duration
                 )
 
-                started_suites: set[str] = set()
-                for item in items:
-                    if item.suite and item.suite.full_path not in started_suites:
-                        await self._session.events.emit(
-                            Event.SUITE_START, item.suite.full_path
-                        )
-                        started_suites.add(item.suite.full_path)
+                self._started_suites = set()
+                self._suite_start_lock = asyncio.Lock()
 
                 total_counts = await self._run_all_parallel(
-                    items, semaphore, suite_semaphores, tracker
+                    items,
+                    semaphore,
+                    suite_semaphores,
+                    tracker,
                 )
 
-                for suite_path in reversed(list(started_suites)):
+                for suite_path in reversed(list(self._started_suites)):
                     await self._session.events.emit(Event.SUITE_END, suite_path)
 
         session_duration = time.perf_counter() - session_start
@@ -133,6 +139,25 @@ class TestRunner:
 
         return semaphores
 
+    async def _ensure_suite_hierarchy_started(self, suite_path: str) -> None:
+        """Ensure suite and all parent suites are started with autouse resolved."""
+        assert self._suite_start_lock is not None
+        parts = suite_path.split("::")
+        for idx in range(len(parts)):
+            parent_path = "::".join(parts[: idx + 1])
+            if parent_path in self._started_suites:
+                continue
+            async with self._suite_start_lock:
+                if parent_path in self._started_suites:
+                    continue
+                await self._session.events.emit(Event.SUITE_START, parent_path)
+                set_session_setup_capture(True)
+                try:
+                    await self._session.resolver.resolve_suite_autouse(parent_path)
+                finally:
+                    set_session_setup_capture(False)
+                self._started_suites.add(parent_path)
+
     async def _run_all_parallel(
         self,
         items: list[TestItem],
@@ -149,6 +174,9 @@ class TestRunner:
         async def run_one(item: TestItem) -> TestOutcome | None:
             suite_path = item.suite.full_path if item.suite else None
             suite_sem = suite_semaphores.get(suite_path)
+
+            if suite_path:
+                await self._ensure_suite_hierarchy_started(suite_path)
 
             test_name = get_callable_name(item.func)
             node_id = item.node_id
@@ -210,7 +238,11 @@ class TestRunner:
     async def _teardown_suite(self, suite_path: str) -> None:
         """Teardown suite fixtures after all its tests complete."""
         await self._session.events.emit(Event.SUITE_TEARDOWN_START, suite_path)
-        await self._session.resolver.teardown_suite(suite_path)
+        set_session_teardown_capture(True)
+        try:
+            await self._session.resolver.teardown_suite(suite_path)
+        finally:
+            set_session_teardown_capture(False)
         await self._session.events.emit(Event.SUITE_TEARDOWN_DONE, suite_path)
 
     async def _run_with_exitfirst(

@@ -12,6 +12,10 @@ from protest.execution.capture import (
     TaskAwareStream,
     _capture_buffer,
     _log_records,
+    get_session_setup_output,
+    get_session_teardown_output,
+    set_session_setup_capture,
+    set_session_teardown_capture,
 )
 
 
@@ -136,6 +140,46 @@ class TestCaptureIntegration:
             sys.stdout = sys.__stdout__
 
         assert original_stdout.getvalue() == "not captured\n"
+
+    def test_print_captured_during_session_setup(self) -> None:
+        with GlobalCapturePatch():
+            set_session_setup_capture(True)
+            try:
+                print("setup output")  # noqa: T201
+            finally:
+                set_session_setup_capture(False)
+
+            output = get_session_setup_output()
+
+        assert output == "setup output\n"
+
+    def test_print_captured_during_session_teardown(self) -> None:
+        with GlobalCapturePatch():
+            set_session_teardown_capture(True)
+            try:
+                print("teardown output")  # noqa: T201
+            finally:
+                set_session_teardown_capture(False)
+
+            output = get_session_teardown_output()
+
+        assert output == "teardown output\n"
+
+    def test_session_setup_capture_has_priority_over_teardown(self) -> None:
+        with GlobalCapturePatch():
+            set_session_setup_capture(True)
+            set_session_teardown_capture(True)
+            try:
+                print("goes to setup")  # noqa: T201
+            finally:
+                set_session_setup_capture(False)
+                set_session_teardown_capture(False)
+
+            setup_output = get_session_setup_output()
+            teardown_output = get_session_teardown_output()
+
+        assert setup_output == "goes to setup\n"
+        assert teardown_output == ""
 
     @pytest.mark.asyncio
     async def test_concurrent_tasks_have_isolated_capture(self) -> None:
