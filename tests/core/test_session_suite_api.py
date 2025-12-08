@@ -59,6 +59,16 @@ class TestSessionSuiteAPI:
         assert child.full_path == "Parent::Child"
         assert grandchild.full_path == "Parent::Child::GrandChild"
 
+    def test_suite_description(self) -> None:
+        """Suite can have an optional description."""
+        suite_with_desc = ProTestSuite(
+            "API", description="Integration tests for REST API"
+        )
+        suite_without_desc = ProTestSuite("Unit")
+
+        assert suite_with_desc.description == "Integration tests for REST API"
+        assert suite_without_desc.description is None
+
 
 class TestTreeBasedScoping:
     """Tests for the tree-based scoping system."""

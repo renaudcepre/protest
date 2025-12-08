@@ -28,6 +28,7 @@ class ProTestSuite:
         name: Unique identifier for this suite.
         max_concurrency: Cap concurrency for this suite (takes min with session/CLI).
         tags: Tags for this suite (inherited by tests and child suites).
+        description: Optional description for documentation purposes.
     """
 
     def __init__(
@@ -35,8 +36,10 @@ class ProTestSuite:
         name: str,
         max_concurrency: int | None = None,
         tags: list[str] | None = None,
+        description: str | None = None,
     ) -> None:
         self._name = name
+        self._description = description
         self._session: ProTestSession | None = None
         self._parent_suite: ProTestSuite | None = None
         self._tests: list[TestRegistration] = []
@@ -48,6 +51,10 @@ class ProTestSuite:
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def description(self) -> str | None:
+        return self._description
 
     @property
     def full_path(self) -> str:

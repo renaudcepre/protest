@@ -8,8 +8,8 @@ from protest import ProTestSession, ProTestSuite, Use
 from protest.di.decorators import fixture
 
 session = ProTestSession()
-api_suite = ProTestSuite("API Tests")
-unit_suite = ProTestSuite("Unit Tests")
+api_suite = ProTestSuite("API Tests", description="Integration tests for the REST API")
+unit_suite = ProTestSuite("Unit Tests", description="Fast isolated unit tests")
 
 session.use(FakeSlackNotifier(delay=0.5))
 
