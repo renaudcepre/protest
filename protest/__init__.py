@@ -6,19 +6,23 @@ from protest.di.factory import FixtureFactory
 from protest.di.markers import ForEach, From, Use
 from protest.entities import FixtureCallable
 from protest.exceptions import FixtureError, ProTestError
-from protest.fixtures.builtins import caplog
+from protest.fixtures.builtins import caplog, mocker
+from protest.fixtures.mocker import AsyncMockType, Mocker, MockType
 from protest.loader import LoadError, load_session
 from protest.plugin import PluginBase
 
 __version__ = "0.1.0"
 
 __all__ = [
+    "AsyncMockType",
     "FixtureCallable",
     "FixtureError",
     "FixtureFactory",
     "ForEach",
     "From",
     "LoadError",
+    "MockType",
+    "Mocker",
     "PluginBase",
     "ProTestError",
     "ProTestSession",
@@ -31,5 +35,6 @@ __all__ = [
     "fixture",
     "list_tags",
     "load_session",
+    "mocker",
     "run_session",
 ]
