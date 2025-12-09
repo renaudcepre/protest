@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -207,6 +208,13 @@ def _handle_run_command() -> None:
         action="store_true",
         help="Disable colors (plain ASCII output)",
     )
+    parser.add_argument(
+        "--ctrf-output",
+        dest="ctrf_output",
+        type=Path,
+        metavar="PATH",
+        help="Output CTRF JSON report to PATH",
+    )
 
     args = parser.parse_args(sys.argv[2:])
 
@@ -224,6 +232,7 @@ def _handle_run_command() -> None:
         keywords=args.keywords if args.keywords else None,
         log_file=not args.no_log_file,
         force_no_color=args.no_color,
+        ctrf_output=args.ctrf_output,
     )
 
 
@@ -241,6 +250,7 @@ def run_tests(  # noqa: PLR0913
     keywords: list[str] | None = None,
     log_file: bool = True,
     force_no_color: bool = False,
+    ctrf_output: Path | None = None,
 ) -> None:
     from protest.api import collect_tests, run_session
     from protest.loader import LoadError, load_session, parse_target
@@ -252,6 +262,11 @@ def run_tests(  # noqa: PLR0913
     except LoadError as exc:
         print(f"Error: {exc}")
         sys.exit(1)
+
+    if ctrf_output:
+        from protest.reporting.ctrf import CTRFReporter
+
+        session.use(CTRFReporter(output_path=ctrf_output))
 
     if collect_only:
         items = collect_tests(
