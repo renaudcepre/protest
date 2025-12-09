@@ -1,12 +1,12 @@
 import asyncio
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Generator
 from inspect import Parameter
 from typing import Annotated
 
 import pytest
 
 from protest.core.fixture import is_generator_like
-from protest.di.decorators import fixture
+from protest.di.decorators import FixtureWrapper, fixture
 from protest.di.markers import Use
 from protest.di.resolver import (
     AlreadyRegisteredError,
@@ -467,3 +467,211 @@ async def test_teardown_order_is_lifo(resolver: Resolver) -> None:
         )
 
     assert teardown_order == ["grandchild", "child", "parent"]
+
+
+class TestResolverWithFixtureWrapper:
+    def test_has_fixture_with_wrapper(self, resolver: Resolver) -> None:
+        @fixture()
+        def my_fixture() -> str:
+            return "data"
+
+        resolver.register(my_fixture.func, scope_path=None)
+
+        assert resolver.has_fixture(my_fixture) is True
+        assert isinstance(my_fixture, FixtureWrapper)
+
+    def test_get_fixture_with_wrapper(self, resolver: Resolver) -> None:
+        @fixture()
+        def my_fixture() -> str:
+            return "data"
+
+        resolver.register(my_fixture.func, scope_path=None)
+
+        result = resolver.get_fixture(my_fixture)
+        assert result is not None
+        assert result.func is my_fixture.func
+
+    def test_get_scope_path_with_wrapper(self, resolver: Resolver) -> None:
+        @fixture()
+        def my_fixture() -> str:
+            return "data"
+
+        resolver.register(my_fixture.func, scope_path="MySuite")
+
+        result = resolver.get_scope_path(my_fixture)
+        assert result == "MySuite"
+
+
+class TestTransitiveTags:
+    def test_get_transitive_tags_single_level(self, resolver: Resolver) -> None:
+        @fixture(tags=["database"])
+        def db_fixture() -> str:
+            return "db"
+
+        @fixture(tags=["api"])
+        def api_fixture(db: Annotated[str, Use(db_fixture)]) -> str:
+            return f"api_{db}"
+
+        resolver.register(db_fixture.func, scope_path=None, tags={"database"})
+        resolver.register(api_fixture.func, scope_path=None, tags={"api"})
+
+        tags = resolver.get_transitive_tags(api_fixture)
+        assert tags == {"api", "database"}
+
+    def test_get_transitive_tags_multi_level(self, resolver: Resolver) -> None:
+        @fixture(tags=["level1"])
+        def fixture_a() -> str:
+            return "a"
+
+        @fixture(tags=["level2"])
+        def fixture_b(dep: Annotated[str, Use(fixture_a)]) -> str:
+            return f"b_{dep}"
+
+        @fixture(tags=["level3"])
+        def fixture_c(dep: Annotated[str, Use(fixture_b)]) -> str:
+            return f"c_{dep}"
+
+        resolver.register(fixture_a.func, scope_path=None, tags={"level1"})
+        resolver.register(fixture_b.func, scope_path=None, tags={"level2"})
+        resolver.register(fixture_c.func, scope_path=None, tags={"level3"})
+
+        tags = resolver.get_transitive_tags(fixture_c)
+        assert tags == {"level1", "level2", "level3"}
+
+    def test_get_fixture_tags_direct(self, resolver: Resolver) -> None:
+        @fixture(tags=["slow", "integration"])
+        def tagged_fixture() -> str:
+            return "tagged"
+
+        resolver.register(
+            tagged_fixture.func, scope_path=None, tags={"slow", "integration"}
+        )
+
+        tags = resolver.get_fixture_tags(tagged_fixture)
+        assert tags == {"slow", "integration"}
+
+
+class TestAsyncGeneratorFixtures:
+    @pytest.mark.asyncio
+    async def test_async_generator_fixture_yields_value(
+        self, resolver: Resolver
+    ) -> None:
+        async def async_gen_fixture() -> AsyncGenerator[str, None]:
+            call_counts["async_gen"] += 1
+            yield "async_gen_data"
+            teardown_counts["async_gen"] += 1
+
+        resolver.register(async_gen_fixture, scope_path=None)
+
+        async with resolver:
+            result = await resolver.resolve(async_gen_fixture)
+            assert result == "async_gen_data"
+            assert call_counts["async_gen"] == 1
+
+    @pytest.mark.asyncio
+    async def test_async_generator_fixture_teardown_on_exit(
+        self, resolver: Resolver
+    ) -> None:
+        async def async_gen_fixture() -> AsyncGenerator[str, None]:
+            call_counts["async_gen_teardown"] += 1
+            yield "async_gen_data"
+            teardown_counts["async_gen_teardown"] += 1
+
+        resolver.register(async_gen_fixture, scope_path=None)
+
+        async with resolver:
+            await resolver.resolve(async_gen_fixture)
+            assert teardown_counts["async_gen_teardown"] == 0
+
+        assert teardown_counts["async_gen_teardown"] == 1
+
+    @pytest.mark.asyncio
+    async def test_async_generator_with_dependency(self, resolver: Resolver) -> None:
+        resolver.register(session_dependency, scope_path=None)
+
+        async def async_gen_with_dep(
+            data: Annotated[str, Use(session_dependency)],
+        ) -> AsyncGenerator[str, None]:
+            call_counts["async_gen_dep"] += 1
+            yield f"async_{data}"
+            teardown_counts["async_gen_dep"] += 1
+
+        resolver.register(async_gen_with_dep, scope_path=None)
+
+        async with resolver:
+            result = await resolver.resolve(async_gen_with_dep)
+            assert result == "async_session_data"
+
+        assert teardown_counts["async_gen_dep"] == 1
+
+
+class TestPathScopeConcurrency:
+    @pytest.mark.asyncio
+    async def test_concurrent_resolution_same_suite_fixture(
+        self, resolver: Resolver
+    ) -> None:
+        execution_count = 0
+
+        async def slow_suite_fixture() -> str:
+            nonlocal execution_count
+            execution_count += 1
+            await asyncio.sleep(0.05)
+            return "slow_suite_value"
+
+        resolver.register(slow_suite_fixture, scope_path="MySuite")
+
+        async with resolver:
+            results = await asyncio.gather(
+                resolver.resolve(slow_suite_fixture, current_path="MySuite"),
+                resolver.resolve(slow_suite_fixture, current_path="MySuite"),
+                resolver.resolve(slow_suite_fixture, current_path="MySuite"),
+            )
+
+        expected_execution_count = 1
+        assert execution_count == expected_execution_count
+        assert all(result == "slow_suite_value" for result in results)
+
+
+class TestAutouseWithWrapper:
+    def test_is_autouse_with_fixture_wrapper(self, resolver: Resolver) -> None:
+        @fixture()
+        def autouse_fixture() -> str:
+            return "autouse_data"
+
+        resolver.register(autouse_fixture.func, scope_path=None, autouse=True)
+
+        assert resolver.is_autouse(autouse_fixture) is True
+
+    def test_is_autouse_with_non_autouse(self, resolver: Resolver) -> None:
+        @fixture()
+        def regular_fixture() -> str:
+            return "regular_data"
+
+        resolver.register(regular_fixture.func, scope_path=None, autouse=False)
+
+        assert resolver.is_autouse(regular_fixture) is False
+
+
+class TestTeardownEdgeCases:
+    @pytest.mark.asyncio
+    async def test_teardown_nonexistent_path_is_safe(self, resolver: Resolver) -> None:
+        async with resolver:
+            await resolver.teardown_path("NonExistent")
+
+    @pytest.mark.asyncio
+    async def test_teardown_path_clears_cache(self, resolver: Resolver) -> None:
+        def suite_fixture() -> str:
+            call_counts["cache_test"] += 1
+            return "cached_data"
+
+        resolver.register(suite_fixture, scope_path="MySuite")
+
+        async with resolver:
+            await resolver.resolve(suite_fixture, current_path="MySuite")
+            assert call_counts["cache_test"] == 1
+
+            await resolver.teardown_path("MySuite")
+
+            await resolver.resolve(suite_fixture, current_path="MySuite")
+            expected_count = 2
+            assert call_counts["cache_test"] == expected_count

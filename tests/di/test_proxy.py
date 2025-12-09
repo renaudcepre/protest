@@ -157,3 +157,61 @@ class TestSafeProxyDoesNotDoubleWrap:
             proxy.create()
 
         assert exc_info.value.fixture_name == "inner"
+
+    @pytest.mark.asyncio
+    async def test_fixture_error_not_rewrapped_in_async(self) -> None:
+        """If async method raises FixtureError, don't wrap again."""
+
+        class AsyncFactoryThatRaisesFixtureError:
+            async def create(self) -> None:
+                raise FixtureError("inner_async", RuntimeError("async_original"))
+
+        factory = AsyncFactoryThatRaisesFixtureError()
+        proxy = SafeProxy(factory, "outer_async")
+
+        with pytest.raises(FixtureError) as exc_info:
+            await proxy.create()
+
+        assert exc_info.value.fixture_name == "inner_async"
+
+
+class TestSafeProxyRepr:
+    def test_repr_includes_fixture_name_and_target(self) -> None:
+        factory = FakeUserFactory(db="test_db")
+        proxy: SafeProxy[FakeUserFactory] = SafeProxy(factory, "user_factory")
+
+        repr_str = repr(proxy)
+
+        assert "SafeProxy" in repr_str
+        assert "user_factory" in repr_str
+        assert "FakeUserFactory" in repr_str
+
+    def test_repr_with_simple_target(self) -> None:
+        target = "simple_string"
+        proxy: SafeProxy[str] = SafeProxy(target, "simple_fixture")
+
+        repr_str = repr(proxy)
+
+        assert "simple_fixture" in repr_str
+        assert "simple_string" in repr_str
+
+
+class TestSafeProxyNonCallable:
+    def test_raises_type_error_for_non_callable_target(self) -> None:
+        target = {"not": "callable"}
+        proxy: SafeProxy[dict[str, str]] = SafeProxy(target, "dict_fixture")
+
+        with pytest.raises(TypeError) as exc_info:
+            proxy()
+
+        assert "dict_fixture" in str(exc_info.value)
+        assert "not callable" in str(exc_info.value)
+
+    def test_raises_type_error_for_string_target(self) -> None:
+        target = "just a string"
+        proxy: SafeProxy[str] = SafeProxy(target, "string_fixture")
+
+        with pytest.raises(TypeError) as exc_info:
+            proxy()
+
+        assert "string_fixture" in str(exc_info.value)

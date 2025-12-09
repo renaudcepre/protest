@@ -205,7 +205,7 @@ class TestRunKeywordFilter:
     ) -> None:
         """Multiple -k flags use OR logic."""
         result = run_protest(
-            "run", "suites_session:session", "-k", "users", "-k", "orders"
+            "run", "suites_session:session", "-k", "users", "-k", "test_orders"
         )
         result.assert_success()
         expected_count = 3

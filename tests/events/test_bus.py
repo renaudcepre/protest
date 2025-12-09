@@ -4,6 +4,7 @@ import asyncio
 
 import pytest
 
+from protest.entities import HandlerInfo
 from protest.events.bus import EventBus
 from protest.events.types import Event
 
@@ -290,3 +291,121 @@ class TestEmitAndCollect:
         result = await bus.emit_and_collect(Event.COLLECTION_FINISH, ["a", "b"])
 
         assert result == ["A", "B"]
+
+
+class TestAsyncHandlerNoData:
+    @pytest.mark.asyncio
+    async def test_async_handler_without_data(self) -> None:
+        bus = EventBus()
+        called = False
+
+        async def handler() -> None:
+            nonlocal called
+            called = True
+
+        bus.on(Event.SESSION_START, handler)
+        await bus.emit(Event.SESSION_START)
+        await bus.wait_pending()
+
+        assert called
+
+
+class TestHandlerStartEndErrors:
+    @pytest.mark.asyncio
+    async def test_handler_start_listener_error_swallowed(self) -> None:
+        bus = EventBus()
+        handler_executed = False
+
+        def failing_start_listener(info: HandlerInfo) -> None:
+            raise ValueError("HANDLER_START listener error")
+
+        def main_handler(data: str) -> None:
+            nonlocal handler_executed
+            handler_executed = True
+
+        bus.on(Event.HANDLER_START, failing_start_listener)
+        bus.on(Event.TEST_PASS, main_handler)
+
+        await bus.emit(Event.TEST_PASS, "test_data")
+
+        assert handler_executed
+
+    @pytest.mark.asyncio
+    async def test_handler_end_listener_error_swallowed(self) -> None:
+        bus = EventBus()
+        handler_executed = False
+
+        def failing_end_listener(info: HandlerInfo) -> None:
+            raise ValueError("HANDLER_END listener error")
+
+        def main_handler(data: str) -> None:
+            nonlocal handler_executed
+            handler_executed = True
+
+        bus.on(Event.HANDLER_END, failing_end_listener)
+        bus.on(Event.TEST_PASS, main_handler)
+
+        await bus.emit(Event.TEST_PASS, "test_data")
+
+        assert handler_executed
+
+    @pytest.mark.asyncio
+    async def test_sync_handler_in_handler_start(self) -> None:
+        bus = EventBus()
+        start_events: list[HandlerInfo] = []
+
+        def start_listener(info: HandlerInfo) -> None:
+            start_events.append(info)
+
+        def main_handler(data: str) -> None:
+            pass
+
+        bus.on(Event.HANDLER_START, start_listener)
+        bus.on(Event.TEST_PASS, main_handler)
+
+        await bus.emit(Event.TEST_PASS, "test_data")
+
+        assert len(start_events) == 1
+        assert start_events[0].event == Event.TEST_PASS
+        assert start_events[0].is_async is False
+
+    @pytest.mark.asyncio
+    async def test_async_handler_start_listener(self) -> None:
+        bus = EventBus()
+        start_events: list[HandlerInfo] = []
+
+        async def start_listener(info: HandlerInfo) -> None:
+            start_events.append(info)
+
+        async def main_handler(data: str) -> None:
+            pass
+
+        bus.on(Event.HANDLER_START, start_listener)
+        bus.on(Event.TEST_PASS, main_handler)
+
+        await bus.emit(Event.TEST_PASS, "test_data")
+        await bus.wait_pending()
+
+        assert len(start_events) == 1
+        assert start_events[0].is_async is True
+
+    @pytest.mark.asyncio
+    async def test_handler_end_receives_duration_and_error(self) -> None:
+        bus = EventBus()
+        end_events: list[HandlerInfo] = []
+
+        def end_listener(info: HandlerInfo) -> None:
+            end_events.append(info)
+
+        def failing_handler(data: str) -> None:
+            raise ValueError("handler failure")
+
+        bus.on(Event.HANDLER_END, end_listener)
+        bus.on(Event.TEST_PASS, failing_handler)
+
+        await bus.emit(Event.TEST_PASS, "test_data")
+
+        assert len(end_events) == 1
+        assert end_events[0].error is not None
+        assert isinstance(end_events[0].error, ValueError)
+        assert end_events[0].duration >= 0
