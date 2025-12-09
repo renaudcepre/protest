@@ -71,6 +71,14 @@ protest run tests:session::API::Users  # Nested suite
 | `--no-capture` | `-s` | Show stdout/stderr during tests | false |
 | `--app-dir` | - | Directory containing the module | . |
 
+#### Output Options
+
+| Option | Description |
+|--------|-------------|
+| `--no-color` | Disable colors (plain ASCII output) |
+| `--no-log-file` | Disable writing to `.protest/last_run.log` |
+| `--ctrf-output PATH` | Output CTRF JSON report to PATH |
+
 ---
 
 ## Filtering in Detail
@@ -234,6 +242,9 @@ protest run tests:session -t unit -n 4
 
 # Integration tests (might need sequential)
 protest run tests:session -t integration
+
+# Generate CTRF report for CI tools
+protest run tests:session -n 4 --ctrf-output ctrf-report.json
 ```
 
 ### Debugging

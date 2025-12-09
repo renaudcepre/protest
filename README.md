@@ -181,6 +181,7 @@ def test_user(user: Annotated[User, Use(get_test_user)]):
 - **Factory fixtures** - Return callables to create instances on-demand in tests
 - **Plugin system** - Extend with custom reporters, filters
 - **Last-failed mode** - Re-run only failed tests with `--lf`
+- **CTRF reports** - Standardized JSON for CI/CD integration
 
 ## Installation
 
@@ -203,6 +204,7 @@ protest module:session --lf               # Re-run failed tests only
 protest module:session --collect-only     # List tests without running
 protest module:session --cache-clear      # Clear cache before run
 protest --app-dir src module:session      # Look for module in src/
+protest module:session --ctrf-output r.json  # CTRF report for CI/CD
 ```
 
 ## API Reference
