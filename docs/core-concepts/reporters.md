@@ -91,3 +91,89 @@ class MyReporter(PluginBase):
 session = ProTestSession(default_reporter=False)
 session.use(MyReporter())
 ```
+
+## CTRF Reporter (CI/CD Integration)
+
+ProTest includes a built-in [CTRF](https://ctrf.io) (Common Test Report Format) reporter for CI/CD integration. CTRF is a standardized JSON format supported by GitHub Actions, Slack, Jenkins, and other tools.
+
+### Usage
+
+```bash
+# Generate CTRF report
+protest run tests:session --ctrf-output ctrf-report.json
+
+# Combine with parallel execution
+protest run tests:session -n 4 --ctrf-output ctrf-report.json
+```
+
+### Output Format
+
+The report includes:
+
+- **Summary**: Test counts, duration, timestamps
+- **Tests**: Name, status, duration, error messages, stack traces
+- **Environment**: OS platform, git branch, commit SHA
+
+### Example Output
+
+```json
+{
+  "reportFormat": "CTRF",
+  "specVersion": "0.0.0",
+  "results": {
+    "tool": { "name": "ProTest", "version": "0.1.0" },
+    "summary": {
+      "tests": 10,
+      "passed": 8,
+      "failed": 2,
+      "skipped": 0,
+      "pending": 0,
+      "other": 0,
+      "start": 1733754600000,
+      "stop": 1733754605000
+    },
+    "tests": [
+      {
+        "name": "test_login",
+        "status": "passed",
+        "duration": 150,
+        "suite": ["API", "Auth"]
+      },
+      {
+        "name": "test_invalid_token",
+        "status": "failed",
+        "duration": 50,
+        "message": "AssertionError: Expected 401",
+        "trace": "Traceback ..."
+      }
+    ],
+    "environment": {
+      "osPlatform": "linux",
+      "branchName": "main",
+      "commit": "abc123"
+    }
+  }
+}
+```
+
+### Status Mapping
+
+| ProTest Status | CTRF Status | rawStatus |
+|---------------|-------------|-----------|
+| passed | `passed` | - |
+| failed | `failed` | - |
+| skipped | `skipped` | - |
+| xfail | `failed` | `xfail` |
+| xpass | `failed` | `xpass` |
+| fixture error | `failed` | `error` |
+| timeout | `failed` | `timeout` |
+
+### Programmatic Usage
+
+```python
+from pathlib import Path
+from protest.reporting.ctrf import CTRFReporter
+
+session = ProTestSession()
+session.use(CTRFReporter(output_path=Path("ctrf-report.json")))
+```
