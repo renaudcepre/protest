@@ -5,7 +5,7 @@ import inspect
 import time
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from inspect import Parameter, signature
-from typing import TYPE_CHECKING, Annotated, Any, Final, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, Final, cast, get_args, get_origin
 
 from protest.core.fixture import is_generator_like
 from protest.di.decorators import FixtureWrapper
@@ -49,7 +49,7 @@ class Resolver:
     ) -> tuple[FixtureCallable, FixtureRegistration | None]:
         """Extract the actual function and registration from a FixtureWrapper."""
         if isinstance(func, FixtureWrapper):
-            return func.func, func.registration
+            return cast("FixtureCallable", func.func), func.registration
         return func, None
 
     def __init__(self, event_bus: EventBus | None = None) -> None:
@@ -175,7 +175,7 @@ class Resolver:
         - Unregistered plain functions: raises PlainFunctionError
         """
         if isinstance(func, FixtureWrapper):
-            actual_func = func.func
+            actual_func = cast("FixtureCallable", func.func)
             reg = func.registration
 
             if actual_func not in self._registry:

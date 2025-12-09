@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import builtins
 import inspect
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, create_autospec, patch
+
+DictType = builtins.dict[Any, Any]
 
 MockType = MagicMock | AsyncMock
 AsyncMockType = AsyncMock
@@ -25,7 +28,7 @@ class _PatchHelper:
         self._mocker._mock_to_patcher[id(mock)] = patcher
         return mock
 
-    def object(self, target: object, attribute: str, **kwargs: Any) -> MagicMock:
+    def object(self, target: Any, attribute: str, **kwargs: Any) -> MagicMock:
         """Patch an attribute on an object instance."""
         patcher = patch.object(target, attribute, **kwargs)
         mock: MagicMock = patcher.start()
@@ -36,11 +39,11 @@ class _PatchHelper:
 
     def dict(
         self,
-        in_dict: dict[Any, Any],
-        values: dict[Any, Any] | None = None,
+        in_dict: DictType,
+        values: DictType | None = None,
         clear: bool = False,
         **kwargs: Any,
-    ) -> dict[Any, Any]:
+    ) -> DictType:
         """Patch a dictionary (e.g., os.environ). Use clear=True to replace entirely."""
         patcher = patch.dict(in_dict, values or {}, clear=clear, **kwargs)
         patcher.start()
