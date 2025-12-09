@@ -30,7 +30,7 @@ from protest.execution.capture import (
     set_session_teardown_capture,
 )
 from protest.execution.context import TestExecutionContext
-from protest.execution.interrupt import InterruptHandler
+from protest.execution.interrupt import InterruptHandler, InterruptState
 from protest.utils import get_callable_name
 
 
@@ -49,11 +49,17 @@ class TestRunner:
         self._interrupt_handler = InterruptHandler()
         self._interrupted = False
 
+    def _on_interrupt(self, state: InterruptState) -> None:
+        """Handle interrupt by emitting event synchronously to reporters."""
+        force_teardown = state == InterruptState.FORCE_TEARDOWN
+        self._session.events.emit_sync(Event.SESSION_INTERRUPTED, force_teardown)
+
     def run(self) -> RunResult:
         """Run the test session synchronously. Returns RunResult with success and interrupted status."""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         self._interrupt_handler.install(loop)
+        self._interrupt_handler.set_interrupt_callback(self._on_interrupt)
         try:
             success = loop.run_until_complete(self._main_loop())
             return RunResult(success=success, interrupted=self._interrupted)
