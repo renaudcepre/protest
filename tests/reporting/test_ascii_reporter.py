@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from protest.entities import HandlerInfo, SessionResult, TestItem, TestResult
+from protest.entities import HandlerInfo, SessionResult, TestResult
 from protest.events.types import Event
 from protest.reporting.ascii import (
     AsciiReporter,
@@ -10,86 +10,100 @@ from protest.reporting.ascii import (
     _format_duration,
     _format_test_name,
 )
+from tests.factories.test_items import make_test_item
+
+
+@pytest.fixture
+def ascii_reporter() -> AsciiReporter:
+    """Provide a fresh AsciiReporter for each test."""
+    return AsciiReporter()
 
 
 class TestFormatDuration:
-    def test_sub_millisecond(self) -> None:
-        assert _format_duration(0.0001) == "<1ms"
-
-    def test_zero(self) -> None:
-        assert _format_duration(0) == "<1ms"
-
-    def test_milliseconds(self) -> None:
-        assert _format_duration(0.5) == "500ms"
-        assert _format_duration(0.123) == "123ms"
-
-    def test_one_millisecond(self) -> None:
-        assert _format_duration(0.001) == "1ms"
-
-    def test_seconds(self) -> None:
-        assert _format_duration(2.5) == "2.50s"
-        assert _format_duration(1.0) == "1.00s"
+    @pytest.mark.parametrize(
+        "duration,expected",
+        [
+            pytest.param(0.0001, "<1ms", id="sub_millisecond"),
+            pytest.param(0, "<1ms", id="zero"),
+            pytest.param(0.001, "1ms", id="one_millisecond"),
+            pytest.param(0.5, "500ms", id="half_second"),
+            pytest.param(0.123, "123ms", id="fractional_ms"),
+            pytest.param(2.5, "2.50s", id="seconds"),
+            pytest.param(1.0, "1.00s", id="one_second"),
+        ],
+    )
+    def test_format_duration(self, duration: float, expected: str) -> None:
+        """Given a duration in seconds, when formatted, then output matches expected format."""
+        assert _format_duration(duration) == expected
 
 
 class TestFormatTestName:
-    def test_simple_name(self) -> None:
-        result = TestResult(name="test_foo", node_id="module::test_foo", duration=0.1)
-        assert _format_test_name(result) == "test_foo"
-
-    def test_with_params(self) -> None:
-        result = TestResult(
-            name="test_x", node_id="module::test_x[param1-param2]", duration=0.1
-        )
-        assert _format_test_name(result) == "test_x[param1-param2]"
+    @pytest.mark.parametrize(
+        "name,node_id,expected",
+        [
+            pytest.param("test_foo", "module::test_foo", "test_foo", id="simple"),
+            pytest.param(
+                "test_x",
+                "module::test_x[param1-param2]",
+                "test_x[param1-param2]",
+                id="with_params",
+            ),
+        ],
+    )
+    def test_format_test_name(self, name: str, node_id: str, expected: str) -> None:
+        """Given a TestResult, when formatted, then name includes params if present."""
+        result = TestResult(name=name, node_id=node_id, duration=0.1)
+        assert _format_test_name(result) == expected
 
 
 class TestAsciiReporterHooks:
-    @pytest.fixture
-    def reporter(self) -> AsciiReporter:
-        return AsciiReporter()
-
     def test_on_session_start(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        reporter.on_session_start()
+        """Given a session, when started, then 'Starting session' is printed."""
+        ascii_reporter.on_session_start()
         captured = capsys.readouterr()
         assert "Starting session" in captured.out
 
     def test_on_suite_start(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        reporter.on_suite_start("MySuite")
+        """Given a suite, when started, then suite name is printed."""
+        ascii_reporter.on_suite_start("MySuite")
         captured = capsys.readouterr()
         assert "MySuite" in captured.out
 
     def test_on_test_pass(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
+        """Given a passing test, when reported, then 'OK' marker and duration are shown."""
         result = TestResult(
             name="test_example", node_id="mod::test_example", duration=0.05
         )
-        reporter.on_test_pass(result)
+        ascii_reporter.on_test_pass(result)
         captured = capsys.readouterr()
         assert "OK test_example" in captured.out
         assert "50ms" in captured.out
 
     def test_on_test_fail(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
+        """Given a failing test, when reported, then 'XX' marker and error message are shown."""
         result = TestResult(
             name="test_failing",
             node_id="mod::test_failing",
             duration=0.01,
             error=AssertionError("oops"),
         )
-        reporter.on_test_fail(result)
+        ascii_reporter.on_test_fail(result)
         captured = capsys.readouterr()
         assert "XX test_failing" in captured.out
         assert "oops" in captured.out
 
     def test_on_test_fail_with_output(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
+        """Given a failing test with captured output, when reported, then output lines are shown."""
         result = TestResult(
             name="test_failing",
             node_id="mod::test_failing",
@@ -97,14 +111,15 @@ class TestAsciiReporterHooks:
             error=AssertionError("oops"),
             output="debug line 1\ndebug line 2",
         )
-        reporter.on_test_fail(result)
+        ascii_reporter.on_test_fail(result)
         captured = capsys.readouterr()
         assert "| debug line 1" in captured.out
         assert "| debug line 2" in captured.out
 
     def test_on_test_fail_fixture_error(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
+        """Given a fixture error, when reported, then '!!' marker is shown."""
         result = TestResult(
             name="test_x",
             node_id="mod::test_x",
@@ -112,275 +127,285 @@ class TestAsciiReporterHooks:
             error=RuntimeError("db down"),
             is_fixture_error=True,
         )
-        reporter.on_test_fail(result)
+        ascii_reporter.on_test_fail(result)
         captured = capsys.readouterr()
         assert "!! test_x" in captured.out
 
     def test_on_waiting_handlers(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        reporter.on_waiting_handlers(3)
+        """Given async handlers pending, when reported, then count is shown."""
+        ascii_reporter.on_waiting_handlers(3)
         captured = capsys.readouterr()
         assert "Async handlers (3)" in captured.out
 
-    def test_on_handler_end_async_success(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    @pytest.mark.parametrize(
+        "is_async,error,expected_marker,expected_text",
+        [
+            pytest.param(True, None, "OK", "500ms", id="async_success"),
+            pytest.param(
+                True, RuntimeError("timeout"), "XX", "timeout", id="async_error"
+            ),
+        ],
+    )
+    def test_on_handler_end_async(
+        self,
+        ascii_reporter: AsciiReporter,
+        capsys: pytest.CaptureFixture[str],
+        is_async: bool,
+        error: Exception | None,
+        expected_marker: str,
+        expected_text: str,
     ) -> None:
-        info = HandlerInfo(
-            name="send_slack", event=Event.SESSION_END, is_async=True, duration=0.5
-        )
-        reporter.on_handler_end(info)
-        captured = capsys.readouterr()
-        assert "OK send_slack" in captured.out
-        assert "500ms" in captured.out
-
-    def test_on_handler_end_async_error(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+        """Given an async handler, when completed, then marker and status are shown."""
         info = HandlerInfo(
             name="send_slack",
             event=Event.SESSION_END,
-            is_async=True,
-            error=RuntimeError("timeout"),
+            is_async=is_async,
+            duration=0.5,
+            error=error,
         )
-        reporter.on_handler_end(info)
+        ascii_reporter.on_handler_end(info)
         captured = capsys.readouterr()
-        assert "XX send_slack" in captured.out
-        assert "timeout" in captured.out
+        assert f"{expected_marker} send_slack" in captured.out
+        assert expected_text in captured.out
 
     def test_on_handler_end_sync_ignored(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
+        """Given a sync handler, when completed, then nothing is printed."""
         info = HandlerInfo(
             name="sync_handler", event=Event.SESSION_END, is_async=False, duration=0.1
         )
-        reporter.on_handler_end(info)
+        ascii_reporter.on_handler_end(info)
         captured = capsys.readouterr()
         assert captured.out == ""
 
 
 class TestAsciiReporterSessionComplete:
-    @pytest.fixture
-    def reporter(self) -> AsciiReporter:
-        return AsciiReporter()
-
-    def test_all_passed(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    @pytest.mark.parametrize(
+        "passed,failed,errors,expected_marker,expected_parts",
+        [
+            pytest.param(5, 0, 0, "OK ALL PASSED", ["5/5 passed"], id="all_passed"),
+            pytest.param(
+                3, 1, 0, "XX FAILURES", ["3/4 passed", "1 failed"], id="with_failures"
+            ),
+            pytest.param(3, 0, 1, "XX FAILURES", ["1 errors"], id="with_errors"),
+            pytest.param(
+                2,
+                1,
+                1,
+                "XX FAILURES",
+                ["2/4 passed", "1 failed", "1 errors"],
+                id="failures_and_errors",
+            ),
+        ],
+    )
+    def test_session_complete_summary(
+        self,
+        ascii_reporter: AsciiReporter,
+        capsys: pytest.CaptureFixture[str],
+        passed: int,
+        failed: int,
+        errors: int,
+        expected_marker: str,
+        expected_parts: list[str],
     ) -> None:
-        result = SessionResult(passed=5, failed=0, errors=0, duration=1.23)
-        reporter.on_session_complete(result)
+        """Given session results, when completed, then summary shows correct status."""
+        result = SessionResult(
+            passed=passed, failed=failed, errors=errors, duration=1.0
+        )
+        ascii_reporter.on_session_complete(result)
         captured = capsys.readouterr()
-        assert "OK ALL PASSED" in captured.out
-        assert "5/5 passed" in captured.out
-        assert "1.23s" in captured.out
-
-    def test_with_failures(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        result = SessionResult(passed=3, failed=1, errors=0, duration=2.0)
-        reporter.on_session_complete(result)
-        captured = capsys.readouterr()
-        assert "XX FAILURES" in captured.out
-        assert "3/4 passed" in captured.out
-        assert "1 failed" in captured.out
-
-    def test_with_errors(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        result = SessionResult(passed=3, failed=0, errors=1, duration=2.0)
-        reporter.on_session_complete(result)
-        captured = capsys.readouterr()
-        assert "XX FAILURES" in captured.out
-        assert "1 errors" in captured.out
-
-    def test_with_failures_and_errors(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        result = SessionResult(passed=2, failed=1, errors=1, duration=3.0)
-        reporter.on_session_complete(result)
-        captured = capsys.readouterr()
-        assert "XX FAILURES" in captured.out
-        assert "2/4 passed" in captured.out
-        assert "1 failed" in captured.out
-        assert "1 errors" in captured.out
+        assert expected_marker in captured.out
+        for part in expected_parts:
+            assert part in captured.out
 
 
 class TestExtractSuiteFromNodeId:
-    def test_extracts_suite_from_nested_node_id(self) -> None:
-        result = _extract_suite_from_node_id("module::Suite::test_name")
-        assert result == "Suite"
-
-    def test_extracts_nested_suite_path(self) -> None:
-        result = _extract_suite_from_node_id("module::Parent::Child::test_name")
-        assert result == "Parent::Child"
-
-    def test_returns_none_for_simple_node_id(self) -> None:
-        result = _extract_suite_from_node_id("module::test_name")
-        assert result is None
-
-    def test_returns_none_for_single_part(self) -> None:
-        result = _extract_suite_from_node_id("test_name")
-        assert result is None
+    @pytest.mark.parametrize(
+        "node_id,expected",
+        [
+            pytest.param("module::Suite::test_name", "Suite", id="single_suite"),
+            pytest.param(
+                "module::Parent::Child::test_name", "Parent::Child", id="nested_suite"
+            ),
+            pytest.param("module::test_name", None, id="no_suite"),
+            pytest.param("test_name", None, id="single_part"),
+        ],
+    )
+    def test_extract_suite(self, node_id: str, expected: str | None) -> None:
+        """Given a node_id, when extracted, then suite path is correct."""
+        result = _extract_suite_from_node_id(node_id)
+        assert result == expected
 
 
 class TestFormatTestNameWithSuite:
-    def test_includes_suite_when_include_suite_true(self) -> None:
+    @pytest.mark.parametrize(
+        "suite_path,include_suite,expected",
+        [
+            pytest.param("MySuite", True, "MySuite::test_foo", id="include_suite"),
+            pytest.param("MySuite", False, "test_foo", id="exclude_suite"),
+            pytest.param(
+                "Parent::Child", True, "Parent::Child::test_foo", id="nested_suite"
+            ),
+        ],
+    )
+    def test_format_with_suite(
+        self, suite_path: str, include_suite: bool, expected: str
+    ) -> None:
+        """Given a TestResult with suite, when formatted, then suite is included based on flag."""
         result = TestResult(
             name="test_foo",
-            node_id="module::MySuite::test_foo",
+            node_id=f"module::{suite_path}::test_foo",
             duration=0.1,
-            suite_path="MySuite",
+            suite_path=suite_path,
         )
-        formatted = _format_test_name(result, include_suite=True)
-        assert formatted == "MySuite::test_foo"
-
-    def test_no_suite_when_include_suite_false(self) -> None:
-        result = TestResult(
-            name="test_foo",
-            node_id="module::MySuite::test_foo",
-            duration=0.1,
-            suite_path="MySuite",
-        )
-        formatted = _format_test_name(result, include_suite=False)
-        assert formatted == "test_foo"
-
-    def test_nested_suite_in_name(self) -> None:
-        result = TestResult(
-            name="test_foo",
-            node_id="module::Parent::Child::test_foo",
-            duration=0.1,
-            suite_path="Parent::Child",
-        )
-        formatted = _format_test_name(result, include_suite=True)
-        assert formatted == "Parent::Child::test_foo"
-
-
-def _make_test_item(name: str = "test_example") -> TestItem:
-    def test_func() -> None:
-        pass
-
-    test_func.__name__ = name
-    test_func.__module__ = "module"
-    return TestItem(func=test_func, suite=None)
+        formatted = _format_test_name(result, include_suite=include_suite)
+        assert formatted == expected
 
 
 class TestAsciiReporterParallelMode:
-    @pytest.fixture
-    def reporter(self) -> AsciiReporter:
-        return AsciiReporter()
-
     def test_on_collection_finish_sets_parallel_mode(
-        self, reporter: AsciiReporter
+        self, ascii_reporter: AsciiReporter
     ) -> None:
-        items = [_make_test_item(f"test_{idx}") for idx in range(5)]
-        reporter.on_collection_finish(items)
-        assert reporter._is_parallel is True
+        """Given multiple tests collected, when collection finishes, then parallel mode is enabled."""
+        item_count = 5
+        items = [make_test_item(f"test_{idx}") for idx in range(item_count)]
+        ascii_reporter.on_collection_finish(items)
+        assert ascii_reporter._is_parallel is True
 
     def test_on_collection_finish_single_item_not_parallel(
-        self, reporter: AsciiReporter
+        self, ascii_reporter: AsciiReporter
     ) -> None:
-        items = [_make_test_item("test_single")]
-        reporter.on_collection_finish(items)
-        assert reporter._is_parallel is False
+        """Given single test collected, when collection finishes, then parallel mode is disabled."""
+        items = [make_test_item("test_single")]
+        ascii_reporter.on_collection_finish(items)
+        assert ascii_reporter._is_parallel is False
 
     def test_suite_header_not_printed_in_parallel_mode(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        items = [_make_test_item(f"test_{idx}") for idx in range(5)]
-        reporter.on_collection_finish(items)
+        """Given parallel mode, when suite starts, then header is not printed."""
+        item_count = 5
+        items = [make_test_item(f"test_{idx}") for idx in range(item_count)]
+        ascii_reporter.on_collection_finish(items)
 
-        reporter.on_suite_start("MySuite")
+        ascii_reporter.on_suite_start("MySuite")
         captured = capsys.readouterr()
         assert captured.out == ""
 
 
 class TestAsciiReporterSessionHooks:
-    @pytest.fixture
-    def reporter(self) -> AsciiReporter:
-        return AsciiReporter()
-
-    def test_on_session_setup_start(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    @pytest.mark.parametrize(
+        "hook_method,hook_args,expected_text",
+        [
+            pytest.param(
+                "on_session_setup_start", (), "session setup", id="setup_start"
+            ),
+            pytest.param(
+                "on_session_teardown_start", (), "teardown", id="teardown_start"
+            ),
+        ],
+    )
+    def test_session_lifecycle_hooks(
+        self,
+        ascii_reporter: AsciiReporter,
+        capsys: pytest.CaptureFixture[str],
+        hook_method: str,
+        hook_args: tuple,
+        expected_text: str,
     ) -> None:
-        reporter.on_session_setup_start()
+        """Given a lifecycle hook, when called, then expected text is printed."""
+        getattr(ascii_reporter, hook_method)(*hook_args)
         captured = capsys.readouterr()
-        assert "session setup" in captured.out.lower()
+        assert expected_text in captured.out.lower()
 
-    def test_on_session_setup_done(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    @pytest.mark.parametrize(
+        "hook_method,duration,expected_duration_str",
+        [
+            pytest.param("on_session_setup_done", 0.5, "500ms", id="setup_done"),
+            pytest.param("on_session_teardown_done", 0.25, "250ms", id="teardown_done"),
+        ],
+    )
+    def test_session_done_hooks(
+        self,
+        ascii_reporter: AsciiReporter,
+        capsys: pytest.CaptureFixture[str],
+        hook_method: str,
+        duration: float,
+        expected_duration_str: str,
     ) -> None:
-        reporter.on_session_setup_done(0.5)
+        """Given a done hook with duration, when called, then duration is printed."""
+        getattr(ascii_reporter, hook_method)(duration)
         captured = capsys.readouterr()
-        assert "500ms" in captured.out or "0.5" in captured.out
-
-    def test_on_session_teardown_start(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        reporter.on_session_teardown_start()
-        captured = capsys.readouterr()
-        assert "teardown" in captured.out.lower()
-
-    def test_on_session_teardown_done(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        reporter.on_session_teardown_done(0.25)
-        captured = capsys.readouterr()
-        assert "250ms" in captured.out or "0.25" in captured.out
+        assert expected_duration_str in captured.out
 
 
 class TestAsciiReporterTestStatus:
-    @pytest.fixture
-    def reporter(self) -> AsciiReporter:
-        return AsciiReporter()
-
-    def test_on_test_skip(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    @pytest.mark.parametrize(
+        "handler_method,result_kwargs,expected_marker,expected_texts",
+        [
+            pytest.param(
+                "on_test_skip",
+                {
+                    "name": "test_skipped",
+                    "node_id": "mod::test_skipped",
+                    "duration": 0.0,
+                    "skip_reason": "Not implemented",
+                },
+                "--",
+                ["test_skipped", "Not implemented"],
+                id="skip",
+            ),
+            pytest.param(
+                "on_test_xfail",
+                {
+                    "name": "test_xfail",
+                    "node_id": "mod::test_xfail",
+                    "duration": 0.05,
+                    "xfail_reason": "Known bug",
+                    "error": AssertionError("expected"),
+                },
+                "xf",
+                ["test_xfail", "Known bug", "50ms"],
+                id="xfail",
+            ),
+            pytest.param(
+                "on_test_xpass",
+                {
+                    "name": "test_xpass",
+                    "node_id": "mod::test_xpass",
+                    "duration": 0.1,
+                    "xfail_reason": "Was supposed to fail",
+                },
+                "XP",
+                ["test_xpass", "UNEXPECTED PASS", "100ms"],
+                id="xpass",
+            ),
+        ],
+    )
+    def test_test_status_display(
+        self,
+        ascii_reporter: AsciiReporter,
+        capsys: pytest.CaptureFixture[str],
+        handler_method: str,
+        result_kwargs: dict,
+        expected_marker: str,
+        expected_texts: list[str],
     ) -> None:
-        result = TestResult(
-            name="test_skipped",
-            node_id="mod::test_skipped",
-            duration=0.0,
-            skip_reason="Not implemented yet",
-        )
-        reporter.on_test_skip(result)
+        """Given a test with special status, when reported, then marker and info are shown."""
+        result = TestResult(**result_kwargs)
+        getattr(ascii_reporter, handler_method)(result)
         captured = capsys.readouterr()
-        assert "-- test_skipped" in captured.out
-        assert "Not implemented yet" in captured.out
-
-    def test_on_test_xfail(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        result = TestResult(
-            name="test_expected_fail",
-            node_id="mod::test_expected_fail",
-            duration=0.05,
-            xfail_reason="Known bug #123",
-            error=AssertionError("expected"),
-        )
-        reporter.on_test_xfail(result)
-        captured = capsys.readouterr()
-        assert "xf test_expected_fail" in captured.out
-        assert "Known bug #123" in captured.out
-        assert "50ms" in captured.out
-
-    def test_on_test_xpass(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        result = TestResult(
-            name="test_unexpected_pass",
-            node_id="mod::test_unexpected_pass",
-            duration=0.1,
-            xfail_reason="Was supposed to fail",
-        )
-        reporter.on_test_xpass(result)
-        captured = capsys.readouterr()
-        assert "XP test_unexpected_pass" in captured.out
-        assert "UNEXPECTED PASS" in captured.out
-        assert "100ms" in captured.out
+        assert f"{expected_marker} " in captured.out
+        for text in expected_texts:
+            assert text in captured.out
 
     def test_on_test_fail_timeout(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
+        """Given a timeout failure, when reported, then 'TO' marker and TIMEOUT are shown."""
         result = TestResult(
             name="test_slow",
             node_id="mod::test_slow",
@@ -388,7 +413,7 @@ class TestAsciiReporterTestStatus:
             error=TimeoutError("Test exceeded timeout"),
             timeout=5.0,
         )
-        reporter.on_test_fail(result)
+        ascii_reporter.on_test_fail(result)
         captured = capsys.readouterr()
         assert "TO test_slow" in captured.out
         assert "TIMEOUT" in captured.out
@@ -396,46 +421,56 @@ class TestAsciiReporterTestStatus:
 
 
 class TestAsciiReporterSummaryParts:
-    @pytest.fixture
-    def reporter(self) -> AsciiReporter:
-        return AsciiReporter()
-
-    def test_summary_with_skipped(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    @pytest.mark.parametrize(
+        "result_kwargs,expected_texts",
+        [
+            pytest.param(
+                {"passed": 4, "failed": 0, "errors": 0, "skipped": 2, "duration": 1.0},
+                ["2 skipped"],
+                id="with_skipped",
+            ),
+            pytest.param(
+                {"passed": 3, "failed": 0, "errors": 0, "xfailed": 1, "duration": 1.0},
+                ["1 xfailed"],
+                id="with_xfailed",
+            ),
+            pytest.param(
+                {"passed": 3, "failed": 0, "errors": 0, "xpassed": 1, "duration": 1.0},
+                ["XX FAILURES", "1 xpassed"],
+                id="with_xpassed",
+            ),
+            pytest.param(
+                {
+                    "passed": 2,
+                    "failed": 1,
+                    "errors": 1,
+                    "skipped": 1,
+                    "xfailed": 1,
+                    "xpassed": 1,
+                    "duration": 5.0,
+                },
+                [
+                    "2/7 passed",
+                    "1 skipped",
+                    "1 xfailed",
+                    "1 xpassed",
+                    "1 failed",
+                    "1 errors",
+                ],
+                id="all_status_types",
+            ),
+        ],
+    )
+    def test_summary_parts(
+        self,
+        ascii_reporter: AsciiReporter,
+        capsys: pytest.CaptureFixture[str],
+        result_kwargs: dict,
+        expected_texts: list[str],
     ) -> None:
-        result = SessionResult(passed=4, failed=0, errors=0, skipped=2, duration=1.0)
-        reporter.on_session_complete(result)
+        """Given session results, when summary printed, then all status parts are shown."""
+        result = SessionResult(**result_kwargs)
+        ascii_reporter.on_session_complete(result)
         captured = capsys.readouterr()
-        assert "2 skipped" in captured.out
-
-    def test_summary_with_xfailed(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        result = SessionResult(passed=3, failed=0, errors=0, xfailed=1, duration=1.0)
-        reporter.on_session_complete(result)
-        captured = capsys.readouterr()
-        assert "1 xfailed" in captured.out
-
-    def test_summary_with_xpassed(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        result = SessionResult(passed=3, failed=0, errors=0, xpassed=1, duration=1.0)
-        reporter.on_session_complete(result)
-        captured = capsys.readouterr()
-        assert "XX FAILURES" in captured.out
-        assert "1 xpassed" in captured.out
-
-    def test_summary_all_status_types(
-        self, reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        result = SessionResult(
-            passed=2, failed=1, errors=1, skipped=1, xfailed=1, xpassed=1, duration=5.0
-        )
-        reporter.on_session_complete(result)
-        captured = capsys.readouterr()
-        assert "2/7 passed" in captured.out
-        assert "1 skipped" in captured.out
-        assert "1 xfailed" in captured.out
-        assert "1 xpassed" in captured.out
-        assert "1 failed" in captured.out
-        assert "1 errors" in captured.out
+        for text in expected_texts:
+            assert text in captured.out

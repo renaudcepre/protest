@@ -11,86 +11,94 @@ from protest.core.runner import TestRunner
 from protest.execution.interrupt import InterruptHandler, InterruptState
 
 
+@pytest.fixture
+def interrupt_handler_with_loop() -> tuple[InterruptHandler, asyncio.AbstractEventLoop]:
+    """Create an interrupt handler with an installed event loop."""
+    handler = InterruptHandler()
+    loop = asyncio.new_event_loop()
+    handler.install(loop)
+    yield handler, loop
+    handler.uninstall()
+    loop.close()
+
+
 class TestInterruptStateTransitions:
     """Tests for the interrupt state machine."""
 
     def test_initial_state_is_running(self) -> None:
+        """Given a new handler, when created, then state is RUNNING."""
         handler = InterruptHandler()
         assert handler.state == InterruptState.RUNNING
 
-    def test_first_signal_transitions_to_soft_stop(self) -> None:
-        handler = InterruptHandler()
-        loop = asyncio.new_event_loop()
-        try:
-            handler.install(loop)
-            handler._handle_signal(signal.SIGINT, None)
-            assert handler.state == InterruptState.SOFT_STOP
-        finally:
-            handler.uninstall()
-            loop.close()
+    def test_first_signal_transitions_to_soft_stop(
+        self,
+        interrupt_handler_with_loop: tuple[InterruptHandler, asyncio.AbstractEventLoop],
+    ) -> None:
+        """Given RUNNING state, when signal received, then state becomes SOFT_STOP."""
+        handler, _ = interrupt_handler_with_loop
 
-    def test_second_signal_transitions_to_force_teardown(self) -> None:
-        handler = InterruptHandler()
-        loop = asyncio.new_event_loop()
-        try:
-            handler.install(loop)
-            handler._handle_signal(signal.SIGINT, None)
-            handler._handle_signal(signal.SIGINT, None)
-            assert handler.state == InterruptState.FORCE_TEARDOWN
-        finally:
-            handler.uninstall()
-            loop.close()
+        handler.simulate_signal()
 
-    def test_third_signal_raises_keyboard_interrupt(self) -> None:
-        handler = InterruptHandler()
-        loop = asyncio.new_event_loop()
-        try:
-            handler.install(loop)
-            handler._handle_signal(signal.SIGINT, None)
-            handler._handle_signal(signal.SIGINT, None)
+        assert handler.state == InterruptState.SOFT_STOP
 
-            with pytest.raises(KeyboardInterrupt):
-                handler._handle_signal(signal.SIGINT, None)
+    def test_second_signal_transitions_to_force_teardown(
+        self,
+        interrupt_handler_with_loop: tuple[InterruptHandler, asyncio.AbstractEventLoop],
+    ) -> None:
+        """Given SOFT_STOP state, when signal received, then state becomes FORCE_TEARDOWN."""
+        handler, _ = interrupt_handler_with_loop
+        handler.simulate_signal()
 
-            assert handler.state == InterruptState.HARD_EXIT
-        finally:
-            handler.uninstall()
-            loop.close()
+        handler.simulate_signal()
+
+        assert handler.state == InterruptState.FORCE_TEARDOWN
+
+    def test_third_signal_raises_keyboard_interrupt(
+        self,
+        interrupt_handler_with_loop: tuple[InterruptHandler, asyncio.AbstractEventLoop],
+    ) -> None:
+        """Given FORCE_TEARDOWN state, when signal received, then KeyboardInterrupt raised."""
+        handler, _ = interrupt_handler_with_loop
+        handler.simulate_signal()
+        handler.simulate_signal()
+
+        with pytest.raises(KeyboardInterrupt):
+            handler.simulate_signal()
+
+        assert handler.state == InterruptState.HARD_EXIT
 
 
 class TestInterruptEvents:
     """Tests for asyncio.Event behavior."""
 
-    def test_soft_stop_event_set_on_first_signal(self) -> None:
-        handler = InterruptHandler()
-        loop = asyncio.new_event_loop()
-        try:
-            handler.install(loop)
-            assert not handler.soft_stop_event.is_set()
+    def test_soft_stop_event_set_on_first_signal(
+        self,
+        interrupt_handler_with_loop: tuple[InterruptHandler, asyncio.AbstractEventLoop],
+    ) -> None:
+        """Given installed handler, when first signal, then soft_stop_event is set."""
+        handler, loop = interrupt_handler_with_loop
+        assert not handler.soft_stop_event.is_set()
 
-            handler._handle_signal(signal.SIGINT, None)
-            loop.run_until_complete(asyncio.sleep(0))
+        handler.simulate_signal()
+        loop.run_until_complete(asyncio.sleep(0))
 
-            assert handler.soft_stop_event.is_set()
-        finally:
-            handler.uninstall()
-            loop.close()
+        assert handler.soft_stop_event.is_set()
 
-    def test_force_teardown_event_set_on_second_signal(self) -> None:
-        handler = InterruptHandler()
-        loop = asyncio.new_event_loop()
-        try:
-            handler.install(loop)
-            handler._handle_signal(signal.SIGINT, None)
-            handler._handle_signal(signal.SIGINT, None)
-            loop.run_until_complete(asyncio.sleep(0))
+    def test_force_teardown_event_set_on_second_signal(
+        self,
+        interrupt_handler_with_loop: tuple[InterruptHandler, asyncio.AbstractEventLoop],
+    ) -> None:
+        """Given SOFT_STOP state, when second signal, then force_teardown_event is set."""
+        handler, loop = interrupt_handler_with_loop
+        handler.simulate_signal()
 
-            assert handler.force_teardown_event.is_set()
-        finally:
-            handler.uninstall()
-            loop.close()
+        handler.simulate_signal()
+        loop.run_until_complete(asyncio.sleep(0))
+
+        assert handler.force_teardown_event.is_set()
 
     def test_events_not_available_before_install(self) -> None:
+        """Given uninstalled handler, when events accessed, then RuntimeError raised."""
         handler = InterruptHandler()
 
         with pytest.raises(RuntimeError, match="not installed"):
@@ -99,129 +107,81 @@ class TestInterruptEvents:
         with pytest.raises(RuntimeError, match="not installed"):
             _ = handler.force_teardown_event
 
-    def test_events_available_after_install(self) -> None:
-        handler = InterruptHandler()
-        loop = asyncio.new_event_loop()
-        try:
-            handler.install(loop)
-            assert handler.soft_stop_event is not None
-            assert handler.force_teardown_event is not None
-            assert not handler.soft_stop_event.is_set()
-            assert not handler.force_teardown_event.is_set()
-        finally:
-            handler.uninstall()
-            loop.close()
+    def test_events_available_after_install(
+        self,
+        interrupt_handler_with_loop: tuple[InterruptHandler, asyncio.AbstractEventLoop],
+    ) -> None:
+        """Given installed handler, when events accessed, then they are available and not set."""
+        handler, _ = interrupt_handler_with_loop
+
+        assert handler.soft_stop_event is not None
+        assert handler.force_teardown_event is not None
+        assert not handler.soft_stop_event.is_set()
+        assert not handler.force_teardown_event.is_set()
 
 
 class TestInterruptProperties:
     """Tests for boolean query properties."""
 
-    def test_should_stop_new_tests_false_when_running(self) -> None:
-        handler = InterruptHandler()
-        assert handler.should_stop_new_tests is False
+    @pytest.mark.parametrize(
+        "signal_count,expected_should_stop,expected_should_cancel,expected_should_skip_wait",
+        [
+            pytest.param(0, False, False, False, id="running_state"),
+            pytest.param(1, True, False, False, id="soft_stop_state"),
+            pytest.param(2, True, True, True, id="force_teardown_state"),
+        ],
+    )
+    def test_boolean_properties_by_state(
+        self,
+        interrupt_handler_with_loop: tuple[InterruptHandler, asyncio.AbstractEventLoop],
+        signal_count: int,
+        expected_should_stop: bool,
+        expected_should_cancel: bool,
+        expected_should_skip_wait: bool,
+    ) -> None:
+        """Given state transitions, then boolean properties reflect state correctly."""
+        handler, _ = interrupt_handler_with_loop
 
-    def test_should_stop_new_tests_true_when_soft_stop(self) -> None:
-        handler = InterruptHandler()
-        loop = asyncio.new_event_loop()
-        try:
-            handler.install(loop)
-            handler._handle_signal(signal.SIGINT, None)
-            assert handler.should_stop_new_tests is True
-        finally:
-            handler.uninstall()
-            loop.close()
+        for _ in range(signal_count):
+            handler.simulate_signal()
 
-    def test_should_stop_new_tests_true_when_force_teardown(self) -> None:
-        handler = InterruptHandler()
-        loop = asyncio.new_event_loop()
-        try:
-            handler.install(loop)
-            handler._handle_signal(signal.SIGINT, None)
-            handler._handle_signal(signal.SIGINT, None)
-            assert handler.should_stop_new_tests is True
-        finally:
-            handler.uninstall()
-            loop.close()
-
-    def test_should_cancel_running_false_when_running(self) -> None:
-        handler = InterruptHandler()
-        assert handler.should_cancel_running is False
-
-    def test_should_cancel_running_false_when_soft_stop(self) -> None:
-        handler = InterruptHandler()
-        loop = asyncio.new_event_loop()
-        try:
-            handler.install(loop)
-            handler._handle_signal(signal.SIGINT, None)
-            assert handler.should_cancel_running is False
-        finally:
-            handler.uninstall()
-            loop.close()
-
-    def test_should_cancel_running_true_when_force_teardown(self) -> None:
-        handler = InterruptHandler()
-        loop = asyncio.new_event_loop()
-        try:
-            handler.install(loop)
-            handler._handle_signal(signal.SIGINT, None)
-            handler._handle_signal(signal.SIGINT, None)
-            assert handler.should_cancel_running is True
-        finally:
-            handler.uninstall()
-            loop.close()
-
-    def test_should_skip_wait_pending_false_when_soft_stop(self) -> None:
-        handler = InterruptHandler()
-        loop = asyncio.new_event_loop()
-        try:
-            handler.install(loop)
-            handler._handle_signal(signal.SIGINT, None)
-            assert handler.should_skip_wait_pending is False
-        finally:
-            handler.uninstall()
-            loop.close()
-
-    def test_should_skip_wait_pending_true_when_force_teardown(self) -> None:
-        handler = InterruptHandler()
-        loop = asyncio.new_event_loop()
-        try:
-            handler.install(loop)
-            handler._handle_signal(signal.SIGINT, None)
-            handler._handle_signal(signal.SIGINT, None)
-            assert handler.should_skip_wait_pending is True
-        finally:
-            handler.uninstall()
-            loop.close()
+        assert handler.should_stop_new_tests is expected_should_stop
+        assert handler.should_cancel_running is expected_should_cancel
+        assert handler.should_skip_wait_pending is expected_should_skip_wait
 
 
 class TestInterruptInstallUninstall:
     """Tests for install/uninstall lifecycle."""
 
     def test_install_registers_signal_handler(self) -> None:
+        """Given uninstalled handler, when installed, then signal handler is changed."""
         original = signal.getsignal(signal.SIGINT)
         handler = InterruptHandler()
         loop = asyncio.new_event_loop()
         try:
             handler.install(loop)
             current = signal.getsignal(signal.SIGINT)
+
             assert current != original
-            assert current == handler._handle_signal
         finally:
             handler.uninstall()
             loop.close()
 
     def test_uninstall_restores_original_handler(self) -> None:
+        """Given installed handler, when uninstalled, then original signal handler restored."""
         original = signal.getsignal(signal.SIGINT)
         handler = InterruptHandler()
         loop = asyncio.new_event_loop()
         try:
             handler.install(loop)
             handler.uninstall()
+
             assert signal.getsignal(signal.SIGINT) == original
         finally:
             loop.close()
 
     def test_uninstall_clears_events(self) -> None:
+        """Given installed handler, when uninstalled, then events become unavailable."""
         handler = InterruptHandler()
         loop = asyncio.new_event_loop()
         try:
@@ -237,53 +197,42 @@ class TestInterruptInstallUninstall:
 class TestInterruptCallback:
     """Tests for optional interrupt callback."""
 
-    def test_callback_called_on_soft_stop(self) -> None:
-        handler = InterruptHandler()
-        loop = asyncio.new_event_loop()
+    @pytest.mark.parametrize(
+        "signal_count,expected_states",
+        [
+            pytest.param(1, [InterruptState.SOFT_STOP], id="soft_stop"),
+            pytest.param(
+                2,
+                [InterruptState.SOFT_STOP, InterruptState.FORCE_TEARDOWN],
+                id="force_teardown",
+            ),
+        ],
+    )
+    def test_callback_called_on_state_transitions(
+        self,
+        interrupt_handler_with_loop: tuple[InterruptHandler, asyncio.AbstractEventLoop],
+        signal_count: int,
+        expected_states: list[InterruptState],
+    ) -> None:
+        """Given callback set, when signals received, then callback called with correct states."""
+        handler, _ = interrupt_handler_with_loop
         callback_states: list[InterruptState] = []
 
         def on_interrupt(state: InterruptState) -> None:
             callback_states.append(state)
 
-        try:
-            handler.set_interrupt_callback(on_interrupt)
-            handler.install(loop)
-            handler._handle_signal(signal.SIGINT, None)
+        handler.set_interrupt_callback(on_interrupt)
+        for _ in range(signal_count):
+            handler.simulate_signal()
 
-            expected_callback_count = 1
-            assert len(callback_states) == expected_callback_count
-            assert callback_states[0] == InterruptState.SOFT_STOP
-        finally:
-            handler.uninstall()
-            loop.close()
-
-    def test_callback_called_on_force_teardown(self) -> None:
-        handler = InterruptHandler()
-        loop = asyncio.new_event_loop()
-        callback_states: list[InterruptState] = []
-
-        def on_interrupt(state: InterruptState) -> None:
-            callback_states.append(state)
-
-        try:
-            handler.set_interrupt_callback(on_interrupt)
-            handler.install(loop)
-            handler._handle_signal(signal.SIGINT, None)
-            handler._handle_signal(signal.SIGINT, None)
-
-            expected_callback_count = 2
-            assert len(callback_states) == expected_callback_count
-            assert callback_states[0] == InterruptState.SOFT_STOP
-            assert callback_states[1] == InterruptState.FORCE_TEARDOWN
-        finally:
-            handler.uninstall()
-            loop.close()
+        assert callback_states == expected_states
 
 
 class TestRunnerInterruptIntegration:
     """Integration tests with TestRunner."""
 
     def test_run_result_interrupted_false_on_normal_run(self) -> None:
+        """Given normal test run, when completed, then interrupted is False."""
         session = ProTestSession()
 
         @session.test()
@@ -297,6 +246,7 @@ class TestRunnerInterruptIntegration:
         assert result.interrupted is False
 
     def test_run_result_interrupted_true_when_soft_stop_before_tests(self) -> None:
+        """Given soft stop triggered before tests, then result.interrupted is True and no tests run."""
         session = ProTestSession()
         executed: list[str] = []
 
@@ -309,12 +259,10 @@ class TestRunnerInterruptIntegration:
             executed.append("two")
 
         runner = TestRunner(session)
-
         original_main_loop = runner._main_loop
 
         async def patched_main_loop() -> bool:
-            runner._interrupt_handler._state = InterruptState.SOFT_STOP
-            runner._interrupt_handler._soft_stop_event.set()
+            runner._interrupt_handler.simulate_signal()
             return await original_main_loop()
 
         runner._main_loop = patched_main_loop
@@ -324,6 +272,7 @@ class TestRunnerInterruptIntegration:
         assert executed == []
 
     def test_teardowns_still_run_on_normal_completion(self) -> None:
+        """Given test with fixture, when test passes, then teardown is executed."""
         session = ProTestSession()
         teardown_called: list[str] = []
 
@@ -344,6 +293,7 @@ class TestRunnerInterruptIntegration:
         assert len(teardown_called) == expected_teardown_count
 
     def test_soft_stop_prevents_pending_tests_from_starting(self) -> None:
+        """Given soft stop triggered during first test, then pending tests are skipped."""
         session = ProTestSession(concurrency=1)
         executed: list[str] = []
         runner: TestRunner | None = None
@@ -352,8 +302,7 @@ class TestRunnerInterruptIntegration:
         def test_first() -> None:
             executed.append("first")
             if runner:
-                runner._interrupt_handler._state = InterruptState.SOFT_STOP
-                runner._interrupt_handler._soft_stop_event.set()
+                runner._interrupt_handler.simulate_signal()
 
         @session.test()
         def test_second() -> None:
@@ -372,6 +321,7 @@ class TestRunnerInterruptIntegration:
         assert "third" not in executed
 
     def test_keyboard_interrupt_returns_interrupted_result(self) -> None:
+        """Given test raises KeyboardInterrupt, then result.interrupted is True."""
         session = ProTestSession()
 
         @session.test()

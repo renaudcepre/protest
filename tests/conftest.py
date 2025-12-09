@@ -1,11 +1,22 @@
 import asyncio
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 import pytest
 
 from protest.core.suite import ProTestSuite
 from protest.entities import SessionResult, TestItem, TestResult
 from protest.plugin import PluginBase
+from tests.factories.test_items import make_test_item
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+
+@pytest.fixture
+def test_item_factory() -> "Callable[..., TestItem]":
+    """Fixture providing the make_test_item factory function."""
+    return make_test_item
 
 
 @dataclass

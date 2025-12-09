@@ -19,170 +19,223 @@ def cache_dir(tmp_path: Path) -> Path:
     return tmp_path / ".protest"
 
 
-def create_session(cache_dir: Path) -> ProTestSession:
-    """Create a fresh session with the given cache directory."""
-    session = ProTestSession(default_reporter=False, default_cache=True)
-    session._cache_storage = CacheStorage(cache_dir=cache_dir, cache_file="cache.json")
-    return session
+class SessionFactory:
+    """Factory that creates sessions with consistent test functions for cache persistence testing."""
+
+    def __init__(self, cache_dir: Path) -> None:
+        self._cache_dir = cache_dir
+        self._test_behaviors: dict[str, dict] = {}
+
+    def create_session(self) -> ProTestSession:
+        """Create a fresh session with the given cache directory."""
+        session = ProTestSession(default_reporter=False, default_cache=True)
+        session._cache_storage = CacheStorage(
+            cache_dir=self._cache_dir, cache_file="cache.json"
+        )
+        return session
+
+    def register_test(
+        self,
+        session: ProTestSession,
+        name: str,
+        tags: set[str] | None = None,
+        should_fail: bool = False,
+        executed_list: list[str] | None = None,
+        suite: ProTestSuite | None = None,
+    ) -> None:
+        """Register a test with consistent naming across sessions."""
+        tag_list = list(tags) if tags else []
+        tracker = executed_list if executed_list is not None else []
+        fail = should_fail
+
+        def test_func() -> None:
+            tracker.append(name)
+            if fail:
+                raise AssertionError(f"{name} fails")
+
+        test_func.__name__ = name
+        test_func.__module__ = "tests.integration.test_filter_combinations"
+
+        target = suite if suite else session
+        if tag_list:
+            target.test(tags=tag_list)(test_func)
+        else:
+            target.test()(test_func)
+
+
+@pytest.fixture
+def session_factory(cache_dir: Path) -> SessionFactory:
+    """Provide a session factory for cache persistence tests."""
+    return SessionFactory(cache_dir)
 
 
 class TestLastFailedWithTags:
     """Tests for --lf combined with tag filtering."""
 
-    def test_lf_and_include_tag_intersection(self, cache_dir: Path) -> None:
-        """--lf --tag X returns only failed tests that have tag X."""
-        session1 = create_session(cache_dir)
+    def test_lf_and_include_tag_intersection(
+        self, session_factory: SessionFactory
+    ) -> None:
+        """Given failed tests with different tags, when --lf --tag X, then only failed tests with tag X run."""
         first_run_executed: list[str] = []
-
-        @session1.test(tags=["slow"])
-        def test_slow_fail() -> None:
-            first_run_executed.append("slow")
-            raise AssertionError("fails")
-
-        @session1.test(tags=["fast"])
-        def test_fast_fail() -> None:
-            first_run_executed.append("fast")
-            raise AssertionError("fails")
-
-        @session1.test(tags=["slow"])
-        def test_slow_pass() -> None:
-            first_run_executed.append("slow_pass")
-
+        session1 = session_factory.create_session()
+        session_factory.register_test(
+            session1,
+            "test_slow_fail",
+            tags={"slow"},
+            should_fail=True,
+            executed_list=first_run_executed,
+        )
+        session_factory.register_test(
+            session1,
+            "test_fast_fail",
+            tags={"fast"},
+            should_fail=True,
+            executed_list=first_run_executed,
+        )
+        session_factory.register_test(
+            session1,
+            "test_slow_pass",
+            tags={"slow"},
+            should_fail=False,
+            executed_list=first_run_executed,
+        )
         run_session(session1)
 
-        session2 = create_session(cache_dir)
         second_run_executed: list[str] = []
-
-        @session2.test(tags=["slow"])
-        def test_slow_fail_2() -> None:
-            second_run_executed.append("slow")
-
-        test_slow_fail_2.__name__ = "test_slow_fail"
-
-        @session2.test(tags=["fast"])
-        def test_fast_fail_2() -> None:
-            second_run_executed.append("fast")
-
-        test_fast_fail_2.__name__ = "test_fast_fail"
-
-        @session2.test(tags=["slow"])
-        def test_slow_pass_2() -> None:
-            second_run_executed.append("slow_pass")
-
-        test_slow_pass_2.__name__ = "test_slow_pass"
-
+        session2 = session_factory.create_session()
+        session_factory.register_test(
+            session2,
+            "test_slow_fail",
+            tags={"slow"},
+            should_fail=False,
+            executed_list=second_run_executed,
+        )
+        session_factory.register_test(
+            session2,
+            "test_fast_fail",
+            tags={"fast"},
+            should_fail=False,
+            executed_list=second_run_executed,
+        )
+        session_factory.register_test(
+            session2,
+            "test_slow_pass",
+            tags={"slow"},
+            should_fail=False,
+            executed_list=second_run_executed,
+        )
         result = run_session(session2, last_failed=True, include_tags={"slow"})
 
         assert result.success is True
-        assert second_run_executed == ["slow"]
+        assert second_run_executed == ["test_slow_fail"]
 
-    def test_lf_and_exclude_tag_intersection(self, cache_dir: Path) -> None:
-        """--lf --exclude-tag X returns failed tests that don't have tag X."""
-        session1 = create_session(cache_dir)
-
-        @session1.test(tags=["slow"])
-        def test_slow_fail() -> None:
-            raise AssertionError("fails")
-
-        @session1.test(tags=["fast"])
-        def test_fast_fail() -> None:
-            raise AssertionError("fails")
-
+    def test_lf_and_exclude_tag_intersection(
+        self, session_factory: SessionFactory
+    ) -> None:
+        """Given failed tests with different tags, when --lf --exclude-tag X, then failed tests without tag X run."""
+        session1 = session_factory.create_session()
+        session_factory.register_test(
+            session1, "test_slow_fail", tags={"slow"}, should_fail=True
+        )
+        session_factory.register_test(
+            session1, "test_fast_fail", tags={"fast"}, should_fail=True
+        )
         run_session(session1)
 
-        session2 = create_session(cache_dir)
         second_run_executed: list[str] = []
-
-        @session2.test(tags=["slow"])
-        def test_slow_fail_2() -> None:
-            second_run_executed.append("slow")
-
-        test_slow_fail_2.__name__ = "test_slow_fail"
-
-        @session2.test(tags=["fast"])
-        def test_fast_fail_2() -> None:
-            second_run_executed.append("fast")
-
-        test_fast_fail_2.__name__ = "test_fast_fail"
-
+        session2 = session_factory.create_session()
+        session_factory.register_test(
+            session2,
+            "test_slow_fail",
+            tags={"slow"},
+            should_fail=False,
+            executed_list=second_run_executed,
+        )
+        session_factory.register_test(
+            session2,
+            "test_fast_fail",
+            tags={"fast"},
+            should_fail=False,
+            executed_list=second_run_executed,
+        )
         result = run_session(session2, last_failed=True, exclude_tags={"slow"})
 
         assert result.success is True
-        assert second_run_executed == ["fast"]
+        assert second_run_executed == ["test_fast_fail"]
 
-    def test_lf_exclude_tag_results_in_zero_tests(self, cache_dir: Path) -> None:
-        """--lf --exclude-tag X with all failed tests having tag X = 0 tests."""
-        session1 = create_session(cache_dir)
-
-        @session1.test(tags=["slow"])
-        def test_slow_1() -> None:
-            raise AssertionError("fails")
-
-        @session1.test(tags=["slow"])
-        def test_slow_2() -> None:
-            raise AssertionError("fails")
-
-        @session1.test(tags=["fast"])
-        def test_fast_pass() -> None:
-            pass
-
+    def test_lf_exclude_tag_results_in_zero_tests(
+        self, session_factory: SessionFactory
+    ) -> None:
+        """Given all failed tests have excluded tag, when --lf --exclude-tag X, then 0 tests run."""
+        session1 = session_factory.create_session()
+        session_factory.register_test(
+            session1, "test_slow_1", tags={"slow"}, should_fail=True
+        )
+        session_factory.register_test(
+            session1, "test_slow_2", tags={"slow"}, should_fail=True
+        )
+        session_factory.register_test(
+            session1, "test_fast_pass", tags={"fast"}, should_fail=False
+        )
         run_session(session1)
 
-        session2 = create_session(cache_dir)
         second_run_executed: list[str] = []
-
-        @session2.test(tags=["slow"])
-        def test_slow_1_v2() -> None:
-            second_run_executed.append("slow_1")
-
-        test_slow_1_v2.__name__ = "test_slow_1"
-
-        @session2.test(tags=["slow"])
-        def test_slow_2_v2() -> None:
-            second_run_executed.append("slow_2")
-
-        test_slow_2_v2.__name__ = "test_slow_2"
-
-        @session2.test(tags=["fast"])
-        def test_fast_pass_v2() -> None:
-            second_run_executed.append("fast")
-
-        test_fast_pass_v2.__name__ = "test_fast_pass"
-
+        session2 = session_factory.create_session()
+        session_factory.register_test(
+            session2,
+            "test_slow_1",
+            tags={"slow"},
+            should_fail=False,
+            executed_list=second_run_executed,
+        )
+        session_factory.register_test(
+            session2,
+            "test_slow_2",
+            tags={"slow"},
+            should_fail=False,
+            executed_list=second_run_executed,
+        )
+        session_factory.register_test(
+            session2,
+            "test_fast_pass",
+            tags={"fast"},
+            should_fail=False,
+            executed_list=second_run_executed,
+        )
         result = run_session(session2, last_failed=True, exclude_tags={"slow"})
 
         assert result.success is True
         assert second_run_executed == []
 
-    def test_lf_with_tag_no_matching_failures(self, cache_dir: Path) -> None:
-        """--lf --tag X where no failed test has tag X runs 0 tests (no fallback)."""
-        session1 = create_session(cache_dir)
-
-        @session1.test(tags=["slow"])
-        def test_slow_pass() -> None:
-            pass
-
-        @session1.test(tags=["fast"])
-        def test_fast_fail() -> None:
-            raise AssertionError("fails")
-
+    def test_lf_with_tag_no_matching_failures(
+        self, session_factory: SessionFactory
+    ) -> None:
+        """Given no failed test has tag X, when --lf --tag X, then 0 tests run (no fallback)."""
+        session1 = session_factory.create_session()
+        session_factory.register_test(
+            session1, "test_slow_pass", tags={"slow"}, should_fail=False
+        )
+        session_factory.register_test(
+            session1, "test_fast_fail", tags={"fast"}, should_fail=True
+        )
         run_session(session1)
 
-        session2 = create_session(cache_dir)
         second_run_executed: list[str] = []
-
-        @session2.test(tags=["slow"])
-        def test_slow_pass_v2() -> None:
-            second_run_executed.append("slow")
-
-        test_slow_pass_v2.__name__ = "test_slow_pass"
-
-        @session2.test(tags=["fast"])
-        def test_fast_fail_v2() -> None:
-            second_run_executed.append("fast")
-
-        test_fast_fail_v2.__name__ = "test_fast_fail"
-
+        session2 = session_factory.create_session()
+        session_factory.register_test(
+            session2,
+            "test_slow_pass",
+            tags={"slow"},
+            should_fail=False,
+            executed_list=second_run_executed,
+        )
+        session_factory.register_test(
+            session2,
+            "test_fast_fail",
+            tags={"fast"},
+            should_fail=False,
+            executed_list=second_run_executed,
+        )
         result = run_session(session2, last_failed=True, include_tags={"slow"})
 
         assert result.success is True
@@ -192,128 +245,91 @@ class TestLastFailedWithTags:
 class TestLastFailedWithExitFirst:
     """Tests for --lf combined with -x (exitfirst)."""
 
-    def test_lf_exitfirst_stops_on_failure(self, cache_dir: Path) -> None:
-        """--lf -x stops after first failure among failed tests."""
-        session1 = create_session(cache_dir)
-
-        @session1.test()
-        def test_fail_1() -> None:
-            raise AssertionError("fails")
-
-        @session1.test()
-        def test_fail_2() -> None:
-            raise AssertionError("fails")
-
-        @session1.test()
-        def test_pass() -> None:
-            pass
-
+    def test_lf_exitfirst_stops_on_failure(
+        self, session_factory: SessionFactory
+    ) -> None:
+        """Given multiple failed tests, when --lf -x, then stop after first failure."""
+        session1 = session_factory.create_session()
+        session_factory.register_test(session1, "test_fail_1", should_fail=True)
+        session_factory.register_test(session1, "test_fail_2", should_fail=True)
+        session_factory.register_test(session1, "test_pass", should_fail=False)
         run_session(session1)
 
-        session2 = create_session(cache_dir)
         second_run_executed: list[str] = []
-
-        @session2.test()
-        def test_fail_1_v2() -> None:
-            second_run_executed.append("fail_1")
-            raise AssertionError("still fails")
-
-        test_fail_1_v2.__name__ = "test_fail_1"
-
-        @session2.test()
-        def test_fail_2_v2() -> None:
-            second_run_executed.append("fail_2")
-            raise AssertionError("still fails")
-
-        test_fail_2_v2.__name__ = "test_fail_2"
-
-        @session2.test()
-        def test_pass_v2() -> None:
-            second_run_executed.append("pass")
-
-        test_pass_v2.__name__ = "test_pass"
-
+        session2 = session_factory.create_session()
+        session_factory.register_test(
+            session2, "test_fail_1", should_fail=True, executed_list=second_run_executed
+        )
+        session_factory.register_test(
+            session2, "test_fail_2", should_fail=True, executed_list=second_run_executed
+        )
+        session_factory.register_test(
+            session2, "test_pass", should_fail=False, executed_list=second_run_executed
+        )
         result = run_session(session2, last_failed=True, exitfirst=True)
 
         assert result.success is False
         expected_executed_count = 1
         assert len(second_run_executed) == expected_executed_count
-        assert second_run_executed[0] in ("fail_1", "fail_2")
+        assert second_run_executed[0] in ("test_fail_1", "test_fail_2")
 
-    def test_exitfirst_then_lf_runs_only_failed(self, cache_dir: Path) -> None:
-        """After -x run, --lf should run only the test that failed."""
-        session1 = create_session(cache_dir)
+    def test_exitfirst_then_lf_runs_only_failed(
+        self, session_factory: SessionFactory
+    ) -> None:
+        """Given -x stopped on failure, when --lf on second run, then only failed test runs."""
         first_run_executed: list[str] = []
-
-        @session1.test()
-        def test_a() -> None:
-            first_run_executed.append("a")
-
-        @session1.test()
-        def test_b() -> None:
-            first_run_executed.append("b")
-            raise AssertionError("fails")
-
-        @session1.test()
-        def test_c() -> None:
-            first_run_executed.append("c")
-
+        session1 = session_factory.create_session()
+        session_factory.register_test(
+            session1, "test_a", should_fail=False, executed_list=first_run_executed
+        )
+        session_factory.register_test(
+            session1, "test_b", should_fail=True, executed_list=first_run_executed
+        )
+        session_factory.register_test(
+            session1, "test_c", should_fail=False, executed_list=first_run_executed
+        )
         result_first = run_session(session1, exitfirst=True)
         assert result_first.success is False
 
-        session2 = create_session(cache_dir)
         second_run_executed: list[str] = []
-
-        @session2.test()
-        def test_a_v2() -> None:
-            second_run_executed.append("a")
-
-        test_a_v2.__name__ = "test_a"
-
-        @session2.test()
-        def test_b_v2() -> None:
-            second_run_executed.append("b")
-
-        test_b_v2.__name__ = "test_b"
-
-        @session2.test()
-        def test_c_v2() -> None:
-            second_run_executed.append("c")
-
-        test_c_v2.__name__ = "test_c"
-
+        session2 = session_factory.create_session()
+        session_factory.register_test(
+            session2, "test_a", should_fail=False, executed_list=second_run_executed
+        )
+        session_factory.register_test(
+            session2, "test_b", should_fail=False, executed_list=second_run_executed
+        )
+        session_factory.register_test(
+            session2, "test_c", should_fail=False, executed_list=second_run_executed
+        )
         result_second = run_session(session2, last_failed=True)
 
         assert result_second.success is True
-        assert second_run_executed == ["b"]
+        assert second_run_executed == ["test_b"]
 
-    def test_exitfirst_partial_cache_then_lf_fallback(self, cache_dir: Path) -> None:
-        """After -x with failure fixed, --lf falls back to all tests."""
-        session1 = create_session(cache_dir)
-
-        @session1.test()
-        def test_only_one() -> None:
-            raise AssertionError("fails")
-
+    def test_exitfirst_partial_cache_then_lf(
+        self, session_factory: SessionFactory
+    ) -> None:
+        """Given -x stopped and failure is fixed, when --lf, then only previously failed test runs."""
+        session1 = session_factory.create_session()
+        session_factory.register_test(session1, "test_only_one", should_fail=True)
         run_session(session1)
 
-        session2 = create_session(cache_dir)
         second_run_executed: list[str] = []
-
-        @session2.test()
-        def test_only_one_v2() -> None:
-            second_run_executed.append("only_one")
-
-        test_only_one_v2.__name__ = "test_only_one"
-
-        @session2.test()
-        def test_new() -> None:
-            second_run_executed.append("new")
-
+        session2 = session_factory.create_session()
+        session_factory.register_test(
+            session2,
+            "test_only_one",
+            should_fail=False,
+            executed_list=second_run_executed,
+        )
+        session_factory.register_test(
+            session2, "test_new", should_fail=False, executed_list=second_run_executed
+        )
         result = run_session(session2, last_failed=True)
 
         assert result.success is True
-        assert "only_one" in second_run_executed
+        assert "test_only_one" in second_run_executed
         expected_test_count = 1
         assert len(second_run_executed) == expected_test_count
 
@@ -322,7 +338,7 @@ class TestTagsWithExitFirst:
     """Tests for tag filtering combined with -x (exitfirst)."""
 
     def test_tag_filter_with_exitfirst(self) -> None:
-        """--tag X -x stops after first failure among tagged tests."""
+        """Given tests with different tags, when --tag X -x, then stop after first tagged failure."""
         session = ProTestSession(default_reporter=False)
         executed: list[str] = []
 
@@ -347,7 +363,7 @@ class TestTagsWithExitFirst:
         assert "integration" not in executed
 
     def test_exclude_tag_with_exitfirst(self) -> None:
-        """--exclude-tag X -x stops after first failure, skipping excluded."""
+        """Given tests with different tags, when --exclude-tag X -x, then stop after first non-excluded failure."""
         session = ProTestSession(default_reporter=False)
         executed: list[str] = []
 
@@ -375,107 +391,97 @@ class TestTagsWithExitFirst:
 class TestAllThreeCombined:
     """Tests combining --lf, -x, and tag filters."""
 
-    def test_lf_tag_exitfirst_together(self, cache_dir: Path) -> None:
-        """--lf --tag X -x: failed + tagged, stop on first failure."""
-        session1 = create_session(cache_dir)
-
-        @session1.test(tags=["slow"])
-        def test_slow_fail_1() -> None:
-            raise AssertionError("fails")
-
-        @session1.test(tags=["slow"])
-        def test_slow_fail_2() -> None:
-            raise AssertionError("fails")
-
-        @session1.test(tags=["fast"])
-        def test_fast_fail() -> None:
-            raise AssertionError("fails")
-
+    def test_lf_tag_exitfirst_together(self, session_factory: SessionFactory) -> None:
+        """Given failed tests with different tags, when --lf --tag X -x, then stop on first tagged failure."""
+        session1 = session_factory.create_session()
+        session_factory.register_test(
+            session1, "test_slow_fail_1", tags={"slow"}, should_fail=True
+        )
+        session_factory.register_test(
+            session1, "test_slow_fail_2", tags={"slow"}, should_fail=True
+        )
+        session_factory.register_test(
+            session1, "test_fast_fail", tags={"fast"}, should_fail=True
+        )
         run_session(session1)
 
-        session2 = create_session(cache_dir)
         second_run_executed: list[str] = []
-
-        @session2.test(tags=["slow"])
-        def test_slow_fail_1_v2() -> None:
-            second_run_executed.append("slow_1")
-            raise AssertionError("still fails")
-
-        test_slow_fail_1_v2.__name__ = "test_slow_fail_1"
-
-        @session2.test(tags=["slow"])
-        def test_slow_fail_2_v2() -> None:
-            second_run_executed.append("slow_2")
-            raise AssertionError("still fails")
-
-        test_slow_fail_2_v2.__name__ = "test_slow_fail_2"
-
-        @session2.test(tags=["fast"])
-        def test_fast_fail_v2() -> None:
-            second_run_executed.append("fast")
-            raise AssertionError("should not run - wrong tag")
-
-        test_fast_fail_v2.__name__ = "test_fast_fail"
-
+        session2 = session_factory.create_session()
+        session_factory.register_test(
+            session2,
+            "test_slow_fail_1",
+            tags={"slow"},
+            should_fail=True,
+            executed_list=second_run_executed,
+        )
+        session_factory.register_test(
+            session2,
+            "test_slow_fail_2",
+            tags={"slow"},
+            should_fail=True,
+            executed_list=second_run_executed,
+        )
+        session_factory.register_test(
+            session2,
+            "test_fast_fail",
+            tags={"fast"},
+            should_fail=True,
+            executed_list=second_run_executed,
+        )
         result = run_session(
             session2, last_failed=True, include_tags={"slow"}, exitfirst=True
         )
 
         assert result.success is False
-        assert "slow_1" in second_run_executed
-        assert "fast" not in second_run_executed
+        assert "test_fast_fail" not in second_run_executed
         expected_max_executed = 1
         assert len(second_run_executed) == expected_max_executed
 
-    def test_lf_exclude_tag_exitfirst_together(self, cache_dir: Path) -> None:
-        """--lf --exclude-tag X -x: failed without tag, stop on first failure."""
-        session1 = create_session(cache_dir)
-
-        @session1.test(tags=["slow"])
-        def test_slow_fail() -> None:
-            raise AssertionError("fails")
-
-        @session1.test(tags=["fast"])
-        def test_fast_fail_1() -> None:
-            raise AssertionError("fails")
-
-        @session1.test(tags=["fast"])
-        def test_fast_fail_2() -> None:
-            raise AssertionError("fails")
-
+    def test_lf_exclude_tag_exitfirst_together(
+        self, session_factory: SessionFactory
+    ) -> None:
+        """Given failed tests with different tags, when --lf --exclude-tag X -x, then stop on first non-excluded failure."""
+        session1 = session_factory.create_session()
+        session_factory.register_test(
+            session1, "test_slow_fail", tags={"slow"}, should_fail=True
+        )
+        session_factory.register_test(
+            session1, "test_fast_fail_1", tags={"fast"}, should_fail=True
+        )
+        session_factory.register_test(
+            session1, "test_fast_fail_2", tags={"fast"}, should_fail=True
+        )
         run_session(session1)
 
-        session2 = create_session(cache_dir)
         second_run_executed: list[str] = []
-
-        @session2.test(tags=["slow"])
-        def test_slow_fail_v2() -> None:
-            second_run_executed.append("slow")
-            raise AssertionError("should not run - excluded")
-
-        test_slow_fail_v2.__name__ = "test_slow_fail"
-
-        @session2.test(tags=["fast"])
-        def test_fast_fail_1_v2() -> None:
-            second_run_executed.append("fast_1")
-            raise AssertionError("still fails")
-
-        test_fast_fail_1_v2.__name__ = "test_fast_fail_1"
-
-        @session2.test(tags=["fast"])
-        def test_fast_fail_2_v2() -> None:
-            second_run_executed.append("fast_2")
-            raise AssertionError("still fails")
-
-        test_fast_fail_2_v2.__name__ = "test_fast_fail_2"
-
+        session2 = session_factory.create_session()
+        session_factory.register_test(
+            session2,
+            "test_slow_fail",
+            tags={"slow"},
+            should_fail=True,
+            executed_list=second_run_executed,
+        )
+        session_factory.register_test(
+            session2,
+            "test_fast_fail_1",
+            tags={"fast"},
+            should_fail=True,
+            executed_list=second_run_executed,
+        )
+        session_factory.register_test(
+            session2,
+            "test_fast_fail_2",
+            tags={"fast"},
+            should_fail=True,
+            executed_list=second_run_executed,
+        )
         result = run_session(
             session2, last_failed=True, exclude_tags={"slow"}, exitfirst=True
         )
 
         assert result.success is False
-        assert "slow" not in second_run_executed
-        assert "fast_1" in second_run_executed
+        assert "test_slow_fail" not in second_run_executed
         expected_max_executed = 1
         assert len(second_run_executed) == expected_max_executed
 
@@ -484,7 +490,7 @@ class TestSuiteFilter:
     """Tests for suite filtering (::SuiteName syntax)."""
 
     def test_suite_filter_basic(self) -> None:
-        """Suite filter runs only tests in specified suite."""
+        """Given tests in different suites, when suite filter applied, then only suite tests run."""
         session = ProTestSession(default_reporter=False)
         api_suite = ProTestSuite("API")
         session.add_suite(api_suite)
@@ -504,7 +510,7 @@ class TestSuiteFilter:
         assert executed == ["api"]
 
     def test_suite_filter_with_nested_suites(self) -> None:
-        """Suite filter includes child suites."""
+        """Given nested suites, when parent suite filter applied, then child suite tests also run."""
         session = ProTestSession(default_reporter=False)
         api_suite = ProTestSuite("API")
         users_suite = ProTestSuite("Users")
@@ -526,7 +532,7 @@ class TestSuiteFilter:
         assert set(executed) == {"api", "users"}
 
     def test_suite_filter_specific_child(self) -> None:
-        """Suite filter for nested suite excludes parent tests."""
+        """Given nested suites, when child suite filter applied, then parent suite tests excluded."""
         session = ProTestSession(default_reporter=False)
         api_suite = ProTestSuite("API")
         users_suite = ProTestSuite("Users")
@@ -548,7 +554,7 @@ class TestSuiteFilter:
         assert executed == ["users"]
 
     def test_suite_filter_nonexistent(self) -> None:
-        """Suite filter with nonexistent suite runs zero tests."""
+        """Given nonexistent suite filter, when session runs, then 0 tests run."""
         session = ProTestSession(default_reporter=False)
         api_suite = ProTestSuite("API")
         session.add_suite(api_suite)
@@ -567,8 +573,17 @@ class TestSuiteFilter:
 class TestKeywordFilter:
     """Tests for keyword filtering (-k flag)."""
 
-    def test_keyword_filter_basic(self) -> None:
-        """Keyword filter matches test names."""
+    @pytest.mark.parametrize(
+        "keyword_patterns,expected_executed",
+        [
+            pytest.param(["login"], ["login"], id="exact_match"),
+            pytest.param(["nonexistent"], [], id="no_match"),
+        ],
+    )
+    def test_keyword_filter_single_pattern(
+        self, keyword_patterns: list[str], expected_executed: list[str]
+    ) -> None:
+        """Given tests with different names, when keyword filter applied, then matching tests run."""
         session = ProTestSession(default_reporter=False)
         executed: list[str] = []
 
@@ -584,13 +599,13 @@ class TestKeywordFilter:
         def test_dashboard() -> None:
             executed.append("dashboard")
 
-        result = run_session(session, keyword_patterns=["login"])
+        result = run_session(session, keyword_patterns=keyword_patterns)
 
         assert result.success is True
-        assert executed == ["login"]
+        assert executed == expected_executed
 
     def test_keyword_filter_substring(self) -> None:
-        """Keyword filter matches substrings."""
+        """Given tests with similar names, when keyword filter applied, then all matching substrings run."""
         session = ProTestSession(default_reporter=False)
         executed: list[str] = []
 
@@ -612,7 +627,7 @@ class TestKeywordFilter:
         assert set(executed) == {"user_login", "admin_login"}
 
     def test_keyword_filter_multiple_or_logic(self) -> None:
-        """Multiple keyword patterns use OR logic."""
+        """Given multiple keyword patterns, when applied, then OR logic is used."""
         session = ProTestSession(default_reporter=False)
         executed: list[str] = []
 
@@ -633,26 +648,12 @@ class TestKeywordFilter:
         assert result.success is True
         assert set(executed) == {"login", "auth"}
 
-    def test_keyword_filter_no_match(self) -> None:
-        """Keyword filter with no matches runs zero tests."""
-        session = ProTestSession(default_reporter=False)
-        executed: list[str] = []
-
-        @session.test()
-        def test_login() -> None:
-            executed.append("login")
-
-        result = run_session(session, keyword_patterns=["nonexistent"])
-
-        assert result.success is True
-        assert executed == []
-
 
 class TestSuiteFilterWithTags:
     """Tests for suite filter combined with tag filtering."""
 
     def test_suite_and_include_tag(self) -> None:
-        """Suite filter + tag filter intersect."""
+        """Given suite tests with different tags, when suite + tag filter applied, then intersection runs."""
         session = ProTestSession(default_reporter=False)
         api_suite = ProTestSuite("API")
         session.add_suite(api_suite)
@@ -676,7 +677,7 @@ class TestSuiteFilterWithTags:
         assert executed == ["api_slow"]
 
     def test_suite_and_exclude_tag(self) -> None:
-        """Suite filter + exclude tag filter."""
+        """Given suite tests with different tags, when suite + exclude tag filter, then intersection runs."""
         session = ProTestSession(default_reporter=False)
         api_suite = ProTestSuite("API")
         session.add_suite(api_suite)
@@ -700,7 +701,7 @@ class TestKeywordFilterWithTags:
     """Tests for keyword filter combined with tag filtering."""
 
     def test_keyword_and_tag(self) -> None:
-        """Keyword filter + tag filter intersect."""
+        """Given tests with different names and tags, when keyword + tag filter, then intersection runs."""
         session = ProTestSession(default_reporter=False)
         executed: list[str] = []
 
@@ -726,7 +727,7 @@ class TestSuiteAndKeywordCombined:
     """Tests for suite + keyword filters together."""
 
     def test_suite_and_keyword(self) -> None:
-        """Suite filter + keyword filter intersect."""
+        """Given suite tests with different names, when suite + keyword filter, then intersection runs."""
         session = ProTestSession(default_reporter=False)
         api_suite = ProTestSuite("API")
         session.add_suite(api_suite)
@@ -754,7 +755,7 @@ class TestAllFiltersCombined:
     """Tests combining suite, keyword, tag, and --lf filters."""
 
     def test_suite_keyword_tag_combined(self) -> None:
-        """Suite + keyword + tag filters all intersect."""
+        """Given tests in suite with different names and tags, when all filters applied, then intersection runs."""
         session = ProTestSession(default_reporter=False)
         api_suite = ProTestSuite("API")
         session.add_suite(api_suite)
@@ -786,49 +787,64 @@ class TestAllFiltersCombined:
         assert result.success is True
         assert executed == ["api_login_slow"]
 
-    def test_suite_keyword_tag_lf_combined(self, cache_dir: Path) -> None:
-        """Suite + keyword + tag + --lf filters all intersect."""
-        session1 = create_session(cache_dir)
+    def test_suite_keyword_tag_lf_combined(
+        self, session_factory: SessionFactory
+    ) -> None:
+        """Given all filters + --lf, when applied, then full intersection runs."""
+        session1 = session_factory.create_session()
         api_suite1 = ProTestSuite("API")
         session1.add_suite(api_suite1)
-
-        @api_suite1.test(tags=["slow"])
-        def test_api_login_slow_fail() -> None:
-            raise AssertionError("fails")
-
-        @api_suite1.test(tags=["slow"])
-        def test_api_login_slow_pass() -> None:
-            pass
-
-        @api_suite1.test(tags=["fast"])
-        def test_api_login_fast_fail() -> None:
-            raise AssertionError("fails")
-
+        session_factory.register_test(
+            session1,
+            "test_api_login_slow_fail",
+            tags={"slow"},
+            should_fail=True,
+            suite=api_suite1,
+        )
+        session_factory.register_test(
+            session1,
+            "test_api_login_slow_pass",
+            tags={"slow"},
+            should_fail=False,
+            suite=api_suite1,
+        )
+        session_factory.register_test(
+            session1,
+            "test_api_login_fast_fail",
+            tags={"fast"},
+            should_fail=True,
+            suite=api_suite1,
+        )
         run_session(session1)
 
-        session2 = create_session(cache_dir)
+        executed: list[str] = []
+        session2 = session_factory.create_session()
         api_suite2 = ProTestSuite("API")
         session2.add_suite(api_suite2)
-        executed: list[str] = []
-
-        @api_suite2.test(tags=["slow"])
-        def test_api_login_slow_fail_v2() -> None:
-            executed.append("api_login_slow_fail")
-
-        test_api_login_slow_fail_v2.__name__ = "test_api_login_slow_fail"
-
-        @api_suite2.test(tags=["slow"])
-        def test_api_login_slow_pass_v2() -> None:
-            executed.append("api_login_slow_pass")
-
-        test_api_login_slow_pass_v2.__name__ = "test_api_login_slow_pass"
-
-        @api_suite2.test(tags=["fast"])
-        def test_api_login_fast_fail_v2() -> None:
-            executed.append("api_login_fast_fail")
-
-        test_api_login_fast_fail_v2.__name__ = "test_api_login_fast_fail"
-
+        session_factory.register_test(
+            session2,
+            "test_api_login_slow_fail",
+            tags={"slow"},
+            should_fail=False,
+            executed_list=executed,
+            suite=api_suite2,
+        )
+        session_factory.register_test(
+            session2,
+            "test_api_login_slow_pass",
+            tags={"slow"},
+            should_fail=False,
+            executed_list=executed,
+            suite=api_suite2,
+        )
+        session_factory.register_test(
+            session2,
+            "test_api_login_fast_fail",
+            tags={"fast"},
+            should_fail=False,
+            executed_list=executed,
+            suite=api_suite2,
+        )
         result = run_session(
             session2,
             suite_filter="API",
@@ -838,4 +854,4 @@ class TestAllFiltersCombined:
         )
 
         assert result.success is True
-        assert executed == ["api_login_slow_fail"]
+        assert executed == ["test_api_login_slow_fail"]

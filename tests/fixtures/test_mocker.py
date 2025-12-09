@@ -97,31 +97,29 @@ class TestMockerFixture:
         assert result.success is True
         assert original_env_key in os.environ
 
-    def test_stopall_lifo(self) -> None:
+    def test_multiple_patches_all_cleaned_up(self) -> None:
+        """Given multiple patches applied, when test completes, then all are restored."""
         session = ProTestSession()
-        teardown_order: list[str] = []
+        service = DummyService()
+        original_external = external_function()
+        original_service = service.get_value()
 
         @session.test()
-        def test_lifo(mock_manager: Annotated[Mocker, Use(mocker)]) -> None:
-            def tracking_stopall() -> None:
-                for patcher in reversed(mock_manager._patchers):
-                    teardown_order.append(str(patcher))
-                    patcher.stop()
-                mock_manager._patchers.clear()
-                mock_manager._mocks.clear()
+        def test_multiple_patches(mock_manager: Annotated[Mocker, Use(mocker)]) -> None:
+            mock1 = mock_manager.patch("tests.fixtures.test_mocker.external_function")
+            mock1.return_value = "mocked_external"
+            mock2 = mock_manager.patch.object(service, "get_value")
+            mock2.return_value = "mocked_service"
 
-            mock_manager.stopall = tracking_stopall
-
-            mock_manager.patch("tests.fixtures.test_mocker.external_function")
-            service = DummyService()
-            mock_manager.patch.object(service, "get_value")
+            assert external_function() == "mocked_external"
+            assert service.get_value() == "mocked_service"
 
         runner = TestRunner(session)
         result = runner.run()
 
         assert result.success is True
-        expected_teardown_count = 2
-        assert len(teardown_order) == expected_teardown_count
+        assert external_function() == original_external
+        assert service.get_value() == original_service
 
     def test_stop_single(self) -> None:
         session = ProTestSession()

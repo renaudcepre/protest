@@ -264,32 +264,52 @@ async def test_mixed_regular_and_generator_fixtures(resolver: Resolver) -> None:
     assert teardown_counts["generator_function"] == 1
 
 
-def test_is_generator_like_with_sync_generator() -> None:
-    def sync_gen() -> Generator[str, None, None]:
-        yield "value"
+class TestIsGeneratorLike:
+    @pytest.mark.parametrize(
+        "func_factory,expected",
+        [
+            pytest.param(
+                lambda: (lambda: (yield "value")),
+                True,
+                id="sync_generator_with_yield",
+            ),
+            pytest.param(
+                lambda: (lambda: "value"),
+                False,
+                id="regular_function",
+            ),
+        ],
+    )
+    def test_is_generator_like_by_code_inspection(
+        self, func_factory: callable, expected: bool
+    ) -> None:
+        """Given a function, when checked for generator-like, then result depends on yield presence."""
+        func = func_factory()
+        assert is_generator_like(func) is expected
 
-    assert is_generator_like(sync_gen) is True
+    def test_sync_generator_with_annotation(self) -> None:
+        """Given a function with Generator annotation and yield, then is_generator_like returns True."""
 
+        def sync_gen() -> Generator[str, None, None]:
+            yield "value"
 
-def test_is_generator_like_with_unannotated_generator() -> None:
-    def unannotated_gen():  # type: ignore[no-untyped-def]
-        yield "value"
+        assert is_generator_like(sync_gen) is True
 
-    assert is_generator_like(unannotated_gen) is True
+    def test_unannotated_generator(self) -> None:
+        """Given an unannotated function with yield, then is_generator_like returns True."""
 
+        def unannotated_gen():  # type: ignore[no-untyped-def]
+            yield "value"
 
-def test_is_generator_like_with_regular_function() -> None:
-    def regular_func() -> str:
-        return "value"
+        assert is_generator_like(unannotated_gen) is True
 
-    assert is_generator_like(regular_func) is False
+    def test_fake_generator_annotation_without_yield(self) -> None:
+        """Given a function with Generator annotation but no yield, then is_generator_like returns False."""
 
+        def fake_gen() -> Generator[str, None, None]:
+            return "value"  # type: ignore[return-value]
 
-def test_is_generator_like_ignores_annotation_without_yield() -> None:
-    def fake_gen() -> Generator[str, None, None]:
-        return "value"  # type: ignore[return-value]
-
-    assert is_generator_like(fake_gen) is False
+        assert is_generator_like(fake_gen) is False
 
 
 # --- Auto-registration Tests ---

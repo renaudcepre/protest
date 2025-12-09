@@ -8,7 +8,8 @@ import pytest
 from protest.cache.plugin import CachePlugin
 from protest.cache.storage import CacheStorage
 from protest.core.session import ProTestSession
-from protest.entities import SessionResult, TestItem, TestResult
+from protest.entities import SessionResult, TestResult
+from tests.factories.test_items import make_test_item_from_node_id as make_test_item
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -28,21 +29,6 @@ def temp_session(tmp_path: Path) -> ProTestSession:
 def cache_file(temp_session: ProTestSession) -> Path:
     """Return the cache file path."""
     return temp_session.cache.cache_file
-
-
-def make_test_item(node_id: str) -> TestItem:
-    """Create a TestItem with a specific node_id for testing."""
-    parts = node_id.split("::")
-    module = parts[0]
-    func_name = parts[-1]
-
-    def dummy() -> None:
-        pass
-
-    dummy.__module__ = module
-    dummy.__name__ = func_name
-
-    return TestItem(func=dummy, suite=None)
 
 
 def write_cache(cache_file: Path, data: dict[str, Any]) -> None:
