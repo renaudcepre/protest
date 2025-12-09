@@ -1,7 +1,7 @@
 import asyncio
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator, Callable, Generator
 from inspect import Parameter
-from typing import Annotated
+from typing import Annotated, Any
 
 import pytest
 
@@ -33,22 +33,34 @@ def resolver() -> Resolver:
 
 
 @pytest.mark.asyncio
-async def test_session_scope_is_cached(resolver: Resolver) -> None:
+@pytest.mark.parametrize(
+    "target_scope",
+    [
+        pytest.param(None, id="session_target"),
+        pytest.param(Resolver.FUNCTION_SCOPE, id="function_target"),
+    ],
+)
+async def test_session_dependency_is_cached(
+    resolver: Resolver, target_scope: str | None
+) -> None:
+    """Given a session dependency, when resolved twice from any scope, then only called once."""
     resolver.register(session_dependency, scope_path=None)
 
     def target(session_data: Annotated[str, Use(session_dependency)]) -> str:
         return session_data
 
-    resolver.register(target, scope_path=None)
+    resolver.register(target, scope_path=target_scope)
 
     await resolver.resolve(target)
     await resolver.resolve(target)
 
-    assert call_counts["session"] == 1
+    expected_call_count = 1
+    assert call_counts["session"] == expected_call_count
 
 
 @pytest.mark.asyncio
 async def test_function_scope_is_not_cached_across_runs(resolver: Resolver) -> None:
+    """Given a function-scoped fixture, when resolved twice, then called each time."""
     resolver.register(function_dependency, scope_path=Resolver.FUNCTION_SCOPE)
 
     def target(function_data: Annotated[str, Use(function_dependency)]) -> str:
@@ -57,27 +69,12 @@ async def test_function_scope_is_not_cached_across_runs(resolver: Resolver) -> N
     resolver.register(target, scope_path=Resolver.FUNCTION_SCOPE)
 
     await resolver.resolve(target)
-    assert call_counts["function"] == 1
+    expected_call_count_first = 1
+    assert call_counts["function"] == expected_call_count_first
 
     await resolver.resolve(target)
-    assert call_counts["function"] == 2
-
-
-@pytest.mark.asyncio
-async def test_session_dependency_is_available_in_function_scope(
-    resolver: Resolver,
-) -> None:
-    resolver.register(session_dependency, scope_path=None)
-
-    def target(session_data: Annotated[str, Use(session_dependency)]) -> str:
-        return session_data
-
-    resolver.register(target, scope_path=Resolver.FUNCTION_SCOPE)
-
-    await resolver.resolve(target)
-    await resolver.resolve(target)
-
-    assert call_counts["session"] == 1
+    expected_call_count_second = 2
+    assert call_counts["function"] == expected_call_count_second
 
 
 # --- Invalid Scope Dependency Test ---
@@ -281,7 +278,7 @@ class TestIsGeneratorLike:
         ],
     )
     def test_is_generator_like_by_code_inspection(
-        self, func_factory: callable, expected: bool
+        self, func_factory: Callable[[], Callable[..., Any]], expected: bool
     ) -> None:
         """Given a function, when checked for generator-like, then result depends on yield presence."""
         func = func_factory()

@@ -1,4 +1,4 @@
-"""Tests for combinations of --lf, -x (exitfirst), tag, suite, and keyword filters."""
+"""Component-level tests for filter plugin composition (--lf, -x, -t, -k, ::suite)."""
 
 from __future__ import annotations
 
