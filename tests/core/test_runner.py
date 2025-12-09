@@ -479,11 +479,13 @@ class TestRunnerExitFirst:
         result = runner.run()
 
         # Then: stops after first failure, not all tests executed
-        assert result.success is False
-        assert "fast_fail" in executed
+        assert result.success is False, "exitfirst should result in failed session"
+        assert "fast_fail" in executed, "failing test must have executed"
         executed_count = len(executed)
-        total_tests = 4
-        assert executed_count < total_tests
+        total_tests_count = 4
+        assert executed_count < total_tests_count, (
+            f"exitfirst should stop early: {executed}"
+        )
 
     def test_exitfirst_false_runs_all_tests(self) -> None:
         """With exitfirst=False (default), all tests run even after failure."""
