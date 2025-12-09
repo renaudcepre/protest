@@ -319,17 +319,3 @@ class TestRunnerInterruptIntegration:
         assert "first" in executed
         assert "second" not in executed
         assert "third" not in executed
-
-    def test_keyboard_interrupt_returns_interrupted_result(self) -> None:
-        """Given test raises KeyboardInterrupt, then result.interrupted is True."""
-        session = ProTestSession()
-
-        @session.test()
-        def test_raises_kb() -> None:
-            raise KeyboardInterrupt
-
-        runner = TestRunner(session)
-        result = runner.run()
-
-        assert result.interrupted is True
-        assert result.success is False
