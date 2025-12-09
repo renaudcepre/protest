@@ -1,5 +1,8 @@
 ![ProTest](assets/logo-term.svg)
 
+[![CI](https://github.com/renaudcepre/protest/actions/workflows/ci.yml/badge.svg)](https://github.com/renaudcepre/protest/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/renaudcepre/protest/graph/badge.svg)](https://codecov.io/gh/renaudcepre/protest)
+
 Modern, async-first testing framework for Python 3.10+
 
 **Explicit dependencies. Native async. Built-in parallelism.**
