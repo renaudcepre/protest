@@ -175,9 +175,9 @@ class TestXfailExecution:
             pass
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_xpass_causes_failure_exit_code(self) -> None:
         session = ProTestSession()
@@ -191,9 +191,9 @@ class TestXfailExecution:
             pass
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is False
+        assert result.success is False
 
 
 class TestXfailWithParameterizedTests:

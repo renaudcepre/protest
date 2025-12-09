@@ -113,6 +113,12 @@ class AsciiReporter(PluginBase):
         duration = _format_duration(result.duration)
         print(f"  XP {name} UNEXPECTED PASS ({duration})")
 
+    def on_session_interrupted(self, force_teardown: bool) -> None:
+        if force_teardown:
+            print("\n!! Forcing teardown... (press Ctrl+C again to kill)")
+        else:
+            print("\n!! Stopping... (press Ctrl+C again to force teardown)")
+
     def on_waiting_handlers(self, pending_count: int) -> None:
         print(f"\n.. Async handlers ({pending_count})")
 
@@ -135,7 +141,9 @@ class AsciiReporter(PluginBase):
             + result.xpassed
         )
 
-        if result.failed == 0 and result.errors == 0 and result.xpassed == 0:
+        if result.interrupted:
+            status = "!! INTERRUPTED"
+        elif result.failed == 0 and result.errors == 0 and result.xpassed == 0:
             status = "OK ALL PASSED"
         else:
             status = "XX FAILURES"

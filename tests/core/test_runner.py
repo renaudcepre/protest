@@ -26,7 +26,7 @@ class TestRunnerBasics:
         runner = TestRunner(session)
         result = runner.run()
 
-        assert result is True
+        assert result.success is True
 
     def test_runner_with_failing_test(self) -> None:
         """Runner returns False when any test fails."""
@@ -39,7 +39,7 @@ class TestRunnerBasics:
         runner = TestRunner(session)
         result = runner.run()
 
-        assert result is False
+        assert result.success is False
 
     def test_runner_with_mixed_results(self) -> None:
         """Runner returns False if any test fails."""
@@ -56,7 +56,7 @@ class TestRunnerBasics:
         runner = TestRunner(session)
         result = runner.run()
 
-        assert result is False
+        assert result.success is False
 
     def test_runner_with_no_tests(self) -> None:
         """Runner returns True when no tests to run."""
@@ -64,7 +64,7 @@ class TestRunnerBasics:
         runner = TestRunner(session)
         result = runner.run()
 
-        assert result is True
+        assert result.success is True
 
 
 class TestRunnerEvents:
@@ -479,7 +479,7 @@ class TestRunnerExitFirst:
         result = runner.run()
 
         # Then: stops after first failure, not all tests executed
-        assert result is False
+        assert result.success is False
         assert "fast_fail" in executed
         executed_count = len(executed)
         total_tests = 4
@@ -538,7 +538,7 @@ class TestRunnerExitFirst:
         runner = TestRunner(session)
         result = runner.run()
 
-        assert result is False
+        assert result.success is False
         assert "fast_error" not in executed
 
     def test_exitfirst_across_chunks(self) -> None:

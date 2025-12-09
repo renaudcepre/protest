@@ -8,8 +8,11 @@ Dependencies are declared using `Annotated[Type, Use(fixture)]`:
 
 ```python
 from typing import Annotated
-from protest import Use
+from protest import ProTestSession, Use, fixture
 
+session = ProTestSession()
+
+@fixture()
 def database():
     return Database()
 

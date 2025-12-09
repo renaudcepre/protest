@@ -41,9 +41,9 @@ class TestMockerFixture:
             mock_func.assert_called_once()
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
         expected_pass_count = 1
         assert len(collected.test_passes) == expected_pass_count
 
@@ -61,9 +61,9 @@ class TestMockerFixture:
             mock_method.assert_called_once()
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_patch_dict(self) -> None:
         session = ProTestSession()
@@ -75,9 +75,9 @@ class TestMockerFixture:
             assert os.environ.get("TEST_VAR") == "test_value"
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
         assert "TEST_VAR" not in os.environ
 
     def test_patch_dict_clear(self) -> None:
@@ -92,9 +92,9 @@ class TestMockerFixture:
             assert original_env_key not in os.environ
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
         assert original_env_key in os.environ
 
     def test_stopall_lifo(self) -> None:
@@ -117,9 +117,9 @@ class TestMockerFixture:
             mock_manager.patch.object(service, "get_value")
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
         expected_teardown_count = 2
         assert len(teardown_order) == expected_teardown_count
 
@@ -138,9 +138,9 @@ class TestMockerFixture:
             assert external_function() == "external_result"
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_resetall(self) -> None:
         session = ProTestSession()
@@ -162,9 +162,9 @@ class TestMockerFixture:
             assert mock_func.call_count == 0
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_spy_tracks_calls_classic_style(self) -> None:
         session = ProTestSession()
@@ -180,9 +180,9 @@ class TestMockerFixture:
             spy.assert_called_once_with(5)
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_spy_tracks_calls_bound_method_style(self) -> None:
         session = ProTestSession()
@@ -198,9 +198,9 @@ class TestMockerFixture:
             spy.assert_called_once_with(5)
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_spy_return(self) -> None:
         session = ProTestSession()
@@ -219,9 +219,9 @@ class TestMockerFixture:
             assert spy.spy_return == 14
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_stub(self) -> None:
         session = ProTestSession()
@@ -237,9 +237,9 @@ class TestMockerFixture:
             callback.assert_called_once_with("arg1", key="value")
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_async_stub(self) -> None:
         session = ProTestSession()
@@ -257,9 +257,9 @@ class TestMockerFixture:
             async_callback.assert_awaited_once_with("async_arg")
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_create_autospec(self) -> None:
         session = ProTestSession()
@@ -275,9 +275,9 @@ class TestMockerFixture:
             mock_service.compute.assert_called_once_with(5)
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_isolation_between_tests(self) -> None:
         session = ProTestSession()
@@ -300,9 +300,9 @@ class TestMockerFixture:
             call_counts.append(mock_func.call_count)
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
         assert call_counts == [1, 1]
 
     def test_parallel_isolation(
@@ -337,9 +337,9 @@ class TestMockerFixture:
             assert external_function() == "c"
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
         expected_pass_count = 3
         assert len(collected.test_passes) == expected_pass_count
 
@@ -361,9 +361,9 @@ class TestMockerFixture:
             raise AssertionError("Intentional failure")
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is False
+        assert result.success is False
         cleanup_verified.append(service.method() == "original")
         assert cleanup_verified[0] is True
 

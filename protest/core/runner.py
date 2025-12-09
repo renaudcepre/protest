@@ -11,6 +11,7 @@ from protest.core.session import ProTestSession
 from protest.core.tracker import SuiteTracker
 from protest.di.resolver import Resolver
 from protest.entities import (
+    RunResult,
     SessionResult,
     TestCounts,
     TestItem,
@@ -29,6 +30,7 @@ from protest.execution.capture import (
     set_session_teardown_capture,
 )
 from protest.execution.context import TestExecutionContext
+from protest.execution.interrupt import InterruptHandler
 from protest.utils import get_callable_name
 
 
@@ -44,10 +46,22 @@ class TestRunner:
         self._outcome_builder = OutcomeBuilder()
         self._started_suites: set[str] = set()
         self._suite_start_lock: asyncio.Lock | None = None
+        self._interrupt_handler = InterruptHandler()
+        self._interrupted = False
 
-    def run(self) -> bool:
-        """Run the test session synchronously. Returns True if all tests passed."""
-        return asyncio.run(self._main_loop())
+    def run(self) -> RunResult:
+        """Run the test session synchronously. Returns RunResult with success and interrupted status."""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        self._interrupt_handler.install(loop)
+        try:
+            success = loop.run_until_complete(self._main_loop())
+            return RunResult(success=success, interrupted=self._interrupted)
+        except KeyboardInterrupt:
+            return RunResult(success=False, interrupted=True)
+        finally:
+            self._interrupt_handler.uninstall()
+            loop.close()
 
     async def _main_loop(self) -> bool:
         """The main async loop for running tests."""
@@ -94,6 +108,9 @@ class TestRunner:
                 for suite_path in reversed(list(self._started_suites)):
                     await self._session.events.emit(Event.SUITE_END, suite_path)
 
+        if self._interrupt_handler.should_stop_new_tests:
+            self._interrupted = True
+
         session_duration = time.perf_counter() - session_start
         session_result = SessionResult(
             passed=total_counts.passed,
@@ -103,13 +120,17 @@ class TestRunner:
             xfailed=total_counts.xfailed,
             xpassed=total_counts.xpassed,
             duration=session_duration,
+            interrupted=self._interrupted,
         )
         await self._session.events.emit(Event.SESSION_END, session_result)
-        if self._session.events.pending_count > 0:
-            await self._session.events.emit(
-                Event.WAITING_HANDLERS, self._session.events.pending_count
-            )
-        await self._session.events.wait_pending()
+
+        if not self._interrupt_handler.should_skip_wait_pending:
+            if self._session.events.pending_count > 0:
+                await self._session.events.emit(
+                    Event.WAITING_HANDLERS, self._session.events.pending_count
+                )
+            await self._session.events.wait_pending()
+
         await self._session.events.emit(Event.SESSION_COMPLETE, session_result)
         return (
             total_counts.failed == 0
@@ -167,8 +188,12 @@ class TestRunner:
             return TestCounts()
 
         stop_flag = asyncio.Event() if self._session.exitfirst else None
+        handler = self._interrupt_handler
 
         async def run_one(item: TestItem) -> TestOutcome | None:
+            if handler.soft_stop_event.is_set():
+                return None
+
             suite_path = item.suite.full_path if item.suite else None
             suite_sem = suite_semaphores.get(suite_path)
 
@@ -181,11 +206,15 @@ class TestRunner:
             await self._session.events.emit(Event.TEST_START, start_info)
 
             async with global_semaphore:
+                if handler.soft_stop_event.is_set():
+                    return None
                 if stop_flag and stop_flag.is_set():
                     return None
 
                 if suite_sem:
                     async with suite_sem:
+                        if handler.soft_stop_event.is_set():
+                            return None
                         if stop_flag and stop_flag.is_set():
                             return None
                         outcome = await self._execute_test(item, start_info)
@@ -209,11 +238,48 @@ class TestRunner:
         if self._session.exitfirst and stop_flag:
             return await self._run_with_exitfirst(tasks, stop_flag)
 
-        outcomes = await asyncio.gather(*tasks)
+        return await self._gather_with_interrupt(tasks)
+
+    async def _gather_with_interrupt(
+        self, tasks: list[asyncio.Task[TestOutcome | None]]
+    ) -> TestCounts:
+        """Gather tasks with support for interrupt-based cancellation."""
+        handler = self._interrupt_handler
+
+        async def wait_for_force_teardown() -> bool:
+            await handler.force_teardown_event.wait()
+            return True
+
+        async def gather_all() -> list[TestOutcome | BaseException | None]:
+            return await asyncio.gather(*tasks, return_exceptions=True)
+
+        force_wait_task = asyncio.create_task(wait_for_force_teardown())
+        gather_task = asyncio.create_task(gather_all())
+
+        done, _ = await asyncio.wait(
+            {force_wait_task, gather_task}, return_when=asyncio.FIRST_COMPLETED
+        )
+
+        if force_wait_task in done:
+            await self._session.events.emit(Event.SESSION_INTERRUPTED, True)
+            gather_task.cancel()
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+        else:
+            force_wait_task.cancel()
+            if handler.soft_stop_event.is_set():
+                await self._session.events.emit(Event.SESSION_INTERRUPTED, False)
+
         total = TestCounts()
-        for outcome in outcomes:
-            if outcome:
-                total = total + outcome.counts
+        for task in tasks:
+            if task.cancelled():
+                continue
+            with contextlib.suppress(Exception):
+                outcome = task.result()
+                if outcome:
+                    total = total + outcome.counts
         return total
 
     async def _execute_test(

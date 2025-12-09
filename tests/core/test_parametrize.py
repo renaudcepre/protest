@@ -220,9 +220,9 @@ class TestParameterizedExecution:
             collected_values.append(num)
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success
+        assert result.success
         assert sorted(collected_values) == [10, 20, 30]
 
     def test_cartesian_product_execution(self) -> None:
@@ -240,9 +240,9 @@ class TestParameterizedExecution:
             collected_pairs.append((user, role))
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success
+        assert result.success
         expected_pair_count = 4
         assert len(collected_pairs) == expected_pair_count
         assert ("alice", "admin") in collected_pairs
@@ -268,9 +268,9 @@ class TestParameterizedExecution:
             results.append(num * mult)
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success
+        assert result.success
         assert sorted(results) == [10, 20, 30]
 
     def test_foreach_failure_reported_correctly(self) -> None:
@@ -283,6 +283,6 @@ class TestParameterizedExecution:
             assert num != 2, f"Failed on {num}"
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert not success
+        assert not result.success

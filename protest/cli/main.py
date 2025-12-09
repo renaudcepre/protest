@@ -281,7 +281,7 @@ def run_tests(  # noqa: PLR0913
             print(f"  {item.node_id}")
         sys.exit(0)
 
-    success = run_session(
+    result = run_session(
         session,
         concurrency=concurrency,
         exitfirst=exitfirst,
@@ -295,7 +295,10 @@ def run_tests(  # noqa: PLR0913
         log_file=log_file,
         force_no_color=force_no_color,
     )
-    sys.exit(0 if success else 1)
+    exit_code_interrupted = 130
+    if result.interrupted:
+        sys.exit(exit_code_interrupted)
+    sys.exit(0 if result.success else 1)
 
 
 if __name__ == "__main__":

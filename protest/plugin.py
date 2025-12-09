@@ -102,3 +102,6 @@ class PluginBase:
 
     def on_fixture_teardown(self, info: FixtureInfo) -> None | Awaitable[None]:
         """Called when a fixture is torn down."""
+
+    def on_session_interrupted(self, force_teardown: bool) -> None | Awaitable[None]:
+        """Called when Ctrl+C is pressed. force_teardown=True on 2nd Ctrl+C."""

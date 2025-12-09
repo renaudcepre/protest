@@ -29,9 +29,9 @@ class TestFactoryErrorDistinction:
             await user_factory(username="alice")
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is False
+        assert result.success is False
         expected_fail_count = 1
         assert len(collected.test_fails) == expected_fail_count
         assert collected.test_fails[0].is_fixture_error is True
@@ -53,9 +53,9 @@ class TestFactoryErrorDistinction:
             raise AssertionError("Expected failure")
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is False
+        assert result.success is False
         expected_session_result_count = 1
         assert len(collected.session_results) == expected_session_result_count
         assert collected.session_results[0].passed == 0
@@ -79,9 +79,9 @@ class TestFactoryErrorDistinction:
             pass
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is False
+        assert result.success is False
         expected_fail_count = 1
         assert len(collected.test_fails) == expected_fail_count
         assert collected.test_fails[0].is_fixture_error is True
@@ -118,15 +118,15 @@ class TestFactoryErrorDistinction:
             await user_factory(username="alice", fail=True)
 
         runner = TestRunner(session)
-        success = runner.run()
+        run_result = runner.run()
 
-        assert success is False
+        assert run_result.success is False
         expected_session_result_count = 1
         assert len(collected.session_results) == expected_session_result_count
-        result = collected.session_results[0]
-        assert result.passed == 1
-        assert result.failed == 1
-        assert result.errors == 1
+        session_result = collected.session_results[0]
+        assert session_result.passed == 1
+        assert session_result.failed == 1
+        assert session_result.errors == 1
 
 
 class TestFactoryErrorPreservesOriginal:
@@ -179,9 +179,9 @@ class TestAsyncFactoryErrors:
             await user_factory(username="alice")
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is False
+        assert result.success is False
         expected_fail_count = 1
         assert len(collected.test_fails) == expected_fail_count
         assert collected.test_fails[0].is_fixture_error is True
@@ -253,9 +253,9 @@ class TestFactoryCaching:
             assert call_count == expected_call_count
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_factory_no_cache_when_disabled(
         self, event_collector: tuple[PluginBase, CollectedEvents]
@@ -284,6 +284,6 @@ class TestFactoryCaching:
             assert call_count == expected_call_count
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True

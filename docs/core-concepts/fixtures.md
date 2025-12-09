@@ -43,13 +43,14 @@ Use case: Resources shared within a group of related tests.
 
 ### Function Scope
 
-Plain functions or `@fixture()` decorator. Fresh instance for each test.
+Use `@fixture()` decorator. Fresh instance for each test.
 
 ```python
+@fixture()
 def request_id():
     return str(uuid.uuid4())
 
-# Or with tags:
+# With tags:
 @fixture(tags=["slow"])
 def temp_file():
     path = Path("/tmp/test.txt")
@@ -59,6 +60,8 @@ def temp_file():
 ```
 
 Use case: Isolated state per test, unique IDs, temporary files.
+
+**Note:** All fixtures must be decorated. Plain functions without `@fixture()` raise `PlainFunctionError` when used with `Use()`.
 
 ## Teardown with yield
 

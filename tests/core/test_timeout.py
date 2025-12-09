@@ -33,9 +33,9 @@ class TestTimeoutBasic:
             await asyncio.sleep(1.0)
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert not success
+        assert not result.success
         assert len(results) == 1
         assert isinstance(results[0].error, TimeoutError)
         assert results[0].timeout == 0.1
@@ -50,9 +50,9 @@ class TestTimeoutBasic:
             await asyncio.sleep(0.01)
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success
+        assert result.success
         assert len(results) == 1
         assert results[0].timeout == 1.0
 
@@ -66,9 +66,9 @@ class TestTimeoutBasic:
             time.sleep(1.0)
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert not success
+        assert not result.success
         assert len(results) == 1
         assert isinstance(results[0].error, TimeoutError)
 
@@ -82,9 +82,9 @@ class TestTimeoutBasic:
             await asyncio.sleep(0.2)
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success
+        assert result.success
         assert len(results) == 1
         assert results[0].timeout is None
 
@@ -106,9 +106,9 @@ class TestTimeoutWithXfail:
             await asyncio.sleep(1.0)
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success
+        assert result.success
         assert len(results) == 1
         assert results[0].xfail_reason == "Known slow"
 
@@ -122,9 +122,9 @@ class TestTimeoutWithXfail:
             await asyncio.sleep(0.01)
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert not success
+        assert not result.success
         assert len(results) == 1
 
 
@@ -145,9 +145,9 @@ class TestTimeoutWithSkip:
             await asyncio.sleep(100)
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success
+        assert result.success
         assert len(results) == 1
         assert results[0].skip_reason == "Not ready"
 
@@ -196,9 +196,9 @@ class TestTimeoutWithSuite:
             await asyncio.sleep(1.0)
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert not success
+        assert not result.success
         assert len(results) == 1
         assert isinstance(results[0].error, TimeoutError)
 

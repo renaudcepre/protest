@@ -71,9 +71,9 @@ class TestLastFailedWithTags:
 
         test_slow_pass_2.__name__ = "test_slow_pass"
 
-        success = run_session(session2, last_failed=True, include_tags={"slow"})
+        result = run_session(session2, last_failed=True, include_tags={"slow"})
 
-        assert success is True
+        assert result.success is True
         assert second_run_executed == ["slow"]
 
     def test_lf_and_exclude_tag_intersection(self, cache_dir: Path) -> None:
@@ -105,9 +105,9 @@ class TestLastFailedWithTags:
 
         test_fast_fail_2.__name__ = "test_fast_fail"
 
-        success = run_session(session2, last_failed=True, exclude_tags={"slow"})
+        result = run_session(session2, last_failed=True, exclude_tags={"slow"})
 
-        assert success is True
+        assert result.success is True
         assert second_run_executed == ["fast"]
 
     def test_lf_exclude_tag_results_in_zero_tests(self, cache_dir: Path) -> None:
@@ -149,9 +149,9 @@ class TestLastFailedWithTags:
 
         test_fast_pass_v2.__name__ = "test_fast_pass"
 
-        success = run_session(session2, last_failed=True, exclude_tags={"slow"})
+        result = run_session(session2, last_failed=True, exclude_tags={"slow"})
 
-        assert success is True
+        assert result.success is True
         assert second_run_executed == []
 
     def test_lf_with_tag_no_matching_failures(self, cache_dir: Path) -> None:
@@ -183,9 +183,9 @@ class TestLastFailedWithTags:
 
         test_fast_fail_v2.__name__ = "test_fast_fail"
 
-        success = run_session(session2, last_failed=True, include_tags={"slow"})
+        result = run_session(session2, last_failed=True, include_tags={"slow"})
 
-        assert success is True
+        assert result.success is True
         assert second_run_executed == []
 
 
@@ -233,9 +233,9 @@ class TestLastFailedWithExitFirst:
 
         test_pass_v2.__name__ = "test_pass"
 
-        success = run_session(session2, last_failed=True, exitfirst=True)
+        result = run_session(session2, last_failed=True, exitfirst=True)
 
-        assert success is False
+        assert result.success is False
         assert "fail_1" in second_run_executed
         expected_max_executed = 1
         assert len(second_run_executed) == expected_max_executed
@@ -258,8 +258,8 @@ class TestLastFailedWithExitFirst:
         def test_c() -> None:
             first_run_executed.append("c")
 
-        success_first = run_session(session1, exitfirst=True)
-        assert success_first is False
+        result_first = run_session(session1, exitfirst=True)
+        assert result_first.success is False
 
         session2 = create_session(cache_dir)
         second_run_executed: list[str] = []
@@ -282,9 +282,9 @@ class TestLastFailedWithExitFirst:
 
         test_c_v2.__name__ = "test_c"
 
-        success_second = run_session(session2, last_failed=True)
+        result_second = run_session(session2, last_failed=True)
 
-        assert success_second is True
+        assert result_second.success is True
         assert second_run_executed == ["b"]
 
     def test_exitfirst_partial_cache_then_lf_fallback(self, cache_dir: Path) -> None:
@@ -310,9 +310,9 @@ class TestLastFailedWithExitFirst:
         def test_new() -> None:
             second_run_executed.append("new")
 
-        success = run_session(session2, last_failed=True)
+        result = run_session(session2, last_failed=True)
 
-        assert success is True
+        assert result.success is True
         assert "only_one" in second_run_executed
         expected_test_count = 1
         assert len(second_run_executed) == expected_test_count
@@ -340,9 +340,9 @@ class TestTagsWithExitFirst:
             executed.append("integration")
             raise AssertionError("should not run")
 
-        success = run_session(session, include_tags={"unit"}, exitfirst=True)
+        result = run_session(session, include_tags={"unit"}, exitfirst=True)
 
-        assert success is False
+        assert result.success is False
         assert "unit_1" in executed
         assert "integration" not in executed
 
@@ -365,9 +365,9 @@ class TestTagsWithExitFirst:
         def test_fast_pass() -> None:
             executed.append("fast_pass")
 
-        success = run_session(session, exclude_tags={"slow"}, exitfirst=True)
+        result = run_session(session, exclude_tags={"slow"}, exitfirst=True)
 
-        assert success is False
+        assert result.success is False
         assert "slow" not in executed
         assert "fast_fail" in executed
 
@@ -417,11 +417,11 @@ class TestAllThreeCombined:
 
         test_fast_fail_v2.__name__ = "test_fast_fail"
 
-        success = run_session(
+        result = run_session(
             session2, last_failed=True, include_tags={"slow"}, exitfirst=True
         )
 
-        assert success is False
+        assert result.success is False
         assert "slow_1" in second_run_executed
         assert "fast" not in second_run_executed
         expected_max_executed = 1
@@ -469,11 +469,11 @@ class TestAllThreeCombined:
 
         test_fast_fail_2_v2.__name__ = "test_fast_fail_2"
 
-        success = run_session(
+        result = run_session(
             session2, last_failed=True, exclude_tags={"slow"}, exitfirst=True
         )
 
-        assert success is False
+        assert result.success is False
         assert "slow" not in second_run_executed
         assert "fast_1" in second_run_executed
         expected_max_executed = 1
@@ -498,9 +498,9 @@ class TestSuiteFilter:
         def test_api() -> None:
             executed.append("api")
 
-        success = run_session(session, suite_filter="API")
+        result = run_session(session, suite_filter="API")
 
-        assert success is True
+        assert result.success is True
         assert executed == ["api"]
 
     def test_suite_filter_with_nested_suites(self) -> None:
@@ -520,9 +520,9 @@ class TestSuiteFilter:
         def test_users() -> None:
             executed.append("users")
 
-        success = run_session(session, suite_filter="API")
+        result = run_session(session, suite_filter="API")
 
-        assert success is True
+        assert result.success is True
         assert set(executed) == {"api", "users"}
 
     def test_suite_filter_specific_child(self) -> None:
@@ -542,9 +542,9 @@ class TestSuiteFilter:
         def test_users() -> None:
             executed.append("users")
 
-        success = run_session(session, suite_filter="API::Users")
+        result = run_session(session, suite_filter="API::Users")
 
-        assert success is True
+        assert result.success is True
         assert executed == ["users"]
 
     def test_suite_filter_nonexistent(self) -> None:
@@ -558,9 +558,9 @@ class TestSuiteFilter:
         def test_api() -> None:
             executed.append("api")
 
-        success = run_session(session, suite_filter="NonExistent")
+        result = run_session(session, suite_filter="NonExistent")
 
-        assert success is True
+        assert result.success is True
         assert executed == []
 
 
@@ -584,9 +584,9 @@ class TestKeywordFilter:
         def test_dashboard() -> None:
             executed.append("dashboard")
 
-        success = run_session(session, keyword_patterns=["login"])
+        result = run_session(session, keyword_patterns=["login"])
 
-        assert success is True
+        assert result.success is True
         assert executed == ["login"]
 
     def test_keyword_filter_substring(self) -> None:
@@ -606,9 +606,9 @@ class TestKeywordFilter:
         def test_logout() -> None:
             executed.append("logout")
 
-        success = run_session(session, keyword_patterns=["login"])
+        result = run_session(session, keyword_patterns=["login"])
 
-        assert success is True
+        assert result.success is True
         assert set(executed) == {"user_login", "admin_login"}
 
     def test_keyword_filter_multiple_or_logic(self) -> None:
@@ -628,9 +628,9 @@ class TestKeywordFilter:
         def test_dashboard() -> None:
             executed.append("dashboard")
 
-        success = run_session(session, keyword_patterns=["login", "auth"])
+        result = run_session(session, keyword_patterns=["login", "auth"])
 
-        assert success is True
+        assert result.success is True
         assert set(executed) == {"login", "auth"}
 
     def test_keyword_filter_no_match(self) -> None:
@@ -642,9 +642,9 @@ class TestKeywordFilter:
         def test_login() -> None:
             executed.append("login")
 
-        success = run_session(session, keyword_patterns=["nonexistent"])
+        result = run_session(session, keyword_patterns=["nonexistent"])
 
-        assert success is True
+        assert result.success is True
         assert executed == []
 
 
@@ -670,9 +670,9 @@ class TestSuiteFilterWithTags:
         def test_standalone_slow() -> None:
             executed.append("standalone_slow")
 
-        success = run_session(session, suite_filter="API", include_tags={"slow"})
+        result = run_session(session, suite_filter="API", include_tags={"slow"})
 
-        assert success is True
+        assert result.success is True
         assert executed == ["api_slow"]
 
     def test_suite_and_exclude_tag(self) -> None:
@@ -690,9 +690,9 @@ class TestSuiteFilterWithTags:
         def test_api_fast() -> None:
             executed.append("api_fast")
 
-        success = run_session(session, suite_filter="API", exclude_tags={"slow"})
+        result = run_session(session, suite_filter="API", exclude_tags={"slow"})
 
-        assert success is True
+        assert result.success is True
         assert executed == ["api_fast"]
 
 
@@ -716,9 +716,9 @@ class TestKeywordFilterWithTags:
         def test_login_unit() -> None:
             executed.append("login_unit")
 
-        success = run_session(session, keyword_patterns=["login"], include_tags={"api"})
+        result = run_session(session, keyword_patterns=["login"], include_tags={"api"})
 
-        assert success is True
+        assert result.success is True
         assert executed == ["login_api"]
 
 
@@ -744,9 +744,9 @@ class TestSuiteAndKeywordCombined:
         def test_standalone_login() -> None:
             executed.append("standalone_login")
 
-        success = run_session(session, suite_filter="API", keyword_patterns=["login"])
+        result = run_session(session, suite_filter="API", keyword_patterns=["login"])
 
-        assert success is True
+        assert result.success is True
         assert executed == ["api_login"]
 
 
@@ -776,14 +776,14 @@ class TestAllFiltersCombined:
         def test_standalone_login_slow() -> None:
             executed.append("standalone_login_slow")
 
-        success = run_session(
+        result = run_session(
             session,
             suite_filter="API",
             keyword_patterns=["login"],
             include_tags={"slow"},
         )
 
-        assert success is True
+        assert result.success is True
         assert executed == ["api_login_slow"]
 
     def test_suite_keyword_tag_lf_combined(self, cache_dir: Path) -> None:
@@ -829,7 +829,7 @@ class TestAllFiltersCombined:
 
         test_api_login_fast_fail_v2.__name__ = "test_api_login_fast_fail"
 
-        success = run_session(
+        result = run_session(
             session2,
             suite_filter="API",
             keyword_patterns=["login"],
@@ -837,5 +837,5 @@ class TestAllFiltersCombined:
             last_failed=True,
         )
 
-        assert success is True
+        assert result.success is True
         assert executed == ["api_login_slow_fail"]

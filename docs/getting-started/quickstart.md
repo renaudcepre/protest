@@ -8,7 +8,7 @@ Create `tests.py`:
 
 ```python
 from typing import Annotated
-from protest import ProTestSession, ProTestSuite, Use
+from protest import ProTestSession, ProTestSuite, Use, fixture
 
 # Create a session - the root of your test hierarchy
 session = ProTestSession()
@@ -19,6 +19,7 @@ session.add_suite(api_suite)
 
 
 # Define a fixture (a reusable piece of setup)
+@fixture()
 def config():
     return {"api_url": "https://api.example.com"}
 
