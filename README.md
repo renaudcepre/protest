@@ -141,12 +141,12 @@ No magic fixture names. You declare what you need:
 
 ```python
 from typing import Annotated
-from protest import ProTestSession, Use, Scope, fixture
+from protest import ProTestSession, Use, fixture
 
 session = ProTestSession()
 
 
-@fixture(scope=Scope.SESSION)
+@session.fixture()
 async def database():
     db = await Database.connect()
     yield db
@@ -159,9 +159,10 @@ async def test_create_user(db: Annotated[Database, Use(database)]):
     assert user.name == "alice"
 ```
 
-Functions without `@fixture` are treated as `FUNCTION` scope by default:
+Function-scoped fixtures use the `@fixture()` decorator:
 
 ```python
+@fixture()
 def get_test_user():
     return User(name="alice")
 
@@ -249,11 +250,11 @@ session.include_suite(api_suite)
 
 ### Fixtures
 
-Fixtures are scoped based on where they are defined:
+Fixtures are scoped based on where they are decorated:
 
 - `@session.fixture()` - Session scope (lives entire session)
 - `@suite.fixture()` - Suite scope (lives while suite runs)
-- Plain functions - Function scope (fresh per test)
+- `@fixture()` - Function scope (fresh per test)
 
 ```python
 # Session-scoped fixture with teardown
@@ -370,17 +371,29 @@ async def test_postgres_only(db_factory: Annotated[..., Use(database)]):
     db = await db_factory(engine_type="postgres")  # No loop, just postgres
 ```
 
-### Scopes
+### Scopes (Tree-Based)
 
-| Scope      | Lifecycle                             | Use Case                            |
-|------------|---------------------------------------|-------------------------------------|
-| `SESSION`  | Created once, shared across all tests | DB connections, expensive resources |
-| `SUITE`    | Created once per suite                | Suite-specific config               |
-| `FUNCTION` | Fresh instance per test               | Isolated test data                  |
+The scope of a fixture is determined by **where** it's decorated, not by an enum:
+
+```python
+@session.fixture()      # Session scope - lives entire session
+def database(): ...
+
+@api_suite.fixture()    # Suite scope - lives while suite runs
+def api_client(): ...
+
+@fixture()              # Function scope - fresh per test
+def payload(): ...
+```
+
+| Decorator               | Scope      | Lifecycle                             |
+|-------------------------|------------|---------------------------------------|
+| `@session.fixture()`    | Session    | Created once, shared across all tests |
+| `@suite.fixture()`      | Suite      | Created once per suite                |
+| `@fixture()`            | Function   | Fresh instance per test               |
 
 **Rule:** A fixture can only depend on fixtures with equal or wider scope.
-`FUNCTION` can use `SUITE`/`SESSION`. `SUITE` can use `SESSION`. `SESSION` cannot use
-`FUNCTION`.
+Function can use Suite/Session. Suite can use Session. Session cannot use Function.
 
 ### Built-in Fixtures
 
