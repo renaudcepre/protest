@@ -168,3 +168,21 @@ class EventBus:
                     event.value,
                 )
         return data
+
+    def emit_sync(self, event: Event, data: Any = None) -> None:
+        """Synchronous emergency dispatch for signal handlers.
+
+        Calls only sync handlers directly, skipping async ones.
+        Exceptions are silently caught to avoid crashing signal handlers.
+        Use only for SIGINT/interrupt handling where the event loop is blocked.
+        """
+        for registered in self._handlers[event]:
+            if asyncio.iscoroutinefunction(registered.func):
+                continue
+            try:
+                if data is not None:
+                    registered.func(data)
+                else:
+                    registered.func()
+            except Exception:  # noqa: S110
+                pass
