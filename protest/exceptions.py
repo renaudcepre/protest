@@ -60,3 +60,9 @@ class PlainFunctionError(ProTestError):
             f"Function '{func_name}' must be decorated with @fixture() or @factory(). "
             f"Plain functions are not allowed as fixtures."
         )
+
+
+class CircularDependencyError(ProTestError):
+    def __init__(self, cycle_path: list[str]):
+        cycle_str = " -> ".join(cycle_path)
+        super().__init__(f"Circular dependency detected: {cycle_str}")

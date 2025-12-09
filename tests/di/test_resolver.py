@@ -13,7 +13,7 @@ from protest.di.resolver import (
     Resolver,
     ScopeMismatchError,
 )
-from protest.exceptions import PlainFunctionError
+from protest.exceptions import CircularDependencyError, PlainFunctionError
 from tests.di.dependencies import (
     function_dependency,
     generator_function_fixture,
@@ -692,3 +692,98 @@ class TestTeardownEdgeCases:
             await resolver.resolve(suite_fixture, current_path="MySuite")
             expected_count = 2
             assert call_counts["cache_test"] == expected_count
+
+
+class TestCircularDependencyDetection:
+    @pytest.mark.asyncio
+    async def test_direct_cycle_a_depends_on_a(self, resolver: Resolver) -> None:
+        """Given A depends on itself, when resolving A, then CircularDependencyError is raised."""
+
+        def fixture_a() -> str:
+            return "a"
+
+        resolver.register(fixture_a, scope_path=None)
+        resolver._dependencies[fixture_a] = {"dep": fixture_a}
+
+        with pytest.raises(CircularDependencyError, match=r"fixture_a -> fixture_a"):
+            async with resolver:
+                await resolver.resolve(fixture_a)
+
+    @pytest.mark.asyncio
+    async def test_two_fixture_cycle_a_b_a(self, resolver: Resolver) -> None:
+        """Given A → B → A cycle, when resolving A, then CircularDependencyError shows full path."""
+
+        def fixture_a() -> str:
+            return "a"
+
+        def fixture_b() -> str:
+            return "b"
+
+        resolver.register(fixture_a, scope_path=None)
+        resolver.register(fixture_b, scope_path=None)
+        resolver._dependencies[fixture_a] = {"dep": fixture_b}
+        resolver._dependencies[fixture_b] = {"dep": fixture_a}
+
+        with pytest.raises(
+            CircularDependencyError, match=r"fixture_a -> fixture_b -> fixture_a"
+        ):
+            async with resolver:
+                await resolver.resolve(fixture_a)
+
+    @pytest.mark.asyncio
+    async def test_three_fixture_cycle_a_b_c_a(self, resolver: Resolver) -> None:
+        """Given A → B → C → A cycle, when resolving A, then CircularDependencyError shows full chain."""
+
+        def fixture_a() -> str:
+            return "a"
+
+        def fixture_b() -> str:
+            return "b"
+
+        def fixture_c() -> str:
+            return "c"
+
+        resolver.register(fixture_a, scope_path=None)
+        resolver.register(fixture_b, scope_path=None)
+        resolver.register(fixture_c, scope_path=None)
+        resolver._dependencies[fixture_a] = {"dep": fixture_b}
+        resolver._dependencies[fixture_b] = {"dep": fixture_c}
+        resolver._dependencies[fixture_c] = {"dep": fixture_a}
+
+        with pytest.raises(
+            CircularDependencyError,
+            match=r"fixture_a -> fixture_b -> fixture_c -> fixture_a",
+        ):
+            async with resolver:
+                await resolver.resolve(fixture_a)
+
+    @pytest.mark.asyncio
+    async def test_diamond_dependency_no_cycle(self, resolver: Resolver) -> None:
+        """Given a diamond (A→B, A→C, B→D, C→D), when resolving, then no cycle error."""
+
+        def fixture_d() -> str:
+            call_counts["diamond_d"] += 1
+            return "d"
+
+        def fixture_b(dep: Annotated[str, Use(fixture_d)]) -> str:
+            return f"b_{dep}"
+
+        def fixture_c(dep: Annotated[str, Use(fixture_d)]) -> str:
+            return f"c_{dep}"
+
+        def fixture_a(
+            dep_b: Annotated[str, Use(fixture_b)],
+            dep_c: Annotated[str, Use(fixture_c)],
+        ) -> str:
+            return f"a_{dep_b}_{dep_c}"
+
+        resolver.register(fixture_d, scope_path=None)
+        resolver.register(fixture_b, scope_path=None)
+        resolver.register(fixture_c, scope_path=None)
+        resolver.register(fixture_a, scope_path=None)
+
+        async with resolver:
+            result = await resolver.resolve(fixture_a)
+            assert result == "a_b_d_c_d"
+            expected_call_count = 1
+            assert call_counts["diamond_d"] == expected_call_count

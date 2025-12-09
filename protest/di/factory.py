@@ -6,6 +6,7 @@ from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 from protest.core.fixture import is_generator_like
+from protest.di.hashable import UnhashableValueError, make_hashable
 from protest.exceptions import FixtureError
 from protest.execution.async_bridge import ensure_async
 
@@ -31,17 +32,15 @@ class FixtureFactory(Generic[T]):
         self._resolved_dependencies = resolved_dependencies
         self._exit_stack = exit_stack
         self._cache_enabled = cache_enabled
-        self._instance_cache: dict[frozenset[tuple[str, Any]], T] = {}
+        self._instance_cache: dict[Any, T] = {}
         self._lock = asyncio.Lock()
 
-    def _make_cache_key(self, kwargs: dict[str, Any]) -> frozenset[tuple[str, Any]]:
+    def _make_cache_key(self, kwargs: dict[str, Any]) -> Any:
         try:
-            return frozenset(kwargs.items())
-        except TypeError as exc:
+            return make_hashable(kwargs, path=self._fixture_name)
+        except UnhashableValueError as exc:
             raise TypeError(
-                f"Factory fixture '{self._fixture_name}' received unhashable kwargs. "
-                f"All factory kwargs must be hashable for caching. "
-                f"Problematic kwargs: {kwargs}"
+                f"Factory '{self._fixture_name}' cannot cache call: {exc}"
             ) from exc
 
     async def __call__(self, **kwargs: Any) -> T:

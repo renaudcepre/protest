@@ -183,7 +183,9 @@ class TestFixtureFactoryErrors:
             assert "DB connection failed" in str(exc_info.value.original)
 
     @pytest.mark.asyncio
-    async def test_unhashable_kwargs_raises_type_error(self) -> None:
+    async def test_list_kwargs_are_supported(self) -> None:
+        """Lists are converted to tuples for hashing, so they work as kwargs."""
+
         def fixture_with_list(items: list[str]) -> str:
             return ",".join(items)
 
@@ -199,10 +201,33 @@ class TestFixtureFactoryErrors:
                 cache_enabled=True,
             )
 
-            with pytest.raises(TypeError) as exc_info:
-                await factory(items=["a", "b"])
+            result = await factory(items=["a", "b"])
+            assert result == "a,b"
 
-            assert "unhashable kwargs" in str(exc_info.value)
+    @pytest.mark.asyncio
+    async def test_truly_unhashable_kwargs_raises_type_error(self) -> None:
+        """Objects that cannot be made hashable raise TypeError."""
+
+        class UnhashableService:
+            __hash__ = None  # type: ignore[assignment]
+
+        def fixture_with_service(svc: object) -> str:
+            return str(svc)
+
+        fixture = Fixture(func=fixture_with_service, is_factory=True)
+        exit_stack = AsyncExitStack()
+
+        async with exit_stack:
+            factory: FixtureFactory[str] = FixtureFactory(
+                fixture=fixture,
+                fixture_name="test",
+                resolved_dependencies={},
+                exit_stack=exit_stack,
+                cache_enabled=True,
+            )
+
+            with pytest.raises(TypeError, match=r"cannot cache call"):
+                await factory(svc=UnhashableService())
 
 
 class TestFixtureFactoryWithDependencies:

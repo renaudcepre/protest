@@ -16,6 +16,7 @@ from protest.entities import Fixture, FixtureCallable, FixtureInfo, FixtureRegis
 from protest.events.types import Event
 from protest.exceptions import (
     AlreadyRegisteredError,
+    CircularDependencyError,
     PlainFunctionError,
     ScopeMismatchError,
 )
@@ -198,28 +199,65 @@ class Resolver:
         self,
         target_func: FixtureCallable,
         current_path: str | None = None,
+        _resolution_stack: tuple[FixtureCallable, ...] = (),
+        context_cache: dict[FixtureCallable, Any] | None = None,
+        context_exit_stack: AsyncExitStack | None = None,
     ) -> Any:
         """Resolve a fixture recursively.
 
         Args:
             target_func: The fixture function (must be decorated with @fixture/@factory).
             current_path: Current execution context path (suite path for tests).
+            _resolution_stack: Internal stack tracking fixtures being resolved (cycle detection).
+            context_cache: External cache for FUNCTION-scoped fixtures (injected by TestExecutionContext).
+            context_exit_stack: External exit stack for FUNCTION-scoped fixtures teardown.
 
         Returns:
             The resolved fixture value.
         """
         target_fixture = self._ensure_registered(target_func)
         actual_func = target_fixture.func
+
+        if actual_func in _resolution_stack:
+            cycle_path = [get_callable_name(func) for func in _resolution_stack]
+            cycle_path.append(get_callable_name(actual_func))
+            raise CircularDependencyError(cycle_path)
+
         scope_path = self._scope_paths[actual_func]
+        new_stack = (*_resolution_stack, actual_func)
 
         if scope_path is None:
-            return await self._resolve_session_scoped(target_fixture, current_path)
+            return await self._resolve_session_scoped(
+                target_fixture,
+                current_path,
+                new_stack,
+                context_cache,
+                context_exit_stack,
+            )
         if scope_path == self.FUNCTION_SCOPE:
-            return await self._resolve_function_scoped(target_fixture, current_path)
-        return await self._resolve_path_scoped(target_fixture, scope_path, current_path)
+            return await self._resolve_function_scoped(
+                target_fixture,
+                current_path,
+                new_stack,
+                context_cache,
+                context_exit_stack,
+            )
+        return await self._resolve_path_scoped(
+            target_fixture,
+            scope_path,
+            current_path,
+            new_stack,
+            context_cache,
+            context_exit_stack,
+        )
 
     async def _resolve_session_scoped(
-        self, target_fixture: Fixture, current_path: str | None
+        self,
+        target_fixture: Fixture,
+        current_path: str | None,
+        resolution_stack: tuple[FixtureCallable, ...],
+        context_cache: dict[FixtureCallable, Any] | None,
+        context_exit_stack: AsyncExitStack | None,
     ) -> Any:
         """Resolve a session-scoped fixture with global caching."""
         if target_fixture.is_cached:
@@ -229,7 +267,13 @@ class Resolver:
             if target_fixture.is_cached:
                 return target_fixture.cached_value
 
-            kwargs = await self._resolve_dependencies(target_fixture.func, current_path)
+            kwargs = await self._resolve_dependencies(
+                target_fixture.func,
+                current_path,
+                resolution_stack,
+                context_cache,
+                context_exit_stack,
+            )
             result = await self._resolve_fixture_value(
                 target_fixture, kwargs, self._exit_stack
             )
@@ -238,8 +282,14 @@ class Resolver:
             target_fixture.is_cached = True
             return result
 
-    async def _resolve_path_scoped(
-        self, target_fixture: Fixture, scope_path: str, current_path: str | None
+    async def _resolve_path_scoped(  # noqa: PLR0913
+        self,
+        target_fixture: Fixture,
+        scope_path: str,
+        current_path: str | None,
+        resolution_stack: tuple[FixtureCallable, ...],
+        context_cache: dict[FixtureCallable, Any] | None,
+        context_exit_stack: AsyncExitStack | None,
     ) -> Any:
         """Resolve a path-scoped (suite) fixture with per-path caching."""
         if scope_path not in self._path_caches:
@@ -256,7 +306,13 @@ class Resolver:
             if scope_path not in self._path_exit_stacks:
                 self._path_exit_stacks[scope_path] = AsyncExitStack()
 
-            kwargs = await self._resolve_dependencies(target_fixture.func, current_path)
+            kwargs = await self._resolve_dependencies(
+                target_fixture.func,
+                current_path,
+                resolution_stack,
+                context_cache,
+                context_exit_stack,
+            )
             result = await self._resolve_fixture_value(
                 target_fixture, kwargs, self._path_exit_stacks[scope_path]
             )
@@ -265,16 +321,41 @@ class Resolver:
             return result
 
     async def _resolve_function_scoped(
-        self, target_fixture: Fixture, current_path: str | None
+        self,
+        target_fixture: Fixture,
+        current_path: str | None,
+        resolution_stack: tuple[FixtureCallable, ...],
+        context_cache: dict[FixtureCallable, Any] | None,
+        context_exit_stack: AsyncExitStack | None,
     ) -> Any:
-        """Resolve a function-scoped fixture (no caching at this level).
+        """Resolve a function-scoped fixture using injected context resources.
 
-        Note: In practice, function-scoped fixtures are handled by TestExecutionContext
-        which maintains its own cache per test. This method is a fallback.
+        When context_cache and context_exit_stack are provided (by TestExecutionContext),
+        uses them for caching and teardown. Otherwise falls back to creating a local
+        exit stack (for direct resolve calls outside test context).
         """
-        kwargs = await self._resolve_dependencies(target_fixture.func, current_path)
-        exit_stack = AsyncExitStack()
-        return await self._resolve_fixture_value(target_fixture, kwargs, exit_stack)
+        actual_func = target_fixture.func
+
+        if context_cache is not None and actual_func in context_cache:
+            return context_cache[actual_func]
+
+        kwargs = await self._resolve_dependencies(
+            actual_func,
+            current_path,
+            resolution_stack,
+            context_cache,
+            context_exit_stack,
+        )
+
+        exit_stack = (
+            context_exit_stack if context_exit_stack is not None else AsyncExitStack()
+        )
+        result = await self._resolve_fixture_value(target_fixture, kwargs, exit_stack)
+
+        if context_cache is not None:
+            context_cache[actual_func] = result
+
+        return result
 
     async def _resolve_fixture_value(
         self,
@@ -295,12 +376,23 @@ class Resolver:
         return await self._execute_fixture(fixture, kwargs, exit_stack)
 
     async def _resolve_dependencies(
-        self, target_func: FixtureCallable, current_path: str | None
+        self,
+        target_func: FixtureCallable,
+        current_path: str | None,
+        resolution_stack: tuple[FixtureCallable, ...],
+        context_cache: dict[FixtureCallable, Any] | None,
+        context_exit_stack: AsyncExitStack | None,
     ) -> dict[str, Any]:
         """Resolve all dependencies for a fixture."""
         kwargs: dict[str, Any] = {}
         for param_name, dep_func in self._dependencies.get(target_func, {}).items():
-            kwargs[param_name] = await self.resolve(dep_func, current_path)
+            kwargs[param_name] = await self.resolve(
+                dep_func,
+                current_path,
+                resolution_stack,
+                context_cache,
+                context_exit_stack,
+            )
         return kwargs
 
     def _create_fixture_factory(
