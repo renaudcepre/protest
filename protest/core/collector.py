@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 from protest.di.markers import ForEach, From, Use
 from protest.entities import FixtureCallable, TestItem, TestRegistration
 from protest.exceptions import ParameterizedFixtureError
+from protest.utils import get_callable_name
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -31,7 +32,9 @@ def validate_no_from_params(func: Callable[..., Any]) -> None:
     """Raise ParameterizedFixtureError if fixture uses From()."""
     from_params = _extract_from_params(func)
     if from_params:
-        raise ParameterizedFixtureError(func.__name__, list(from_params.keys()))
+        raise ParameterizedFixtureError(
+            get_callable_name(func), list(from_params.keys())
+        )
 
 
 def _extract_use_fixtures(func: Callable[..., Any]) -> list[FixtureCallable]:

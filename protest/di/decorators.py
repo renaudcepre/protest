@@ -15,6 +15,9 @@ class FixtureWrapper(Generic[FuncT]):
 
     __slots__ = ("__dict__", "__wrapped__", "func", "registration")
 
+    func: FuncT
+    registration: FixtureRegistration
+
     def __init__(self, func: FuncT, registration: FixtureRegistration) -> None:
         self.func = func
         self.registration = registration

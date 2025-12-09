@@ -1,3 +1,5 @@
+"""CTRF JSON reporter - uses TypedDict instead of dataclasses for direct JSON serialization with camelCase field names imposed by the CTRF spec."""
+
 from __future__ import annotations
 
 import json
@@ -7,7 +9,9 @@ import time
 import traceback
 import uuid
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, NotRequired, TypedDict
+from typing import TYPE_CHECKING, TypedDict
+
+from typing_extensions import NotRequired
 
 from protest.plugin import PluginBase
 
