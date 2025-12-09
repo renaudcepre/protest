@@ -153,11 +153,23 @@ class GlobalCapturePatch:
         sys.stdout = TaskAwareStream(sys.stdout, self._show_output)
         sys.stderr = TaskAwareStream(sys.stderr, self._show_output)
 
+        # DEBUG: voir combien de handlers avant/après
+        existing = [
+            h for h in logging.root.handlers if isinstance(h, TaskAwareLogHandler)
+        ]
+        print(f"[DEBUG] __enter__: {len(existing)} TaskAwareLogHandler BEFORE add")  # noqa
+        print(f"[DEBUG] __enter__: all handlers = {logging.root.handlers}")  # noqa
+
         self._orig_log_level = logging.root.level
         logging.root.setLevel(logging.NOTSET)
         self._log_handler = TaskAwareLogHandler()
         self._log_handler.setLevel(logging.DEBUG)
         logging.root.addHandler(self._log_handler)
+
+        existing_after = [
+            h for h in logging.root.handlers if isinstance(h, TaskAwareLogHandler)
+        ]
+        print(f"[DEBUG] __enter__: {len(existing_after)} TaskAwareLogHandler AFTER add")  # noqa
         return self
 
     def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
