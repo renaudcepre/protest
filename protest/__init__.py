@@ -5,7 +5,7 @@ from protest.di.decorators import factory, fixture
 from protest.di.factory import FixtureFactory
 from protest.di.markers import ForEach, From, Use
 from protest.entities import FixtureCallable
-from protest.exceptions import FixtureError, ProTestError
+from protest.exceptions import CircularDependencyError, FixtureError, ProTestError
 from protest.fixtures.builtins import caplog, mocker
 from protest.fixtures.mocker import AsyncMockType, Mocker, MockType
 from protest.loader import LoadError, load_session
@@ -15,6 +15,7 @@ __version__ = "0.1.0"
 
 __all__ = [
     "AsyncMockType",
+    "CircularDependencyError",
     "FixtureCallable",
     "FixtureError",
     "FixtureFactory",
