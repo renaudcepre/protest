@@ -18,6 +18,7 @@ from tests.di.dependencies import (
     function_dependency,
     generator_function_fixture,
     generator_session_fixture,
+    generator_without_try_finally,
     session_dependency,
 )
 from tests.di.utils import call_counts, reset_call_counts, teardown_counts
@@ -239,6 +240,33 @@ async def test_generator_fixture_teardown_on_exception(resolver: Resolver) -> No
             raise ValueError("test exception")
 
     assert teardown_counts["generator_session"] == 1
+
+
+@pytest.mark.asyncio
+async def test_generator_teardown_without_try_finally_on_exception(
+    resolver: Resolver,
+) -> None:
+    """Proves that AsyncExitStack pattern guarantees teardown even without try/finally.
+
+    When an exception is raised OUTSIDE the generator (in test code), it's caught
+    at the test level, not inside the generator. Later, when the exit stack closes,
+    it sends GeneratorExit (not the original exception) to the generator, which
+    allows the code after yield to execute normally.
+
+    This is different from raising an exception INSIDE an `async with` block,
+    where the exception would be injected via athrow() and skip post-yield code.
+    """
+    resolver.register(generator_without_try_finally, scope_path=None)
+
+    async with resolver:
+        await resolver.resolve(generator_without_try_finally)
+        try:
+            raise ValueError("test exception caught outside generator")
+        except ValueError:
+            pass
+
+    expected_teardown_count = 1
+    assert teardown_counts["no_try_finally"] == expected_teardown_count
 
 
 @pytest.mark.asyncio

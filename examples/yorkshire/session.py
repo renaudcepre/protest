@@ -15,6 +15,7 @@ from protest import (
     Use,
     caplog,
     mocker,
+    raises,
 )
 from protest.di.decorators import fixture
 from protest.entities import LogCapture
@@ -462,3 +463,75 @@ async def test_chef_cooking_disaster(
     gordon = await factory(name="Gordon", job=Job.CHEF, age=48)
     assert gordon.job == Job.CHEF
     raise ValueError(f"{gordon.name} burned the kitchen down!")
+
+
+# =============================================================================
+# RAISES EXAMPLES (exception assertion)
+# =============================================================================
+
+
+@session.test()
+def test_yorkshire_refuses_bath() -> None:
+    def give_bath(dog: Yorkshire) -> None:
+        if dog.coat == Coat.LONG:
+            raise ValueError(f"{dog.name} has escaped through the bathroom window")
+
+    fluffy = Yorkshire(name="Fluffy", size=Size.MINI, job=Job.INFLUENCER, age=24, coat=Coat.LONG)
+    with raises(ValueError):
+        give_bath(fluffy)
+
+
+@session.test()
+def test_teacup_weight_limit_exceeded() -> None:
+    def feed_treats(dog: Yorkshire, treat_count: int) -> None:
+        if dog.size == Size.TEACUP and treat_count > 3:
+            raise ValueError(f"Too many treats! {dog.name} now spherical")
+
+    tiny = Yorkshire(name="Gizmo", size=Size.TEACUP, job=Job.THERAPIST, age=36)
+    with raises(ValueError, match=r"spherical"):
+        feed_treats(tiny, treat_count=47)
+
+
+@session.test()
+def test_detective_case_file_missing() -> None:
+    case_files: dict[str, str] = {"case_001": "The Missing Squeaky Toy"}
+
+    with raises(KeyError) as exc_info:
+        _ = case_files["case_404"]
+
+    assert "case_404" in str(exc_info.value)
+    assert exc_info.type is KeyError
+
+
+@session.test()
+async def test_influencer_wifi_outage() -> None:
+    async def post_selfie() -> None:
+        await asyncio.sleep(0.01)
+        raise RuntimeError("No WiFi! Cannot post today's 47th selfie")
+
+    with raises(RuntimeError, match="WiFi"):
+        await post_selfie()
+
+
+@session.test()
+def test_chef_recipe_parsing_error() -> None:
+    def parse_recipe(instructions: str) -> None:
+        raise TypeError(f"Expected kibble recipe, got '{instructions}'")
+
+    with raises(TypeError) as exc_info:
+        parse_recipe("human food")
+
+    match_result = exc_info.match(r"Expected (\w+) recipe, got '(.+)'")
+    assert match_result.group(1) == "kibble"
+    assert match_result.group(2) == "human food"
+
+
+@session.test()
+def test_bodyguard_never_flinches() -> None:
+    def startle_dog(dog: Yorkshire) -> None:
+        if dog.job != Job.BODYGUARD:
+            raise RuntimeError(f"{dog.name} jumped three feet in the air")
+
+    brutus = Yorkshire(name="Brutus", size=Size.STANDARD, job=Job.BODYGUARD, age=48)
+    with raises(RuntimeError):
+        startle_dog(brutus)
