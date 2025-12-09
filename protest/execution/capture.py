@@ -3,6 +3,7 @@ import logging
 import sys
 from collections.abc import Callable
 from contextvars import ContextVar, Token
+from dataclasses import dataclass
 from logging import LogRecord
 from typing import TextIO
 
@@ -16,11 +17,15 @@ _log_records: ContextVar[list[LogRecord] | None] = ContextVar(
 
 _current_node_id: ContextVar[str | None] = ContextVar("current_node_id", default=None)
 
-_session_setup: dict[str, io.StringIO | None | bool] = {"buffer": None, "active": False}
-_session_teardown: dict[str, io.StringIO | None | bool] = {
-    "buffer": None,
-    "active": False,
-}
+
+@dataclass(slots=True)
+class CaptureState:
+    buffer: io.StringIO | None = None
+    active: bool = False
+
+
+_session_setup = CaptureState()
+_session_teardown = CaptureState()
 
 _log_callbacks: list[Callable[[str, LogRecord], None]] = []
 _stdout_callbacks: list[Callable[[str, str], None]] = []
@@ -68,27 +73,25 @@ def reset_current_node_id(token: Token[str | None]) -> None:
 def set_session_setup_capture(enabled: bool) -> None:
     """Enable/disable session setup capture buffer."""
     if enabled:
-        _session_setup["buffer"] = io.StringIO()
-    _session_setup["active"] = enabled
+        _session_setup.buffer = io.StringIO()
+    _session_setup.active = enabled
 
 
 def get_session_setup_output() -> str:
     """Get captured session setup output."""
-    buffer = _session_setup["buffer"]
-    return buffer.getvalue() if isinstance(buffer, io.StringIO) else ""
+    return _session_setup.buffer.getvalue() if _session_setup.buffer else ""
 
 
 def set_session_teardown_capture(enabled: bool) -> None:
     """Enable/disable session teardown capture buffer."""
     if enabled:
-        _session_teardown["buffer"] = io.StringIO()
-    _session_teardown["active"] = enabled
+        _session_teardown.buffer = io.StringIO()
+    _session_teardown.active = enabled
 
 
 def get_session_teardown_output() -> str:
     """Get captured session teardown output."""
-    buffer = _session_teardown["buffer"]
-    return buffer.getvalue() if isinstance(buffer, io.StringIO) else ""
+    return _session_teardown.buffer.getvalue() if _session_teardown.buffer else ""
 
 
 class TaskAwareStream:
@@ -107,14 +110,10 @@ class TaskAwareStream:
             if self._show_output:
                 self._original.write(data)
             return len(data)
-        if _session_setup["active"]:
-            setup_buffer = _session_setup["buffer"]
-            if isinstance(setup_buffer, io.StringIO):
-                return setup_buffer.write(data)
-        if _session_teardown["active"]:
-            teardown_buffer = _session_teardown["buffer"]
-            if isinstance(teardown_buffer, io.StringIO):
-                return teardown_buffer.write(data)
+        if _session_setup.active and _session_setup.buffer:
+            return _session_setup.buffer.write(data)
+        if _session_teardown.active and _session_teardown.buffer:
+            return _session_teardown.buffer.write(data)
         return self._original.write(data)
 
     def flush(self) -> None:
