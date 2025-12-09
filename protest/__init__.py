@@ -1,4 +1,5 @@
 from protest.api import collect_tests, list_tags, run_session
+from protest.assertions import ExceptionInfo, RaisesContext, raises
 from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
 from protest.di.decorators import factory, fixture
@@ -16,6 +17,7 @@ __version__ = "0.1.0"
 __all__ = [
     "AsyncMockType",
     "CircularDependencyError",
+    "ExceptionInfo",
     "FixtureCallable",
     "FixtureError",
     "FixtureFactory",
@@ -28,6 +30,7 @@ __all__ = [
     "ProTestError",
     "ProTestSession",
     "ProTestSuite",
+    "RaisesContext",
     "Use",
     "__version__",
     "caplog",
@@ -37,5 +40,6 @@ __all__ = [
     "list_tags",
     "load_session",
     "mocker",
+    "raises",
     "run_session",
 ]
