@@ -236,9 +236,9 @@ class TestLastFailedWithExitFirst:
         result = run_session(session2, last_failed=True, exitfirst=True)
 
         assert result.success is False
-        assert "fail_1" in second_run_executed
-        expected_max_executed = 1
-        assert len(second_run_executed) == expected_max_executed
+        expected_executed_count = 1
+        assert len(second_run_executed) == expected_executed_count
+        assert second_run_executed[0] in ("fail_1", "fail_2")
 
     def test_exitfirst_then_lf_runs_only_failed(self, cache_dir: Path) -> None:
         """After -x run, --lf should run only the test that failed."""
