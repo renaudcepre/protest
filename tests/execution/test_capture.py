@@ -65,6 +65,34 @@ class TestTaskAwareStream:
         assert stream.readable() == original.readable()  # type: ignore[operator]
         assert stream.writable() == original.writable()  # type: ignore[operator]
 
+    def test_show_output_writes_to_both_buffer_and_original(self) -> None:
+        original = io.StringIO()
+        stream = TaskAwareStream(original, show_output=True)
+        buffer = io.StringIO()
+        token = _capture_buffer.set(buffer)
+
+        try:
+            stream.write("tee output")
+        finally:
+            _capture_buffer.reset(token)
+
+        assert buffer.getvalue() == "tee output"
+        assert original.getvalue() == "tee output"
+
+    def test_show_output_false_only_writes_to_buffer(self) -> None:
+        original = io.StringIO()
+        stream = TaskAwareStream(original, show_output=False)
+        buffer = io.StringIO()
+        token = _capture_buffer.set(buffer)
+
+        try:
+            stream.write("captured only")
+        finally:
+            _capture_buffer.reset(token)
+
+        assert buffer.getvalue() == "captured only"
+        assert original.getvalue() == ""
+
 
 class TestCaptureCurrentTest:
     """Tests for CaptureCurrentTest context manager."""
@@ -119,6 +147,17 @@ class TestGlobalCapturePatch:
         assert sys.stdout is original_stdout
         assert sys.stderr is original_stderr
 
+    def test_show_output_passed_to_streams(self) -> None:
+        with GlobalCapturePatch(show_output=True):
+            assert isinstance(sys.stdout, TaskAwareStream)
+            assert sys.stdout._show_output is True
+            assert sys.stderr._show_output is True
+
+    def test_show_output_default_false(self) -> None:
+        with GlobalCapturePatch():
+            assert sys.stdout._show_output is False
+            assert sys.stderr._show_output is False
+
 
 class TestCaptureIntegration:
     """Integration tests for stdout/stderr capture in test execution."""
@@ -140,6 +179,32 @@ class TestCaptureIntegration:
             sys.stdout = sys.__stdout__
 
         assert original_stdout.getvalue() == "not captured\n"
+
+    def test_show_output_captures_and_displays(self) -> None:
+        original_stdout = io.StringIO()
+        sys.stdout = original_stdout
+
+        try:
+            with GlobalCapturePatch(show_output=True), CaptureCurrentTest() as buffer:
+                print("visible and captured")  # noqa: T201
+        finally:
+            sys.stdout = sys.__stdout__
+
+        assert buffer.getvalue() == "visible and captured\n"
+        assert original_stdout.getvalue() == "visible and captured\n"
+
+    def test_no_show_output_only_captures(self) -> None:
+        original_stdout = io.StringIO()
+        sys.stdout = original_stdout
+
+        try:
+            with GlobalCapturePatch(show_output=False), CaptureCurrentTest() as buffer:
+                print("captured only")  # noqa: T201
+        finally:
+            sys.stdout = sys.__stdout__
+
+        assert buffer.getvalue() == "captured only\n"
+        assert original_stdout.getvalue() == ""
 
     def test_print_captured_during_session_setup(self) -> None:
         with GlobalCapturePatch():

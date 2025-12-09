@@ -92,8 +92,9 @@ def get_session_teardown_output() -> str:
 
 
 class TaskAwareStream:
-    def __init__(self, original_stream: TextIO) -> None:
+    def __init__(self, original_stream: TextIO, show_output: bool = False) -> None:
         self._original = original_stream
+        self._show_output = show_output
 
     def write(self, data: str) -> int:
         buffer = _capture_buffer.get()
@@ -102,7 +103,10 @@ class TaskAwareStream:
             if node_id and _stdout_callbacks:
                 for callback in _stdout_callbacks:
                     callback(node_id, data)
-            return buffer.write(data)
+            buffer.write(data)
+            if self._show_output:
+                self._original.write(data)
+            return len(data)
         if _session_setup["active"]:
             setup_buffer = _session_setup["buffer"]
             if isinstance(setup_buffer, io.StringIO):
@@ -136,7 +140,8 @@ class TaskAwareLogHandler(logging.Handler):
 
 
 class GlobalCapturePatch:
-    def __init__(self) -> None:
+    def __init__(self, show_output: bool = False) -> None:
+        self._show_output = show_output
         self._orig_stdout: TextIO | None = None
         self._orig_stderr: TextIO | None = None
         self._log_handler: TaskAwareLogHandler | None = None
@@ -145,8 +150,8 @@ class GlobalCapturePatch:
     def __enter__(self) -> "GlobalCapturePatch":
         self._orig_stdout = sys.stdout
         self._orig_stderr = sys.stderr
-        sys.stdout = TaskAwareStream(sys.stdout)
-        sys.stderr = TaskAwareStream(sys.stderr)
+        sys.stdout = TaskAwareStream(sys.stdout, self._show_output)
+        sys.stderr = TaskAwareStream(sys.stderr, self._show_output)
 
         self._orig_log_level = logging.root.level
         logging.root.setLevel(logging.NOTSET)

@@ -67,10 +67,7 @@ class TestRunner:
         suite_semaphores = self._build_suite_semaphores(items)
 
         total_counts = TestCounts()
-        capture_ctx = (
-            GlobalCapturePatch() if self._session.capture else contextlib.nullcontext()
-        )
-        with capture_ctx:
+        with GlobalCapturePatch(show_output=not self._session.capture):
             async with self._session:
                 await self._session.events.emit(Event.SESSION_SETUP_START)
                 setup_start = time.perf_counter()
