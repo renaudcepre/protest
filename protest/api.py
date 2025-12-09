@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from protest.core.session import ProTestSession
-    from protest.entities import TestItem
+    from protest.entities import RunResult, TestItem
 
 
 def run_session(  # noqa: PLR0913
@@ -38,8 +38,8 @@ def run_session(  # noqa: PLR0913
     keyword_patterns: list[str] | None = None,
     log_file: bool = True,
     force_no_color: bool = False,
-) -> bool:
-    """Run a test session and return success status.
+) -> RunResult:
+    """Run a test session and return result with success and interrupted status.
 
     This is the main entry point for running tests programmatically.
 
@@ -58,7 +58,7 @@ def run_session(  # noqa: PLR0913
         force_no_color: Disable colors (--no-color flag).
 
     Returns:
-        True if all tests passed, False otherwise.
+        RunResult with success status and interrupted flag.
     """
     from protest.core.runner import TestRunner  # noqa: PLC0415
     from protest.reporting.factory import get_reporter  # noqa: PLC0415

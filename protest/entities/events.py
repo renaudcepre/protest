@@ -50,6 +50,13 @@ class SessionResult:
     xfailed: int = 0
     xpassed: int = 0
     duration: float = 0
+    interrupted: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class RunResult:
+    success: bool
+    interrupted: bool = False
 
 
 @dataclass(frozen=True, slots=True)

@@ -25,9 +25,9 @@ class TestCaplogFixture:
             assert logs.records[0].getMessage() == "test message"
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
         expected_pass_count = 1
         assert len(collected.test_passes) == expected_pass_count
 
@@ -48,9 +48,9 @@ class TestCaplogFixture:
             assert logs.records[3].levelname == "ERROR"
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_caplog_at_level_filtering(self) -> None:
         session = ProTestSession()
@@ -66,9 +66,9 @@ class TestCaplogFixture:
             assert warnings[0].getMessage() == "warning"
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_caplog_text_property(self) -> None:
         session = ProTestSession()
@@ -81,9 +81,9 @@ class TestCaplogFixture:
             assert "hello world" in logs.text
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_caplog_clear(self) -> None:
         session = ProTestSession()
@@ -101,9 +101,9 @@ class TestCaplogFixture:
             assert logs.records[0].getMessage() == "second"
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_caplog_isolation_between_tests(self) -> None:
         session = ProTestSession()
@@ -120,9 +120,9 @@ class TestCaplogFixture:
             captured_counts.append(len(logs.records))
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
         assert captured_counts == [1, 1]
 
     def test_caplog_with_named_logger(self) -> None:
@@ -137,9 +137,9 @@ class TestCaplogFixture:
             assert logs.records[0].name == "my.custom.logger"
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_caplog_parallel_isolation(
         self, event_collector: tuple[PluginBase, CollectedEvents]
@@ -167,9 +167,9 @@ class TestCaplogFixture:
             assert "test_c" in logs.records[0].getMessage()
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
         expected_session_result_count = 1
         assert len(collected.session_results) == expected_session_result_count
         assert collected.session_results[0].passed == 3

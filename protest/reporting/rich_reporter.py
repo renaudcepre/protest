@@ -107,6 +107,16 @@ class RichReporter(PluginBase):
         duration = _format_duration(result.duration)
         self.console.print(f"   [red]⚡[/]   {name} [red]XPASS[/] [dim]({duration})[/]")
 
+    def on_session_interrupted(self, force_teardown: bool) -> None:
+        if force_teardown:
+            self.console.print(
+                "\n[bold yellow]⚠ Forcing teardown... (press Ctrl+C again to kill)[/]"
+            )
+        else:
+            self.console.print(
+                "\n[bold yellow]⚠ Stopping... (press Ctrl+C again to force teardown)[/]"
+            )
+
     def on_waiting_handlers(self, pending_count: int) -> None:
         self.console.print(f"\n[cyan]⏳ Async handlers ({pending_count})[/]")
 
@@ -128,7 +138,9 @@ class RichReporter(PluginBase):
             + result.xfailed
             + result.xpassed
         )
-        if result.failed == 0 and result.errors == 0 and result.xpassed == 0:
+        if result.interrupted:
+            status = "[bold yellow]⚠ INTERRUPTED[/]"
+        elif result.failed == 0 and result.errors == 0 and result.xpassed == 0:
             status = "[bold green]✓ ALL PASSED[/]"
         else:
             status = "[bold red]✗ FAILURES[/]"

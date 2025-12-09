@@ -90,10 +90,11 @@ Create test data with automatic caching and cleanup. No manual teardown.
 
 ```python
 from typing import Annotated
-from protest import ProTestSession, Use
+from protest import ProTestSession, Use, fixture
 
 session = ProTestSession()
 
+@fixture()
 def database():
     return {"connected": True}
 

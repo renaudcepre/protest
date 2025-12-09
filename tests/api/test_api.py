@@ -15,8 +15,8 @@ class TestRunSession:
         def test_two() -> None:
             assert 1 + 1 == 2
 
-        success = run_session(session)
-        assert success is True
+        result = run_session(session)
+        assert result.success is True
 
     def test_run_session_with_failure(self) -> None:
         session = ProTestSession()
@@ -29,8 +29,8 @@ class TestRunSession:
         def test_failing() -> None:
             raise AssertionError("intentional failure")
 
-        success = run_session(session)
-        assert success is False
+        result = run_session(session)
+        assert result.success is False
 
     def test_run_session_with_concurrency(self) -> None:
         session = ProTestSession()
@@ -47,8 +47,8 @@ class TestRunSession:
         async def test_concurrent_2() -> None:
             assert True
 
-        success = run_session(session, concurrency=2)
-        assert success is True
+        result = run_session(session, concurrency=2)
+        assert result.success is True
 
     def test_run_session_exitfirst(self) -> None:
         session = ProTestSession()
@@ -63,8 +63,8 @@ class TestRunSession:
         def test_second() -> None:
             execution_order.append("second")
 
-        success = run_session(session, exitfirst=True)
-        assert success is False
+        result = run_session(session, exitfirst=True)
+        assert result.success is False
         assert execution_order == ["first"]
 
 
@@ -80,8 +80,8 @@ class TestRunSessionTagFiltering:
         def test_integration() -> None:
             raise AssertionError("should not run")
 
-        success = run_session(session, include_tags={"unit"})
-        assert success is True
+        result = run_session(session, include_tags={"unit"})
+        assert result.success is True
 
     def test_exclude_tags(self) -> None:
         session = ProTestSession()
@@ -94,8 +94,8 @@ class TestRunSessionTagFiltering:
         def test_slow() -> None:
             raise AssertionError("should not run")
 
-        success = run_session(session, exclude_tags={"slow"})
-        assert success is True
+        result = run_session(session, exclude_tags={"slow"})
+        assert result.success is True
 
 
 class TestCollectTests:

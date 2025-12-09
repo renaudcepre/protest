@@ -32,3 +32,4 @@ class Event(Enum):
     HANDLER_END = "handler_end"
     FIXTURE_SETUP = "fixture_setup"
     FIXTURE_TEARDOWN = "fixture_teardown"
+    SESSION_INTERRUPTED = "session_interrupted"

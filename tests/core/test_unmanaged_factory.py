@@ -60,9 +60,9 @@ class TestUnmanagedFactoryBasic:
             assert len(users) == expected_count
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
 
 class TestUnmanagedFactoryErrorHandling:
@@ -86,9 +86,9 @@ class TestUnmanagedFactoryErrorHandling:
             factory.create(name="crash")
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is False
+        assert result.success is False
         expected_fail_count = 1
         assert len(collected.test_fails) == expected_fail_count
         assert collected.test_fails[0].is_fixture_error is True
@@ -116,9 +116,9 @@ class TestUnmanagedFactoryErrorHandling:
             assert user["name"] == "bob"
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is False
+        assert result.success is False
         expected_session_count = 1
         assert len(collected.session_results) == expected_session_count
         assert collected.session_results[0].failed == 1
@@ -154,9 +154,9 @@ class TestUnmanagedFactoryWithDependencies:
             assert user["db"] == "postgres://localhost"
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
 
 class TestUnmanagedFactoryWithTeardown:

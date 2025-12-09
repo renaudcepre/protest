@@ -36,9 +36,9 @@ class TestFixtureDecorator:
             assert value == 2  # Fresh instance, counter incremented again
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
         expected_call_count = 2
         assert call_count == expected_call_count
 
@@ -59,9 +59,9 @@ class TestFixtureDecorator:
             assert conn == "connected"
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
         # Tags are propagated to resolver
         tags = session.resolver.get_fixture_tags(db_connection)
         assert "database" in tags
@@ -116,9 +116,9 @@ class TestFactoryDecorator:
             assert alice["name"] == "alice"
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_factory_with_cache(
         self, event_collector: tuple[PluginBase, CollectedEvents]
@@ -148,9 +148,9 @@ class TestFactoryDecorator:
             assert alice1 is not bob
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
         expected_call_count = 2  # alice once, bob once
         assert call_count == expected_call_count
 
@@ -180,9 +180,9 @@ class TestFactoryDecorator:
             assert alice1 is not alice2
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
         expected_call_count = 2
         assert call_count == expected_call_count
 
@@ -210,9 +210,9 @@ class TestFactoryDecorator:
             assert user["name"] == "alice"
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_factory_can_depend_on_function_scoped_fixture(
         self, event_collector: tuple[PluginBase, CollectedEvents]
@@ -242,9 +242,9 @@ class TestFactoryDecorator:
             assert alice["db"] == "postgres://localhost"
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
 
     def test_factory_with_tags(
         self, event_collector: tuple[PluginBase, CollectedEvents]
@@ -265,9 +265,9 @@ class TestFactoryDecorator:
             await user_factory(name="alice")
 
         runner = TestRunner(session)
-        success = runner.run()
+        result = runner.run()
 
-        assert success is True
+        assert result.success is True
         tags = session.resolver.get_fixture_tags(user)
         assert "slow" in tags
         assert "integration" in tags

@@ -9,6 +9,7 @@ from protest.entities.core import (
 from protest.entities.events import (
     FixtureInfo,
     HandlerInfo,
+    RunResult,
     SessionResult,
     TestCounts,
     TestResult,
@@ -23,6 +24,7 @@ __all__ = [
     "FixtureRegistration",
     "HandlerInfo",
     "LogCapture",
+    "RunResult",
     "SessionResult",
     "TestCounts",
     "TestItem",
