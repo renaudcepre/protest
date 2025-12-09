@@ -11,9 +11,18 @@ from protest.execution.capture import (
     TaskAwareLogHandler,
     TaskAwareStream,
     _capture_buffer,
+    _current_node_id,
+    _log_callbacks,
     _log_records,
+    _stdout_callbacks,
+    add_log_callback,
+    add_stdout_callback,
+    get_current_log_records,
     get_session_setup_output,
     get_session_teardown_output,
+    remove_log_callback,
+    remove_stdout_callback,
+    set_log_callback,
     set_session_setup_capture,
     set_session_teardown_capture,
 )
@@ -455,3 +464,184 @@ class TestLogCaptureIntegration:
             assert len(results[name]) == expected_message_count
             for step in range(3):
                 assert results[name][step].getMessage() == f"[{name}] step {step}"
+
+
+class TestLogCallbackSystem:
+    def test_set_log_callback_replaces_all(self) -> None:
+        original_callbacks = list(_log_callbacks)
+        try:
+
+            def callback_one(node_id: str, record: logging.LogRecord) -> None:
+                pass
+
+            def callback_two(node_id: str, record: logging.LogRecord) -> None:
+                pass
+
+            add_log_callback(callback_one)
+            assert callback_one in _log_callbacks
+
+            set_log_callback(callback_two)
+            assert callback_one not in _log_callbacks
+            assert callback_two in _log_callbacks
+            assert len(_log_callbacks) == 1
+        finally:
+            _log_callbacks.clear()
+            _log_callbacks.extend(original_callbacks)
+
+    def test_set_log_callback_none_clears(self) -> None:
+        original_callbacks = list(_log_callbacks)
+        try:
+
+            def callback(node_id: str, record: logging.LogRecord) -> None:
+                pass
+
+            add_log_callback(callback)
+            assert len(_log_callbacks) >= 1
+
+            set_log_callback(None)
+            assert len(_log_callbacks) == 0
+        finally:
+            _log_callbacks.clear()
+            _log_callbacks.extend(original_callbacks)
+
+
+class TestCallbackInvocation:
+    def test_stdout_callback_invoked_with_node_id(self) -> None:
+        original_callbacks = list(_stdout_callbacks)
+        received: list[tuple[str, str]] = []
+
+        def callback(node_id: str, data: str) -> None:
+            received.append((node_id, data))
+
+        try:
+            add_stdout_callback(callback)
+            node_id_token = _current_node_id.set("module::test_example")
+            buffer = io.StringIO()
+            capture_token = _capture_buffer.set(buffer)
+
+            original_stdout = io.StringIO()
+            stream = TaskAwareStream(original_stdout)
+            stream.write("test output")
+
+            _capture_buffer.reset(capture_token)
+            _current_node_id.reset(node_id_token)
+
+            assert len(received) == 1
+            assert received[0] == ("module::test_example", "test output")
+        finally:
+            _stdout_callbacks.clear()
+            _stdout_callbacks.extend(original_callbacks)
+
+    def test_log_callback_invoked_with_node_id(self) -> None:
+        original_callbacks = list(_log_callbacks)
+        received: list[tuple[str, logging.LogRecord]] = []
+
+        def callback(node_id: str, record: logging.LogRecord) -> None:
+            received.append((node_id, record))
+
+        try:
+            add_log_callback(callback)
+            node_id_token = _current_node_id.set("module::test_log")
+
+            handler = TaskAwareLogHandler()
+            handler.setLevel(logging.DEBUG)
+            logger = logging.getLogger("test.callback")
+            logger.addHandler(handler)
+            logger.setLevel(logging.DEBUG)
+
+            logger.info("callback test message")
+
+            _current_node_id.reset(node_id_token)
+            logger.removeHandler(handler)
+
+            assert len(received) == 1
+            assert received[0][0] == "module::test_log"
+            assert received[0][1].getMessage() == "callback test message"
+        finally:
+            _log_callbacks.clear()
+            _log_callbacks.extend(original_callbacks)
+
+    def test_stdout_callback_not_called_without_node_id(self) -> None:
+        original_callbacks = list(_stdout_callbacks)
+        received: list[tuple[str, str]] = []
+
+        def callback(node_id: str, data: str) -> None:
+            received.append((node_id, data))
+
+        try:
+            add_stdout_callback(callback)
+            buffer = io.StringIO()
+            capture_token = _capture_buffer.set(buffer)
+
+            original_stdout = io.StringIO()
+            stream = TaskAwareStream(original_stdout)
+            stream.write("test output")
+
+            _capture_buffer.reset(capture_token)
+
+            assert len(received) == 0
+        finally:
+            _stdout_callbacks.clear()
+            _stdout_callbacks.extend(original_callbacks)
+
+
+class TestGetCurrentLogRecords:
+    def test_returns_empty_list_when_not_in_context(self) -> None:
+        assert _log_records.get() is None
+        result = get_current_log_records()
+        assert result == []
+        assert isinstance(result, list)
+
+    def test_returns_records_when_in_context(self) -> None:
+        records: list[logging.LogRecord] = []
+        token = _log_records.set(records)
+        try:
+            result = get_current_log_records()
+            assert result is records
+        finally:
+            _log_records.reset(token)
+
+
+class TestCallbackAddRemove:
+    def test_add_and_remove_log_callback(self) -> None:
+        original_callbacks = list(_log_callbacks)
+        try:
+
+            def callback(node_id: str, record: logging.LogRecord) -> None:
+                pass
+
+            add_log_callback(callback)
+            assert callback in _log_callbacks
+
+            remove_log_callback(callback)
+            assert callback not in _log_callbacks
+        finally:
+            _log_callbacks.clear()
+            _log_callbacks.extend(original_callbacks)
+
+    def test_add_and_remove_stdout_callback(self) -> None:
+        original_callbacks = list(_stdout_callbacks)
+        try:
+
+            def callback(node_id: str, data: str) -> None:
+                pass
+
+            add_stdout_callback(callback)
+            assert callback in _stdout_callbacks
+
+            remove_stdout_callback(callback)
+            assert callback not in _stdout_callbacks
+        finally:
+            _stdout_callbacks.clear()
+            _stdout_callbacks.extend(original_callbacks)
+
+    def test_remove_nonexistent_callback_is_safe(self) -> None:
+        def callback(node_id: str, record: logging.LogRecord) -> None:
+            pass
+
+        remove_log_callback(callback)
+
+        def stdout_callback(node_id: str, data: str) -> None:
+            pass
+
+        remove_stdout_callback(stdout_callback)

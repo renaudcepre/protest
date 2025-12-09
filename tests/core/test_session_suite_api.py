@@ -437,3 +437,148 @@ class TestNestedSuites:
             )
 
         assert result == "child_using_session_data"
+
+
+class TestSessionTagsInConstructor:
+    def test_include_tags_at_construction(self) -> None:
+        session = ProTestSession(
+            include_tags={"slow", "integration"}, default_reporter=False
+        )
+        assert session._tag_filter_plugin is not None
+        assert session._tag_filter_plugin._include_tags == {"slow", "integration"}
+
+    def test_exclude_tags_at_construction(self) -> None:
+        session = ProTestSession(exclude_tags={"flaky"}, default_reporter=False)
+        assert session._tag_filter_plugin is not None
+        assert session._tag_filter_plugin._exclude_tags == {"flaky"}
+
+    def test_both_include_and_exclude_tags(self) -> None:
+        session = ProTestSession(
+            include_tags={"unit"}, exclude_tags={"slow"}, default_reporter=False
+        )
+        assert session._tag_filter_plugin is not None
+        assert session._tag_filter_plugin._include_tags == {"unit"}
+        assert session._tag_filter_plugin._exclude_tags == {"slow"}
+
+
+class TestSessionFilterReconfiguration:
+    def test_reconfigure_tag_filter(self) -> None:
+        session = ProTestSession(default_reporter=False)
+        session.configure_tags(include_tags={"unit"})
+        assert session._tag_filter_plugin is not None
+        assert session._tag_filter_plugin._include_tags == {"unit"}
+
+        session.configure_tags(include_tags={"integration"}, exclude_tags={"slow"})
+        assert session._tag_filter_plugin._include_tags == {"integration"}
+        assert session._tag_filter_plugin._exclude_tags == {"slow"}
+
+    def test_reconfigure_suite_filter(self) -> None:
+        session = ProTestSession(default_reporter=False)
+        session.configure_suite_filter("MySuite")
+        assert session._suite_filter_plugin is not None
+        assert session._suite_filter_plugin._suite_filter == "MySuite"
+
+        session.configure_suite_filter("OtherSuite")
+        assert session._suite_filter_plugin._suite_filter == "OtherSuite"
+
+    def test_reconfigure_keyword_filter(self) -> None:
+        session = ProTestSession(default_reporter=False)
+        session.configure_keyword_filter(["login"])
+        assert session._keyword_filter_plugin is not None
+        assert session._keyword_filter_plugin._patterns == ["login"]
+
+        session.configure_keyword_filter(["auth", "user"])
+        assert session._keyword_filter_plugin._patterns == ["auth", "user"]
+
+
+class TestSuiteFactory:
+    @pytest.mark.asyncio
+    async def test_suite_factory_basic(self) -> None:
+        session = ProTestSession(default_reporter=False)
+        suite = ProTestSuite("MySuite")
+        session.add_suite(suite)
+
+        @suite.factory()
+        def user_factory(name: str) -> Generator[str, None, None]:
+            yield f"user_{name}"
+
+        async with session:
+            factory = await session.resolver.resolve(
+                user_factory, current_path="MySuite"
+            )
+            user = await factory(name="alice")
+
+        assert user == "user_alice"
+
+    @pytest.mark.asyncio
+    async def test_suite_factory_with_cache_false(self) -> None:
+        call_count = 0
+        session = ProTestSession(default_reporter=False)
+        suite = ProTestSuite("MySuite")
+        session.add_suite(suite)
+
+        @suite.factory(cache=False)
+        def uncached_factory(tag: str) -> str:
+            nonlocal call_count
+            call_count += 1
+            return f"instance_{call_count}_{tag}"
+
+        async with session:
+            factory = await session.resolver.resolve(
+                uncached_factory, current_path="MySuite"
+            )
+            result1 = await factory(tag="a")
+            result2 = await factory(tag="b")
+
+        expected_call_count = 2
+        assert call_count == expected_call_count
+        assert result1 != result2
+
+    @pytest.mark.asyncio
+    async def test_suite_factory_with_managed_false(self) -> None:
+        session = ProTestSession(default_reporter=False)
+        suite = ProTestSuite("MySuite")
+        session.add_suite(suite)
+
+        class UserFactory:
+            def create(self, name: str) -> str:
+                return f"user_{name}"
+
+        @suite.factory(managed=False)
+        def user_factory() -> UserFactory:
+            return UserFactory()
+
+        async with session:
+            factory = await session.resolver.resolve(
+                user_factory, current_path="MySuite"
+            )
+            user = factory.create(name="bob")
+
+        assert user == "user_bob"
+
+
+class TestSuiteAddAfterAttach:
+    def test_add_suite_after_session_attach(self) -> None:
+        session = ProTestSession(default_reporter=False)
+        parent = ProTestSuite("Parent")
+        session.add_suite(parent)
+
+        child = ProTestSuite("Child")
+        parent.add_suite(child)
+
+        assert child._parent_suite is parent
+        assert child._session is session
+
+    def test_add_deeply_nested_after_attach(self) -> None:
+        session = ProTestSession(default_reporter=False)
+        parent = ProTestSuite("Parent")
+        session.add_suite(parent)
+
+        child = ProTestSuite("Child")
+        grandchild = ProTestSuite("GrandChild")
+        child.add_suite(grandchild)
+        parent.add_suite(child)
+
+        assert child._session is session
+        assert grandchild._session is session
+        assert grandchild.full_path == "Parent::Child::GrandChild"

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from io import StringIO
 from pathlib import Path
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
+
+from protest.cli.main import main
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -16,7 +19,8 @@ if TYPE_CHECKING:
 class CLIResult:
     exit_code: int
     stdout: str
-    stderr: str
+    stderr: str = ""
+    _stdout_capture: StringIO = field(default_factory=StringIO, repr=False)
 
     def assert_success(self) -> None:
         assert self.exit_code == 0, (
@@ -42,21 +46,43 @@ def fixtures_dir() -> Path:
 
 @pytest.fixture
 def run_protest(fixtures_dir: Path) -> Callable[..., CLIResult]:
-    def _run(*args: str, app_dir: Path | None = None, timeout: int = 30) -> CLIResult:
-        cmd = [sys.executable, "-m", "protest.cli.main", *args]
-        effective_app_dir = app_dir or fixtures_dir
-        result = subprocess.run(  # noqa: S603
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env={
-                **dict(__import__("os").environ),
-                "PYTHONPATH": str(effective_app_dir.parent.parent.parent),
-            },
-            cwd=str(effective_app_dir),
-            check=False,
+    def _run(*args: str, app_dir: Path | None = None) -> CLIResult:
+        effective_app_dir = str(app_dir or fixtures_dir)
+
+        original_argv = sys.argv.copy()
+        original_path = sys.path.copy()
+
+        modules_before = set(sys.modules.keys())
+
+        stdout_capture = StringIO()
+        stderr_capture = StringIO()
+
+        sys.argv = ["protest", *args]
+
+        if effective_app_dir not in sys.path:
+            sys.path.insert(0, effective_app_dir)
+
+        exit_code = 0
+        try:
+            with (
+                patch("sys.stdout", stdout_capture),
+                patch("sys.stderr", stderr_capture),
+            ):
+                main()
+        except SystemExit as exc:
+            exit_code = exc.code if isinstance(exc.code, int) else 1
+        finally:
+            sys.argv = original_argv
+            sys.path = original_path
+
+            modules_to_remove = set(sys.modules.keys()) - modules_before
+            for mod in modules_to_remove:
+                del sys.modules[mod]
+
+        return CLIResult(
+            exit_code=exit_code,
+            stdout=stdout_capture.getvalue(),
+            stderr=stderr_capture.getvalue(),
         )
-        return CLIResult(result.returncode, result.stdout, result.stderr)
 
     return _run

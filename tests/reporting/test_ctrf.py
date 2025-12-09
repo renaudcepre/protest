@@ -372,6 +372,82 @@ class TestCTRFFileOutput:
         assert report["reportFormat"] == "CTRF"
 
 
+class TestCTRFGitErrors:
+    @pytest.fixture
+    def reporter(self, tmp_path: Path) -> CTRFReporter:
+        return CTRFReporter(output_path=tmp_path / "ctrf-report.json")
+
+    def _get_report(self, tmp_path: Path) -> dict[str, Any]:
+        return json.loads((tmp_path / "ctrf-report.json").read_text())
+
+    @patch("protest.reporting.ctrf.subprocess.run")
+    def test_git_branch_returns_none_on_file_not_found(
+        self, mock_run: Any, reporter: CTRFReporter, tmp_path: Path
+    ) -> None:
+        mock_run.side_effect = FileNotFoundError("git not found")
+
+        reporter.on_session_start()
+        reporter.on_session_end(SessionResult(passed=0, failed=0))
+
+        report = self._get_report(tmp_path)
+        env = report["results"]["environment"]
+
+        assert "branchName" not in env
+
+    @patch("protest.reporting.ctrf.subprocess.run")
+    def test_git_commit_returns_none_on_file_not_found(
+        self, mock_run: Any, reporter: CTRFReporter, tmp_path: Path
+    ) -> None:
+        mock_run.side_effect = FileNotFoundError("git not found")
+
+        reporter.on_session_start()
+        reporter.on_session_end(SessionResult(passed=0, failed=0))
+
+        report = self._get_report(tmp_path)
+        env = report["results"]["environment"]
+
+        assert "commit" not in env
+
+    @patch("protest.reporting.ctrf.subprocess.run")
+    def test_git_branch_returns_none_on_called_process_error(
+        self, mock_run: Any, reporter: CTRFReporter, tmp_path: Path
+    ) -> None:
+        import subprocess  # noqa: PLC0415
+
+        mock_run.side_effect = subprocess.CalledProcessError(128, "git")
+
+        reporter.on_session_start()
+        reporter.on_session_end(SessionResult(passed=0, failed=0))
+
+        report = self._get_report(tmp_path)
+        env = report["results"]["environment"]
+
+        assert "branchName" not in env
+
+
+class TestCTRFVersionError:
+    @pytest.fixture
+    def reporter(self, tmp_path: Path) -> CTRFReporter:
+        return CTRFReporter(output_path=tmp_path / "ctrf-report.json")
+
+    def _get_report(self, tmp_path: Path) -> dict[str, Any]:
+        return json.loads((tmp_path / "ctrf-report.json").read_text())
+
+    @patch("importlib.metadata.version")
+    def test_version_returns_unknown_on_error(
+        self, mock_version: Any, reporter: CTRFReporter, tmp_path: Path
+    ) -> None:
+        mock_version.side_effect = Exception("package not found")
+
+        reporter.on_session_start()
+        reporter.on_session_end(SessionResult(passed=0, failed=0))
+
+        report = self._get_report(tmp_path)
+        tool = report["results"]["tool"]
+
+        assert tool["version"] == "unknown"
+
+
 CTRF_SCHEMA_URL = "https://raw.githubusercontent.com/ctrf-io/ctrf/main/specification/schema-0.0.0.json"
 
 
