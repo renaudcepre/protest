@@ -535,3 +535,52 @@ def test_bodyguard_never_flinches() -> None:
     brutus = Yorkshire(name="Brutus", size=Size.STANDARD, job=Job.BODYGUARD, age=48)
     with raises(RuntimeError):
         startle_dog(brutus)
+
+
+# =============================================================================
+# RETRIES EXAMPLES (stubborn yorkshires need multiple attempts)
+# =============================================================================
+
+
+recall_attempts = 0
+
+
+@session.test(retries=3)
+def test_yorkshire_recall_command() -> None:
+    """Yorkshire ignores recall command until treats are offered."""
+    global recall_attempts
+    recall_attempts += 1
+    if recall_attempts < 3:
+        raise TimeoutError("Yorkshire pretending to be deaf, investigating squirrel")
+
+
+wifi_connection_attempts = 0
+
+
+@session.test(retries=2, retry_on=ConnectionError, retry_delay=0.1)
+async def test_influencer_unstable_wifi(
+    factory: Annotated[FixtureFactory[Yorkshire], Use(yorkshire_factory)],
+) -> None:
+    """Influencer yorkshire dealing with flaky cafe WiFi."""
+    global wifi_connection_attempts
+    wifi_connection_attempts += 1
+    fifi = await factory(name="Fifi", job=Job.INFLUENCER)
+    if wifi_connection_attempts < 2:
+        raise ConnectionError(f"{fifi.name} lost WiFi mid-selfie upload!")
+    await asyncio.sleep(0.01)
+
+
+nap_attempts = 0
+
+
+@seniors_suite.test(timeout=0.15, retries=2)
+async def test_senior_wakes_up_eventually(
+    factory: Annotated[FixtureFactory[Yorkshire], Use(yorkshire_factory)],
+) -> None:
+    """Senior yorkshire takes too long to wake up, but eventually responds."""
+    global nap_attempts
+    nap_attempts += 1
+    papy = await factory(name="Papy", age=120, job=Job.THERAPIST)
+    if nap_attempts < 2:
+        await asyncio.sleep(1.0)
+    assert papy.is_senior

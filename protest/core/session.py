@@ -191,10 +191,22 @@ class ProTestSession:
         skip: bool | str = False,
         xfail: bool | str = False,
         timeout: float | None = None,
+        retries: int = 0,
+        retry_on: type[Exception] | tuple[type[Exception], ...] | None = None,
+        retry_delay: float = 0,
     ) -> Callable[[FuncT], FuncT]:
         def decorator(func: FuncT) -> FuncT:
             if timeout is not None and timeout < 0:
                 raise ValueError(f"timeout must be non-negative, got {timeout}")
+            if retries < 0:
+                raise ValueError(f"retries must be non-negative, got {retries}")
+            if retry_delay < 0:
+                raise ValueError(f"retry_delay must be non-negative, got {retry_delay}")
+            normalized_retry_on: tuple[type[Exception], ...] | None = None
+            if retry_on is not None:
+                normalized_retry_on = (
+                    retry_on if isinstance(retry_on, tuple) else (retry_on,)
+                )
             self._tests.append(
                 TestRegistration(
                     func=func,
@@ -202,6 +214,9 @@ class ProTestSession:
                     skip_reason=normalize_reason(skip, "Skipped"),
                     xfail_reason=normalize_reason(xfail, "Expected failure"),
                     timeout=timeout,
+                    retries=retries,
+                    retry_on=normalized_retry_on,
+                    retry_delay=retry_delay,
                 )
             )
             return func

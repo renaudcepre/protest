@@ -6,6 +6,7 @@ from protest.entities import (
     SessionResult,
     TestItem,
     TestResult,
+    TestRetryInfo,
 )
 from protest.plugin import PluginBase
 
@@ -81,19 +82,34 @@ class AsciiReporter(PluginBase):
         if not self._is_parallel:
             print(f"[] {name}")
 
+    def on_test_retry(self, info: TestRetryInfo) -> None:
+        delay_msg = f", retrying in {info.delay}s" if info.delay > 0 else ""
+        error_name = type(info.error).__name__
+        print(
+            f"  RY {info.name}: attempt {info.attempt}/{info.max_attempts} "
+            f"failed ({error_name}: {info.error}){delay_msg}"
+        )
+
     def on_test_pass(self, result: TestResult) -> None:
         name = _format_test_name(result, include_suite=self._is_parallel)
         duration = _format_duration(result.duration)
-        print(f"  OK {name} ({duration})")
+        retry_suffix = ""
+        if result.max_attempts > 1:
+            retry_suffix = f" [attempt {result.attempt}/{result.max_attempts}]"
+        print(f"  OK {name} ({duration}){retry_suffix}")
 
     def on_test_fail(self, result: TestResult) -> None:
         name = _format_test_name(result, include_suite=self._is_parallel)
+        retry_suffix = ""
+        if result.max_attempts > 1:
+            retry_suffix = f" [{result.max_attempts} attempts]"
+
         if result.is_fixture_error:
             print(f"  !! {name}:  {result.error}")
         elif isinstance(result.error, TimeoutError) and result.timeout is not None:
-            print(f"  TO {name}: TIMEOUT (exceeded {result.timeout}s)")
+            print(f"  TO {name}: TIMEOUT (exceeded {result.timeout}s){retry_suffix}")
         else:
-            print(f"  XX {name}: {result.error}")
+            print(f"  XX {name}: {result.error}{retry_suffix}")
 
         if result.output:
             for line in result.output.rstrip().splitlines():

@@ -24,6 +24,9 @@ class TestRegistration:
     skip_reason: str | None = None
     xfail_reason: str | None = None
     timeout: float | None = None
+    retries: int = 0
+    retry_on: tuple[type[Exception], ...] | None = None
+    retry_delay: float = 0
 
 
 @dataclass(slots=True)
@@ -63,6 +66,9 @@ class TestItem:
     skip_reason: str | None = None
     xfail_reason: str | None = None
     timeout: float | None = None
+    retries: int = 0
+    retry_on: tuple[type[Exception], ...] | None = None
+    retry_delay: float = 0
 
     @property
     def test_name(self) -> str:

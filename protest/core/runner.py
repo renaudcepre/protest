@@ -16,6 +16,7 @@ from protest.entities import (
     TestCounts,
     TestItem,
     TestOutcome,
+    TestRetryInfo,
     TestStartInfo,
 )
 from protest.events.types import Event
@@ -401,24 +402,55 @@ class TestRunner:
 
         await self._session.events.emit(Event.TEST_SETUP_DONE, start_info)
 
+        max_attempts = 1 + item.retries
+        previous_errors: list[Exception] = []
         error: Exception | None = None
         is_fixture_error = False
 
-        try:
-            if item.timeout is not None:
-                await asyncio.wait_for(
-                    ensure_async(item.func, **kwargs),
-                    timeout=item.timeout,
+        for attempt in range(1, max_attempts + 1):
+            error = None
+            is_fixture_error = False
+
+            try:
+                if item.timeout is not None:
+                    await asyncio.wait_for(
+                        ensure_async(item.func, **kwargs),
+                        timeout=item.timeout,
+                    )
+                else:
+                    await ensure_async(item.func, **kwargs)
+            except asyncio.TimeoutError:
+                error = asyncio.TimeoutError(
+                    f"Test exceeded timeout of {item.timeout}s"
                 )
-            else:
-                await ensure_async(item.func, **kwargs)
-        except asyncio.TimeoutError:
-            error = asyncio.TimeoutError(f"Test exceeded timeout of {item.timeout}s")
-        except FixtureError as exc:
-            error = exc.original
-            is_fixture_error = True
-        except Exception as exc:
-            error = exc
+            except FixtureError as exc:
+                error = exc.original
+                is_fixture_error = True
+            except Exception as exc:
+                error = exc
+
+            should_retry = (
+                error is not None
+                and not is_fixture_error
+                and attempt < max_attempts
+                and self._should_retry(error, item.retry_on)
+            )
+            if should_retry and error is not None:
+                previous_errors.append(error)
+                retry_info = TestRetryInfo(
+                    name=test_name,
+                    node_id=node_id,
+                    suite_path=item.suite_path,
+                    attempt=attempt,
+                    max_attempts=max_attempts,
+                    error=error,
+                    delay=item.retry_delay,
+                )
+                await self._session.events.emit(Event.TEST_RETRY, retry_info)
+                if item.retry_delay > 0:
+                    await asyncio.sleep(item.retry_delay)
+                continue
+            break
 
         await self._session.events.emit(Event.TEST_TEARDOWN_START, start_info)
 
@@ -433,5 +465,13 @@ class TestRunner:
                 is_fixture_error=is_fixture_error,
                 xfail_reason=item.xfail_reason if not is_fixture_error else None,
                 timeout=item.timeout,
+                attempt=attempt,
+                max_attempts=max_attempts,
+                previous_errors=tuple(previous_errors),
             )
         )
+
+    def _should_retry(
+        self, error: Exception, retry_on: tuple[type[Exception], ...] | None
+    ) -> bool:
+        return retry_on is None or isinstance(error, retry_on)
