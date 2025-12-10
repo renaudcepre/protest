@@ -3,7 +3,7 @@ import contextlib
 import io
 import time
 from inspect import signature
-from typing import Any
+from typing import Any, get_type_hints
 
 from protest.core.collector import Collector
 from protest.core.outcome import OutcomeBuilder, TestExecutionResult
@@ -354,10 +354,18 @@ class TestRunner:
         func_signature = signature(item.func)
         kwargs: dict[str, Any] = dict(item.case_kwargs)
 
+        try:
+            type_hints = get_type_hints(item.func, include_extras=True)
+        except Exception:
+            type_hints = {}
+
         for param_name, param in func_signature.parameters.items():
             if param_name in kwargs:
                 continue
-            if dependency := Resolver._extract_dependency_from_parameter(param):
+            resolved_annotation = type_hints.get(param_name, param.annotation)
+            if dependency := Resolver._extract_dependency_from_annotation(
+                resolved_annotation
+            ):
                 kwargs[param_name] = await ctx.resolve(dependency)
 
         return kwargs
