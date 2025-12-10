@@ -1,4 +1,9 @@
-"""Tests for the retries feature."""
+"""Tests for the retries feature.
+
+Note: This file intentionally does NOT use `from __future__ import annotations`
+because some tests define fixtures locally within test methods. With PEP 563,
+get_type_hints() cannot resolve local variables from enclosing scopes.
+"""
 
 import asyncio
 import time

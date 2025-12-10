@@ -4,8 +4,17 @@ import asyncio
 import inspect
 import time
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
-from inspect import Parameter, signature
-from typing import TYPE_CHECKING, Annotated, Any, Final, cast, get_args, get_origin
+from inspect import signature
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Final,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from protest.core.fixture import is_generator_like
 from protest.di.decorators import FixtureWrapper
@@ -509,9 +518,18 @@ class Resolver:
         """Analyze function signature and store dependencies."""
         actual_func, _ = self._unwrap(func)
         func_signature = signature(actual_func)
+
+        try:
+            type_hints = get_type_hints(actual_func, include_extras=True)
+        except Exception:
+            type_hints = {}
+
         dependencies: dict[str, FixtureCallable] = {}
         for param_name, param in func_signature.parameters.items():
-            if dependency := self._extract_dependency_from_parameter(param):
+            resolved_annotation = type_hints.get(param_name, param.annotation)
+            if dependency := self._extract_dependency_from_annotation(
+                resolved_annotation
+            ):
                 dep_func, _ = self._unwrap(dependency)
                 self._ensure_registered(dependency)
                 self._validate_scope(func, scope_path, dep_func)
@@ -584,12 +602,12 @@ class Resolver:
         return f"suite '{scope_path}'"
 
     @staticmethod
-    def _extract_dependency_from_parameter(
-        param: Parameter,
+    def _extract_dependency_from_annotation(
+        annotation: Any,
     ) -> FixtureCallable | None:
-        """Extract dependency from Annotated[Type, Use(fixture)] or return None."""
-        if get_origin(param.annotation) is Annotated:
-            for metadata in get_args(param.annotation)[1:]:
+        """Extract dependency from a resolved Annotated[Type, Use(fixture)] or return None."""
+        if get_origin(annotation) is Annotated:
+            for metadata in get_args(annotation)[1:]:
                 if isinstance(metadata, Use):
                     return metadata.dependency
         return None

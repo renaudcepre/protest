@@ -1,6 +1,5 @@
 import asyncio
 from collections.abc import AsyncGenerator, Callable, Generator
-from inspect import Parameter
 from typing import Annotated, Any
 
 import pytest
@@ -131,12 +130,8 @@ def test_undecorated_dependency_raises_plain_function_error(
     assert "unregistered_dependency" in str(exc_info.value)
 
 
-def test_extract_dependency_returns_none_for_regular_params() -> None:
-    regular_param = Parameter(
-        "regular_param", Parameter.POSITIONAL_OR_KEYWORD, annotation=str
-    )
-
-    result = Resolver._extract_dependency_from_parameter(regular_param)
+def test_extract_dependency_returns_none_for_regular_annotation() -> None:
+    result = Resolver._extract_dependency_from_annotation(str)
 
     assert result is None
 
