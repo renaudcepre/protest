@@ -132,6 +132,9 @@ class Collector:
                     skip_reason=reg.skip_reason,
                     xfail_reason=reg.xfail_reason,
                     timeout=reg.timeout,
+                    retries=reg.retries,
+                    retry_on=reg.retry_on,
+                    retry_delay=reg.retry_delay,
                 )
             ]
 
@@ -153,6 +156,9 @@ class Collector:
                     skip_reason=reg.skip_reason,
                     xfail_reason=reg.xfail_reason,
                     timeout=reg.timeout,
+                    retries=reg.retries,
+                    retry_on=reg.retry_on,
+                    retry_delay=reg.retry_delay,
                 )
             )
 

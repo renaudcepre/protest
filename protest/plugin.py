@@ -12,6 +12,7 @@ if TYPE_CHECKING:
         SessionResult,
         TestItem,
         TestResult,
+        TestRetryInfo,
         TestStartInfo,
     )
 
@@ -75,6 +76,9 @@ class PluginBase:
 
     def on_test_teardown_start(self, info: TestStartInfo) -> None | Awaitable[None]:
         """Called after test body, before fixture teardown."""
+
+    def on_test_retry(self, info: TestRetryInfo) -> None | Awaitable[None]:
+        """Called when a test fails and will be retried."""
 
     def on_test_pass(self, result: TestResult) -> None | Awaitable[None]:
         """Called when a test passes."""

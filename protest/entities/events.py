@@ -39,6 +39,9 @@ class TestResult:
     skip_reason: str | None = None
     xfail_reason: str | None = None
     timeout: float | None = None
+    attempt: int = 1
+    max_attempts: int = 1
+    previous_errors: tuple[Exception, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,3 +83,14 @@ class FixtureInfo:
     scope: str
     duration: float = 0
     autouse: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class TestRetryInfo:
+    name: str
+    node_id: str
+    suite_path: str | None
+    attempt: int
+    max_attempts: int
+    error: Exception
+    delay: float

@@ -32,6 +32,9 @@ class TestExecutionResult:
     skip_reason: str | None = None
     xfail_reason: str | None = None
     timeout: float | None = None
+    attempt: int = 1
+    max_attempts: int = 1
+    previous_errors: tuple[Exception, ...] = ()
 
 
 class OutcomeBuilder:
@@ -83,6 +86,9 @@ class OutcomeBuilder:
             suite_path=exec_result.suite_path,
             skip_reason=exec_result.skip_reason,
             timeout=exec_result.timeout,
+            attempt=exec_result.attempt,
+            max_attempts=exec_result.max_attempts,
+            previous_errors=exec_result.previous_errors,
         )
         return TestOutcome(result, TestCounts(skipped=1), Event.TEST_SKIP)
 
@@ -94,6 +100,9 @@ class OutcomeBuilder:
             duration=exec_result.duration,
             output=exec_result.output,
             timeout=exec_result.timeout,
+            attempt=exec_result.attempt,
+            max_attempts=exec_result.max_attempts,
+            previous_errors=exec_result.previous_errors,
         )
         return TestOutcome(result, TestCounts(passed=1), Event.TEST_PASS)
 
@@ -106,6 +115,9 @@ class OutcomeBuilder:
             output=exec_result.output,
             xfail_reason=exec_result.xfail_reason,
             timeout=exec_result.timeout,
+            attempt=exec_result.attempt,
+            max_attempts=exec_result.max_attempts,
+            previous_errors=exec_result.previous_errors,
         )
         return TestOutcome(result, TestCounts(xpassed=1), Event.TEST_XPASS)
 
@@ -119,6 +131,9 @@ class OutcomeBuilder:
             output=exec_result.output,
             is_fixture_error=True,
             timeout=exec_result.timeout,
+            attempt=exec_result.attempt,
+            max_attempts=exec_result.max_attempts,
+            previous_errors=exec_result.previous_errors,
         )
         return TestOutcome(result, TestCounts(errored=1), Event.TEST_FAIL)
 
@@ -132,6 +147,9 @@ class OutcomeBuilder:
             output=exec_result.output,
             xfail_reason=exec_result.xfail_reason,
             timeout=exec_result.timeout,
+            attempt=exec_result.attempt,
+            max_attempts=exec_result.max_attempts,
+            previous_errors=exec_result.previous_errors,
         )
         return TestOutcome(result, TestCounts(xfailed=1), Event.TEST_XFAIL)
 
@@ -144,5 +162,8 @@ class OutcomeBuilder:
             duration=exec_result.duration,
             output=exec_result.output,
             timeout=exec_result.timeout,
+            attempt=exec_result.attempt,
+            max_attempts=exec_result.max_attempts,
+            previous_errors=exec_result.previous_errors,
         )
         return TestOutcome(result, TestCounts(failed=1), Event.TEST_FAIL)

@@ -2,7 +2,13 @@ from pathlib import Path
 
 from rich.console import Console  # type: ignore[import-not-found]
 
-from protest.entities import HandlerInfo, SessionResult, TestItem, TestResult
+from protest.entities import (
+    HandlerInfo,
+    SessionResult,
+    TestItem,
+    TestResult,
+    TestRetryInfo,
+)
 from protest.plugin import PluginBase
 
 
@@ -63,15 +69,34 @@ class RichReporter(PluginBase):
             if suite_path:
                 self.console.print(f"[cyan]       ◈ {suite_path}[/]")
 
+    def on_test_retry(self, info: TestRetryInfo) -> None:
+        self._print_suite_header_if_needed(info.suite_path)
+        delay_msg = f", retrying in {info.delay}s" if info.delay > 0 else ""
+        error_name = type(info.error).__name__
+        self.console.print(
+            f"   [yellow]↻[/]   {info.name}: attempt {info.attempt}/{info.max_attempts} "
+            f"failed ({error_name}: {info.error}){delay_msg}"
+        )
+
     def on_test_pass(self, result: TestResult) -> None:
         self._print_suite_header_if_needed(result.suite_path)
         name = _format_test_name(result)
         duration = _format_duration(result.duration)
-        self.console.print(f"   [green]✓[/]   {name} [dim]({duration})[/]")
+        retry_suffix = ""
+        if result.max_attempts > 1:
+            retry_suffix = (
+                f" [dim]\\[attempt {result.attempt}/{result.max_attempts}][/]"
+            )
+        self.console.print(
+            f"   [green]✓[/]   {name} [dim]({duration})[/]{retry_suffix}"
+        )
 
     def on_test_fail(self, result: TestResult) -> None:
         self._print_suite_header_if_needed(result.suite_path)
         name = _format_test_name(result)
+        retry_suffix = ""
+        if result.max_attempts > 1:
+            retry_suffix = f" [{result.max_attempts} attempts]"
 
         if result.is_fixture_error:
             self.console.print(
@@ -79,10 +104,10 @@ class RichReporter(PluginBase):
             )
         elif isinstance(result.error, TimeoutError) and result.timeout is not None:
             self.console.print(
-                f"   [red]⏱[/]   {name}: [bold red]TIMEOUT[/] (exceeded {result.timeout}s)"
+                f"   [red]⏱[/]   {name}: [bold red]TIMEOUT[/] (exceeded {result.timeout}s){retry_suffix}"
             )
         else:
-            self.console.print(f"   [red]✗[/]   {name}: {result.error}")
+            self.console.print(f"   [red]✗[/]   {name}: {result.error}{retry_suffix}")
 
         if result.output:
             for line in result.output.rstrip().splitlines():

@@ -13,6 +13,7 @@ from protest.entities.events import (
     SessionResult,
     TestCounts,
     TestResult,
+    TestRetryInfo,
     TestStartInfo,
 )
 from protest.entities.execution import LogCapture
@@ -31,5 +32,6 @@ __all__ = [
     "TestOutcome",
     "TestRegistration",
     "TestResult",
+    "TestRetryInfo",
     "TestStartInfo",
 ]
