@@ -1,6 +1,9 @@
 import { escapeHtml, formatDuration, extractTestName } from './utils.js'
 import { highlightTraceback } from './syntax.js'
 
+// Re-export for use in testCard
+export { highlightTraceback }
+
 export const ICONS = {
   pass: '\u2713',
   fail: '\u2717',
@@ -12,29 +15,42 @@ export const ICONS = {
   chevron: `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4l4 4-4 4"/></svg>`,
 }
 
-export function testCard({ nodeId, outcome, duration, message, traceback }) {
+export function testCard({ nodeId, outcome, duration, message, traceback, stdout, logs }) {
   const testName = extractTestName(nodeId)
   const icon = ICONS[outcome] || '?'
-  const hasFailed = outcome === 'fail' || outcome === 'error'
+  const hasDetails = traceback || stdout || logs
 
-  if (hasFailed) {
-    return `
-      <div class="test test--failed" data-outcome="${outcome}" data-node-id="${escapeHtml(nodeId)}">
+  return `
+    <details class="test" data-outcome="${outcome}" data-node-id="${escapeHtml(nodeId)}">
+      <summary class="test-summary">
         <span class="test-icon" data-outcome="${outcome}">${icon}</span>
         <span class="test-name">${escapeHtml(testName)}</span>
         ${message ? `<span class="test-message">${escapeHtml(message)}</span>` : ''}
         ${duration !== undefined ? `<span class="test-duration">${formatDuration(duration)}</span>` : ''}
-        ${traceback ? tracebackDetails(traceback) : ''}
-      </div>
-    `
-  }
-
-  return `
-    <div class="test" data-outcome="${outcome}" data-node-id="${escapeHtml(nodeId)}">
-      <span class="test-icon" data-outcome="${outcome}">${icon}</span>
-      <span class="test-name">${escapeHtml(testName)}</span>
-      ${duration !== undefined ? `<span class="test-duration">${formatDuration(duration)}</span>` : ''}
-    </div>
+      </summary>
+      ${hasDetails ? `
+        <div class="test-details">
+          ${traceback ? `
+            <div class="test-section">
+              <div class="test-section-title">Traceback</div>
+              <pre class="test-section-content">${highlightTraceback(traceback)}</pre>
+            </div>
+          ` : ''}
+          ${stdout ? `
+            <div class="test-section">
+              <div class="test-section-title">Captured Stdout</div>
+              <pre class="test-section-content">${escapeHtml(stdout)}</pre>
+            </div>
+          ` : ''}
+          ${logs ? `
+            <div class="test-section">
+              <div class="test-section-title">Captured Logs</div>
+              <pre class="test-section-content">${escapeHtml(logs)}</pre>
+            </div>
+          ` : ''}
+        </div>
+      ` : '<div class="test-details test-details--empty">No captured output</div>'}
+    </details>
   `
 }
 

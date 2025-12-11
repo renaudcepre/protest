@@ -149,19 +149,11 @@ body.hide-passed .test[data-outcome="pass"] {
 
 /* Test Cards */
 .test {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: 2px var(--space-sm);
   border-left: 2px solid transparent;
   border-radius: var(--radius-sm);
   margin-bottom: 1px;
   animation: slideIn 0.1s ease;
   font-size: var(--text-xs);
-}
-
-.test:hover {
-  background: var(--bg-surface);
 }
 
 .test[data-outcome="pass"] { border-left-color: var(--color-pass); }
@@ -171,24 +163,68 @@ body.hide-passed .test[data-outcome="pass"] {
 .test[data-outcome="error"] { border-left-color: var(--color-error); }
 .test[data-outcome="running"] { border-left-color: var(--color-running); }
 
-/* Failed tests - horizontal layout with traceback below */
-.test--failed {
-  flex-wrap: wrap;
+.test-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 2px var(--space-sm);
+  cursor: pointer;
+  list-style: none;
 }
 
-.test--failed .test-message {
+.test-summary::-webkit-details-marker {
+  display: none;
+}
+
+.test-summary:hover {
+  background: var(--bg-surface);
+}
+
+.test-message {
   color: var(--text-muted);
-  margin-left: var(--space-sm);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.test--failed .traceback {
-  width: 100%;
-  margin-top: var(--space-xs);
-  margin-left: var(--space-lg);
+.test-details {
+  padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-xl);
+  background: var(--bg-surface);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
+
+.test-details--empty {
+  color: var(--text-muted);
+  font-style: italic;
+  padding: var(--space-sm) var(--space-md) var(--space-sm) var(--space-xl);
+}
+
+.test-section {
+  margin-bottom: var(--space-sm);
+}
+
+.test-section:last-child {
+  margin-bottom: 0;
+}
+
+.test-section-title {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+.test-section-content {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  background: var(--bg-elevated);
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .test-icon {

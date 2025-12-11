@@ -60,6 +60,20 @@ function initTooltip() {
     if (!cell) return
     tooltip.classList.remove('visible')
   })
+
+  dom.suitesContainer.addEventListener('click', (event) => {
+    const cell = event.target.closest('.test-cell')
+    if (!cell) return
+
+    const nodeId = cell.dataset.nodeId
+    const testEl = dom.suitesContainer.querySelector(`.test[data-node-id="${CSS.escape(nodeId)}"]`)
+    if (testEl) {
+      const suite = testEl.closest('.suite')
+      if (suite) suite.classList.add('expanded')
+      testEl.setAttribute('open', '')
+      testEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  })
 }
 
 function init() {
