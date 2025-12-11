@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import pytest
 
-from protest import ProTestSession, ProTestSuite
+from protest import ProTestSession, ProTestSuite, Retry
 from protest.core.runner import TestRunner
 from protest.di.markers import Use
 from protest.events.types import Event
@@ -36,7 +36,7 @@ class TestRetriesBasic:
 
         call_count = 0
 
-        @session.test(retries=2)
+        @session.test(retry=2)
         def test_flaky() -> None:
             nonlocal call_count
             call_count += 1
@@ -63,7 +63,7 @@ class TestRetriesBasic:
 
         call_count = 0
 
-        @session.test(retries=2)
+        @session.test(retry=2)
         def test_always_fails() -> None:
             nonlocal call_count
             call_count += 1
@@ -87,7 +87,7 @@ class TestRetriesBasic:
         session.events.on(Event.TEST_PASS, lambda result: results.append(result))
         session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
-        @session.test(retries=3)
+        @session.test(retry=3)
         def test_stable() -> None:
             pass
 
@@ -102,13 +102,13 @@ class TestRetriesBasic:
         assert len(retry_events) == 0
 
     def test_retries_zero_no_retry(self, session: ProTestSession) -> None:
-        """Test with retries=0 fails immediately without retry."""
+        """Test with retry=0 fails immediately without retry."""
         results: list[TestResult] = []
         retry_events: list[TestRetryInfo] = []
         session.events.on(Event.TEST_FAIL, lambda result: results.append(result))
         session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
-        @session.test(retries=0)
+        @session.test(retry=0)
         def test_no_retry() -> None:
             raise ValueError("Immediate failure")
 
@@ -136,7 +136,7 @@ class TestRetryOn:
 
         call_count = 0
 
-        @session.test(retries=2, retry_on=ConnectionError)
+        @session.test(retry=Retry(times=2, on=ConnectionError))
         def test_connection() -> None:
             nonlocal call_count
             call_count += 1
@@ -159,7 +159,7 @@ class TestRetryOn:
 
         call_count = 0
 
-        @session.test(retries=3, retry_on=ConnectionError)
+        @session.test(retry=Retry(times=3, on=ConnectionError))
         def test_wrong_exception() -> None:
             nonlocal call_count
             call_count += 1
@@ -180,7 +180,7 @@ class TestRetryOn:
 
         call_count = 0
 
-        @session.test(retries=3, retry_on=(ConnectionError, TimeoutError))
+        @session.test(retry=Retry(times=3, on=(ConnectionError, TimeoutError)))
         def test_multiple_exceptions() -> None:
             nonlocal call_count
             call_count += 1
@@ -203,7 +203,7 @@ class TestRetryOn:
 
         call_count = 0
 
-        @session.test(retries=2, retry_on=OSError)
+        @session.test(retry=Retry(times=2, on=OSError))
         def test_subclass() -> None:
             nonlocal call_count
             call_count += 1
@@ -223,7 +223,7 @@ class TestRetryOn:
 
         call_count = 0
 
-        @session.test(retries=2)
+        @session.test(retry=2)
         def test_any_exception() -> None:
             nonlocal call_count
             call_count += 1
@@ -248,7 +248,7 @@ class TestRetryDelay:
         """Delay is applied between retries."""
         timestamps: list[float] = []
 
-        @session.test(retries=2, retry_delay=0.1)
+        @session.test(retry=Retry(times=2, delay=0.1))
         def test_with_delay() -> None:
             timestamps.append(time.perf_counter())
             if len(timestamps) < 3:
@@ -268,7 +268,7 @@ class TestRetryDelay:
         """No delay when retry_delay=0."""
         timestamps: list[float] = []
 
-        @session.test(retries=1, retry_delay=0)
+        @session.test(retry=Retry(times=1, delay=0))
         def test_no_delay() -> None:
             timestamps.append(time.perf_counter())
             if len(timestamps) < 2:
@@ -289,7 +289,7 @@ class TestRetryDelay:
 
         delay_value = 0.5
 
-        @session.test(retries=1, retry_delay=delay_value)
+        @session.test(retry=Retry(times=1, delay=delay_value))
         def test_delay_info() -> None:
             raise ValueError("Fail")
 
@@ -316,7 +316,7 @@ class TestRetriesWithSkip:
 
         call_count = 0
 
-        @session.test(skip="Not ready", retries=5)
+        @session.test(skip="Not ready", retry=5)
         def test_skipped() -> None:
             nonlocal call_count
             call_count += 1
@@ -346,7 +346,7 @@ class TestRetriesWithXfail:
         results: list[TestResult] = []
         session.events.on(Event.TEST_XFAIL, lambda result: results.append(result))
 
-        @session.test(xfail="Known flaky", retries=2)
+        @session.test(xfail="Known flaky", retry=2)
         def test_expected_failure() -> None:
             raise ValueError("Always fails")
 
@@ -365,7 +365,7 @@ class TestRetriesWithXfail:
 
         call_count = 0
 
-        @session.test(xfail="Expected to fail", retries=2)
+        @session.test(xfail="Expected to fail", retry=2)
         def test_unexpected_pass() -> None:
             nonlocal call_count
             call_count += 1
@@ -395,7 +395,7 @@ class TestRetriesWithTimeout:
 
         call_count = 0
 
-        @session.test(timeout=0.1, retries=2)
+        @session.test(timeout=0.1, retry=2)
         async def test_timeout_then_fast() -> None:
             nonlocal call_count
             call_count += 1
@@ -416,7 +416,7 @@ class TestRetriesWithTimeout:
         session.events.on(Event.TEST_FAIL, lambda result: results.append(result))
         session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
-        @session.test(timeout=0.05, retries=1)
+        @session.test(timeout=0.05, retry=1)
         async def test_always_slow() -> None:
             await asyncio.sleep(1.0)
 
@@ -436,7 +436,7 @@ class TestRetriesWithTimeout:
         session.events.on(Event.TEST_FAIL, lambda result: results.append(result))
         session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
-        @session.test(timeout=0.05, retries=2, retry_on=ValueError)
+        @session.test(timeout=0.05, retry=Retry(times=2, on=ValueError))
         async def test_timeout_not_retried() -> None:
             await asyncio.sleep(1.0)
 
@@ -457,7 +457,7 @@ class TestRetriesWithTimeout:
         call_count = 0
         timestamps: list[float] = []
 
-        @session.test(timeout=0.1, retries=2, retry_delay=0.05)
+        @session.test(timeout=0.1, retry=Retry(times=2, delay=0.05))
         async def test_slow_then_fast() -> None:
             nonlocal call_count
             call_count += 1
@@ -513,7 +513,7 @@ class TestRetriesWithFixtureErrors:
         def broken_fixture() -> str:
             raise RuntimeError("Fixture broken")
 
-        @session.test(retries=3)
+        @session.test(retry=3)
         def test_with_broken_fixture(
             value: Annotated[str, Use(broken_fixture)],
         ) -> None:
@@ -533,30 +533,20 @@ class TestRetriesValidation:
     """Retry parameter validation."""
 
     def test_negative_retries_raises(self) -> None:
-        """Negative retries raises ValueError at decoration time."""
-        session = ProTestSession(default_reporter=False, default_cache=False)
-
-        with pytest.raises(ValueError, match="retries must be non-negative"):
-
-            @session.test(retries=-1)
-            def test_invalid() -> None:
-                pass
+        """Negative retry times raises ValueError at Retry creation time."""
+        with pytest.raises(ValueError, match="retry times must be non-negative"):
+            Retry(times=-1)
 
     def test_negative_retry_delay_raises(self) -> None:
-        """Negative retry_delay raises ValueError at decoration time."""
-        session = ProTestSession(default_reporter=False, default_cache=False)
-
-        with pytest.raises(ValueError, match="retry_delay must be non-negative"):
-
-            @session.test(retries=1, retry_delay=-0.5)
-            def test_invalid() -> None:
-                pass
+        """Negative retry delay raises ValueError at Retry creation time."""
+        with pytest.raises(ValueError, match="retry delay must be non-negative"):
+            Retry(times=1, delay=-0.5)
 
     def test_zero_retries_allowed(self) -> None:
         """Zero retries is valid (default behavior)."""
         session = ProTestSession(default_reporter=False, default_cache=False)
 
-        @session.test(retries=0)
+        @session.test(retry=0)
         def test_zero() -> None:
             pass
 
@@ -566,11 +556,26 @@ class TestRetriesValidation:
         """Zero retry_delay is valid (no delay)."""
         session = ProTestSession(default_reporter=False, default_cache=False)
 
-        @session.test(retries=1, retry_delay=0.0)
+        @session.test(retry=Retry(times=1, delay=0.0))
         def test_zero_delay() -> None:
             pass
 
         assert session.tests[0].retry_delay == 0.0
+
+    def test_retry_on_single_exception_normalized_to_tuple(self) -> None:
+        """Single exception class is normalized to tuple."""
+        retry_config = Retry(times=2, on=ConnectionError)
+        assert retry_config.on == (ConnectionError,)
+
+    def test_retry_on_tuple_stays_tuple(self) -> None:
+        """Tuple of exceptions stays as tuple."""
+        retry_config = Retry(times=2, on=(ConnectionError, TimeoutError))
+        assert retry_config.on == (ConnectionError, TimeoutError)
+
+    def test_retry_on_default_is_exception_tuple(self) -> None:
+        """Default on value is (Exception,)."""
+        retry_config = Retry(times=2)
+        assert retry_config.on == (Exception,)
 
 
 class TestRetriesWithSuite:
@@ -590,7 +595,7 @@ class TestRetriesWithSuite:
 
         call_count = 0
 
-        @suite.test(retries=2)
+        @suite.test(retry=2)
         def test_api_flaky() -> None:
             nonlocal call_count
             call_count += 1
@@ -605,14 +610,9 @@ class TestRetriesWithSuite:
         assert results[0].attempt == 2
 
     def test_suite_negative_retries_raises(self) -> None:
-        """Suite test with negative retries raises ValueError."""
-        suite = ProTestSuite("API")
-
-        with pytest.raises(ValueError, match="retries must be non-negative"):
-
-            @suite.test(retries=-1)
-            def test_invalid() -> None:
-                pass
+        """Suite test with negative retry times raises ValueError at Retry creation."""
+        with pytest.raises(ValueError, match="retry times must be non-negative"):
+            Retry(times=-1)
 
 
 class TestRetryEvent:
@@ -627,7 +627,7 @@ class TestRetryEvent:
         retry_events: list[TestRetryInfo] = []
         session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
-        @session.test(retries=3)
+        @session.test(retry=3)
         def test_multiple_retries() -> None:
             raise ValueError("Always fails")
 
@@ -648,7 +648,7 @@ class TestRetryEvent:
         suite = ProTestSuite("MySuite")
         session.add_suite(suite)
 
-        @suite.test(retries=1, retry_delay=0.25)
+        @suite.test(retry=Retry(times=1, delay=0.25))
         def test_info() -> None:
             raise RuntimeError("Test error")
 
@@ -670,7 +670,7 @@ class TestRetryEvent:
         retry_events: list[TestRetryInfo] = []
         session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
-        @session.test(retries=3)
+        @session.test(retry=3)
         def test_passes() -> None:
             pass
 
@@ -694,7 +694,7 @@ class TestRetriesAsync:
 
         call_count = 0
 
-        @session.test(retries=2)
+        @session.test(retry=2)
         async def test_async_flaky() -> None:
             nonlocal call_count
             call_count += 1

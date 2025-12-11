@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, TypeVar, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -9,8 +9,8 @@ if TYPE_CHECKING:
 
 from protest.core.collector import validate_no_from_params
 from protest.di.decorators import FixtureWrapper
-from protest.entities import FixtureRegistration, TestRegistration
-from protest.utils import normalize_reason
+from protest.entities import FixtureRegistration, Retry, Skip, TestRegistration, Xfail
+from protest.utils import normalize_retry, normalize_skip, normalize_xfail
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
 
@@ -91,38 +91,34 @@ class ProTestSuite:
     def fixtures(self) -> list[FixtureRegistration]:
         return self._fixtures
 
-    def test(  # noqa: PLR0913
+    def test(
         self,
         tags: list[str] | None = None,
-        skip: bool | str = False,
-        xfail: bool | str = False,
         timeout: float | None = None,
-        retries: int = 0,
-        retry_on: type[Exception] | tuple[type[Exception], ...] | None = None,
-        retry_delay: float = 0,
+        skip: bool | str | Skip | None = None,
+        xfail: bool | str | Xfail | None = None,
+        retry: int | Retry | None = None,
     ) -> Callable[[FuncT], FuncT]:
         def decorator(func: FuncT) -> FuncT:
             if timeout is not None and timeout < 0:
                 raise ValueError(f"timeout must be non-negative, got {timeout}")
-            if retries < 0:
-                raise ValueError(f"retries must be non-negative, got {retries}")
-            if retry_delay < 0:
-                raise ValueError(f"retry_delay must be non-negative, got {retry_delay}")
-            normalized_retry_on: tuple[type[Exception], ...] | None = None
-            if retry_on is not None:
-                normalized_retry_on = (
-                    retry_on if isinstance(retry_on, tuple) else (retry_on,)
-                )
+
+            norm_skip = normalize_skip(skip)
+            norm_xfail = normalize_xfail(xfail)
+            norm_retry = normalize_retry(retry)
+
             self._tests.append(
                 TestRegistration(
                     func=func,
                     tags=set(tags) if tags else set(),
-                    skip_reason=normalize_reason(skip, "Skipped"),
-                    xfail_reason=normalize_reason(xfail, "Expected failure"),
+                    skip_reason=norm_skip.reason if norm_skip else None,
+                    xfail_reason=norm_xfail.reason if norm_xfail else None,
                     timeout=timeout,
-                    retries=retries,
-                    retry_on=normalized_retry_on,
-                    retry_delay=retry_delay,
+                    retries=norm_retry.times if norm_retry else 0,
+                    retry_on=cast("tuple[type[Exception], ...]", norm_retry.on)
+                    if norm_retry
+                    else None,
+                    retry_delay=norm_retry.delay if norm_retry else 0,
                 )
             )
             return func

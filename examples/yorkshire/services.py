@@ -8,11 +8,11 @@ class VetService:
             "healthy": True,
             "weight": base_weight[dog.size.value],
             "age_months": dog.age,
-            "needs_vaccination": dog.age < 24,
+            "needs_vaccination": dog.age < 24,  # noqa
         }
 
     def vaccinate(self, dog: Yorkshire) -> bool:
-        return dog.age >= 8
+        return dog.age >= 8  # noqa
 
 
 class GroomingService:
