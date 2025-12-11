@@ -2,12 +2,9 @@ from protest.entities.core import (
     Fixture,
     FixtureCallable,
     FixtureRegistration,
-    Retry,
-    Skip,
     TestItem,
     TestOutcome,
     TestRegistration,
-    Xfail,
 )
 from protest.entities.events import (
     FixtureInfo,
@@ -19,7 +16,10 @@ from protest.entities.events import (
     TestRetryInfo,
     TestStartInfo,
 )
-from protest.entities.execution import LogCapture
+from protest.entities.log_capture import LogCapture
+from protest.entities.retry import Retry, normalize_retry
+from protest.entities.skip import Skip, normalize_skip
+from protest.entities.xfail import Xfail, normalize_xfail
 
 __all__ = [
     "Fixture",
@@ -40,4 +40,7 @@ __all__ = [
     "TestRetryInfo",
     "TestStartInfo",
     "Xfail",
+    "normalize_retry",
+    "normalize_skip",
+    "normalize_xfail",
 ]

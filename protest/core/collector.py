@@ -129,12 +129,10 @@ class Collector:
                     func=reg.func,
                     suite=suite,
                     tags=tags,
-                    skip_reason=reg.skip_reason,
-                    xfail_reason=reg.xfail_reason,
+                    skip=reg.skip,
+                    xfail=reg.xfail,
                     timeout=reg.timeout,
-                    retries=reg.retries,
-                    retry_on=reg.retry_on,
-                    retry_delay=reg.retry_delay,
+                    retry=reg.retry,
                 )
             ]
 
@@ -153,12 +151,10 @@ class Collector:
                     tags=tags.copy(),
                     case_kwargs=case_kwargs,
                     case_ids=case_ids,
-                    skip_reason=reg.skip_reason,
-                    xfail_reason=reg.xfail_reason,
+                    skip=reg.skip,
+                    xfail=reg.xfail,
                     timeout=reg.timeout,
-                    retries=reg.retries,
-                    retry_on=reg.retry_on,
-                    retry_delay=reg.retry_delay,
+                    retry=reg.retry,
                 )
             )
 

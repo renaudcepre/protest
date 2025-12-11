@@ -381,13 +381,13 @@ class TestRunner:
         test_name = start_info.name
         node_id = start_info.node_id
 
-        if item.skip_reason:
+        if item.skip:
             return self._outcome_builder.build(
                 TestExecutionResult(
                     test_name=test_name,
                     node_id=node_id,
                     suite_path=item.suite_path,
-                    skip_reason=item.skip_reason,
+                    skip_reason=item.skip.reason,
                 )
             )
 
@@ -410,7 +410,7 @@ class TestRunner:
 
         await self._session.events.emit(Event.TEST_SETUP_DONE, start_info)
 
-        max_attempts = 1 + item.retries
+        max_attempts = 1 + (item.retry.times if item.retry else 0)
         previous_errors: list[Exception] = []
         error: Exception | None = None
         is_fixture_error = False
@@ -437,11 +437,13 @@ class TestRunner:
             except Exception as exc:
                 error = exc
 
+            retry_on = item.retry.on if item.retry else None
+            retry_delay = item.retry.delay if item.retry else 0
             should_retry = (
                 error is not None
                 and not is_fixture_error
                 and attempt < max_attempts
-                and self._should_retry(error, item.retry_on)
+                and self._should_retry(error, retry_on)
             )
             if should_retry and error is not None:
                 previous_errors.append(error)
@@ -452,11 +454,11 @@ class TestRunner:
                     attempt=attempt,
                     max_attempts=max_attempts,
                     error=error,
-                    delay=item.retry_delay,
+                    delay=retry_delay,
                 )
                 await self._session.events.emit(Event.TEST_RETRY, retry_info)
-                if item.retry_delay > 0:
-                    await asyncio.sleep(item.retry_delay)
+                if retry_delay > 0:
+                    await asyncio.sleep(retry_delay)
                 continue
             break
 
@@ -471,7 +473,9 @@ class TestRunner:
                 output=buffer.getvalue(),
                 error=error,
                 is_fixture_error=is_fixture_error,
-                xfail_reason=item.xfail_reason if not is_fixture_error else None,
+                xfail_reason=item.xfail.reason
+                if item.xfail and not is_fixture_error
+                else None,
                 timeout=item.timeout,
                 attempt=attempt,
                 max_attempts=max_attempts,
@@ -480,6 +484,8 @@ class TestRunner:
         )
 
     def _should_retry(
-        self, error: Exception, retry_on: tuple[type[Exception], ...] | None
+        self,
+        error: Exception,
+        retry_on: type[Exception] | tuple[type[Exception], ...] | None,
     ) -> bool:
         return retry_on is None or isinstance(error, retry_on)

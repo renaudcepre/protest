@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar, cast
+from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -16,14 +16,22 @@ from protest.cache.storage import CacheStorage
 from protest.core.collector import validate_no_from_params
 from protest.di.decorators import FixtureWrapper
 from protest.di.resolver import Resolver
-from protest.entities import FixtureRegistration, Retry, Skip, TestRegistration, Xfail
+from protest.entities import (
+    FixtureRegistration,
+    Retry,
+    Skip,
+    TestRegistration,
+    Xfail,
+    normalize_retry,
+    normalize_skip,
+    normalize_xfail,
+)
 from protest.events.bus import EventBus
 from protest.events.types import Event
 from protest.filters import KeywordFilterPlugin, SuiteFilterPlugin
 from protest.reporting.factory import get_reporter
 from protest.reporting.log_file import LogFilePlugin
 from protest.tags.plugin import TagFilterPlugin
-from protest.utils import normalize_retry, normalize_skip, normalize_xfail
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
 
@@ -205,14 +213,10 @@ class ProTestSession:
                 TestRegistration(
                     func=func,
                     tags=set(tags) if tags else set(),
-                    skip_reason=norm_skip.reason if norm_skip else None,
-                    xfail_reason=norm_xfail.reason if norm_xfail else None,
+                    skip=norm_skip,
+                    xfail=norm_xfail,
                     timeout=timeout,
-                    retries=norm_retry.times if norm_retry else 0,
-                    retry_on=cast("tuple[type[Exception], ...]", norm_retry.on)
-                    if norm_retry
-                    else None,
-                    retry_delay=norm_retry.delay if norm_retry else 0,
+                    retry=norm_retry,
                 )
             )
             return func
