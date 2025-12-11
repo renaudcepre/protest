@@ -1,0 +1,76 @@
+:root {
+  /* Palette */
+  --bg-base: #0d0d0d;
+  --bg-surface: #141414;
+  --bg-elevated: #1a1a1a;
+  --bg-hover: #222222;
+
+  --text-primary: #e5e5e5;
+  --text-secondary: #888888;
+  --text-muted: #555555;
+
+  --border-subtle: #2a2a2a;
+  --border-default: #333333;
+
+  /* Semantic */
+  --color-pass: #4ade80;
+  --color-fail: #f87171;
+  --color-skip: #fbbf24;
+  --color-xfail: #a78bfa;
+  --color-error: #fb923c;
+  --color-running: #60a5fa;
+
+  /* Syntax highlighting */
+  --syn-keyword: #c792ea;
+  --syn-string: #c3e88d;
+  --syn-number: #f78c6c;
+  --syn-comment: #546e7a;
+  --syn-function: #82aaff;
+  --syn-path: #89ddff;
+  --syn-error: #ff5370;
+  --syn-lineno: #4a5568;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+
+  /* Typography */
+  --font-mono: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-lg: 14px;
+
+  /* Misc */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+
+  /* Layout */
+  --header-height: 48px;
+  --stats-height: 64px;
+  --progress-height: 24px;
+}
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  background: var(--bg-base);
+  color: var(--text-primary);
+  line-height: 1.5;
+}
