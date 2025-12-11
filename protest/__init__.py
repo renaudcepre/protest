@@ -5,7 +5,7 @@ from protest.core.suite import ProTestSuite
 from protest.di.decorators import factory, fixture
 from protest.di.factory import FixtureFactory
 from protest.di.markers import ForEach, From, Use
-from protest.entities import FixtureCallable
+from protest.entities import FixtureCallable, Retry, Skip, Xfail
 from protest.exceptions import CircularDependencyError, FixtureError, ProTestError
 from protest.fixtures.builtins import caplog, mocker
 from protest.fixtures.mocker import AsyncMockType, Mocker, MockType
@@ -31,7 +31,10 @@ __all__ = [
     "ProTestSession",
     "ProTestSuite",
     "RaisesContext",
+    "Retry",
+    "Skip",
     "Use",
+    "Xfail",
     "__version__",
     "caplog",
     "collect_tests",

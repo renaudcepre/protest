@@ -5,6 +5,9 @@ from collections.abc import AsyncGenerator, Generator
 from typing import Annotated
 from uuid import uuid4
 
+from examples.yorkshire.domain import Coat, Job, Size, Yorkshire
+from examples.yorkshire.kennel import Kennel
+from examples.yorkshire.services import GroomingService, VetService
 from protest import (
     FixtureFactory,
     ForEach,
@@ -12,6 +15,7 @@ from protest import (
     Mocker,
     ProTestSession,
     ProTestSuite,
+    Retry,
     Use,
     caplog,
     mocker,
@@ -20,11 +24,8 @@ from protest import (
 from protest.di.decorators import fixture
 from protest.entities import LogCapture
 
-from examples.yorkshire.domain import Coat, Job, Size, Yorkshire
-from examples.yorkshire.kennel import Kennel
-from examples.yorkshire.services import GroomingService, VetService
-
 session = ProTestSession(concurrency=4)
+
 
 # =============================================================================
 # SESSION AUTOUSE (auto-resolved at session start)
@@ -46,9 +47,9 @@ def configure_kennel_logging() -> Generator[None, None, None]:
 async def kennel() -> AsyncGenerator[Kennel, None]:
     kennel_instance = Kennel()
     yield kennel_instance
-    print("  [kennel] starting LONG teardown (3 seconds)...")
+    print("  [kennel] starting LONG teardown (3 seconds)...")  # noqa
     await asyncio.sleep(3)
-    print("  [kennel] teardown complete!")
+    print("  [kennel] teardown complete!")  # noqa
     await kennel_instance.clear()
 
 
@@ -89,6 +90,7 @@ session.add_suite(puppies_suite)
 session.add_suite(adults_suite)
 session.add_suite(seniors_suite)
 session.add_suite(legacy_suite)
+
 
 # =============================================================================
 # SUITE AUTOUSE (auto-resolved when suite starts)
@@ -145,6 +147,7 @@ COATS = ForEach(
     [Coat.LONG, Coat.SHORT],
     ids=lambda coat: coat.value,
 )
+
 
 # =============================================================================
 # SESSION-LEVEL TESTS
@@ -227,7 +230,7 @@ def test_vet_spy_real_method(mock: Annotated[Mocker, Use(mocker)]) -> None:
 
 
 # =============================================================================
-# CARTESIAN PRODUCT (Size × Coat = 6 tests)
+# CARTESIAN PRODUCT (Size * Coat = 6 tests)
 # =============================================================================
 
 
@@ -415,10 +418,10 @@ def test_senior_needs_grooming_sync() -> None:
 
 @legacy_suite.fixture()
 def fax_machine() -> Generator[str, None, None]:
-    print("  [legacy] warming up fax machine...")
+    print("  [legacy] warming up fax machine...")  # noqa
     time.sleep(0.05)
     yield "fax_ready"
-    print("  [legacy] fax machine cooling down")
+    print("  [legacy] fax machine cooling down")  # noqa
 
 
 @legacy_suite.test()
@@ -476,7 +479,9 @@ def test_yorkshire_refuses_bath() -> None:
         if dog.coat == Coat.LONG:
             raise ValueError(f"{dog.name} has escaped through the bathroom window")
 
-    fluffy = Yorkshire(name="Fluffy", size=Size.MINI, job=Job.INFLUENCER, age=24, coat=Coat.LONG)
+    fluffy = Yorkshire(
+        name="Fluffy", size=Size.MINI, job=Job.INFLUENCER, age=24, coat=Coat.LONG
+    )
     with raises(ValueError):
         give_bath(fluffy)
 
@@ -484,7 +489,7 @@ def test_yorkshire_refuses_bath() -> None:
 @session.test()
 def test_teacup_weight_limit_exceeded() -> None:
     def feed_treats(dog: Yorkshire, treat_count: int) -> None:
-        if dog.size == Size.TEACUP and treat_count > 3:
+        if dog.size == Size.TEACUP and treat_count > 3:  # noqa
             raise ValueError(f"Too many treats! {dog.name} now spherical")
 
     tiny = Yorkshire(name="Gizmo", size=Size.TEACUP, job=Job.THERAPIST, age=36)
@@ -545,27 +550,29 @@ def test_bodyguard_never_flinches() -> None:
 recall_attempts = 0
 
 
-@session.test(retries=3)
+@session.test(retry=3)
 def test_yorkshire_recall_command() -> None:
     """Yorkshire ignores recall command until treats are offered."""
-    global recall_attempts
+    global recall_attempts  # noqa
     recall_attempts += 1
-    if recall_attempts < 3:
+    if recall_attempts < 3:  # noqa
         raise TimeoutError("Yorkshire pretending to be deaf, investigating squirrel")
 
 
 wifi_connection_attempts = 0
 
 
-@session.test(retries=2, retry_on=ConnectionError, retry_delay=0.1)
+@session.test(
+    retry=Retry(times=2, on=ConnectionError, delay=0.1),
+)
 async def test_influencer_unstable_wifi(
     factory: Annotated[FixtureFactory[Yorkshire], Use(yorkshire_factory)],
 ) -> None:
     """Influencer yorkshire dealing with flaky cafe WiFi."""
-    global wifi_connection_attempts
+    global wifi_connection_attempts  # noqa
     wifi_connection_attempts += 1
     fifi = await factory(name="Fifi", job=Job.INFLUENCER)
-    if wifi_connection_attempts < 2:
+    if wifi_connection_attempts < 2:  # noqa
         raise ConnectionError(f"{fifi.name} lost WiFi mid-selfie upload!")
     await asyncio.sleep(0.01)
 
@@ -573,14 +580,18 @@ async def test_influencer_unstable_wifi(
 nap_attempts = 0
 
 
-@seniors_suite.test(timeout=0.15, retries=2)
+@seniors_suite.test(
+    timeout=0.15,
+    retry=Retry(times=2, on=AssertionError, delay=0.05),
+    tags=["senior"],
+)
 async def test_senior_wakes_up_eventually(
     factory: Annotated[FixtureFactory[Yorkshire], Use(yorkshire_factory)],
 ) -> None:
     """Senior yorkshire takes too long to wake up, but eventually responds."""
-    global nap_attempts
+    global nap_attempts  # noqa
     nap_attempts += 1
     papy = await factory(name="Papy", age=120, job=Job.THERAPIST)
-    if nap_attempts < 2:
+    if nap_attempts < 2:  # noqa
         await asyncio.sleep(1.0)
     assert papy.is_senior

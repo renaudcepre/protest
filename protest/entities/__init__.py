@@ -2,9 +2,12 @@ from protest.entities.core import (
     Fixture,
     FixtureCallable,
     FixtureRegistration,
+    Retry,
+    Skip,
     TestItem,
     TestOutcome,
     TestRegistration,
+    Xfail,
 )
 from protest.entities.events import (
     FixtureInfo,
@@ -25,8 +28,10 @@ __all__ = [
     "FixtureRegistration",
     "HandlerInfo",
     "LogCapture",
+    "Retry",
     "RunResult",
     "SessionResult",
+    "Skip",
     "TestCounts",
     "TestItem",
     "TestOutcome",
@@ -34,4 +39,5 @@ __all__ = [
     "TestResult",
     "TestRetryInfo",
     "TestStartInfo",
+    "Xfail",
 ]

@@ -1,27 +1,44 @@
 """Utility functions for ProTest."""
 
-from collections.abc import Callable
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+from protest.entities import Retry, Skip, Xfail
 
 
-def normalize_reason(value: bool | str, default: str) -> str | None:
-    """Normalize a bool|str flag to a reason string or None.
-
-    Used for skip/xfail parameters that accept either:
-    - False: disabled, returns None
-    - True: enabled with default reason
-    - str: enabled with custom reason
-
-    Examples:
-        normalize_reason(False, "Skipped") -> None
-        normalize_reason(True, "Skipped") -> "Skipped"
-        normalize_reason("WIP", "Skipped") -> "WIP"
-    """
-    if not value:
+def normalize_skip(skip: bool | str | Skip | None) -> Skip | None:
+    """Normalize skip parameter to Skip object or None."""
+    if skip is None or skip is False:
         return None
-    if isinstance(value, str):
-        return value
-    return default
+    if skip is True:
+        return Skip()
+    if isinstance(skip, str):
+        return Skip(reason=skip)
+    return skip
+
+
+def normalize_xfail(xfail: bool | str | Xfail | None) -> Xfail | None:
+    """Normalize xfail parameter to Xfail object or None."""
+    if xfail is None or xfail is False:
+        return None
+    if xfail is True:
+        return Xfail()
+    if isinstance(xfail, str):
+        return Xfail(reason=xfail)
+    return xfail
+
+
+def normalize_retry(retry: int | Retry | None) -> Retry | None:
+    """Normalize retry parameter to Retry object or None."""
+    if retry is None:
+        return None
+    if isinstance(retry, int):
+        return Retry(times=retry)
+    return retry
 
 
 def get_callable_name(func: Callable[..., Any], fallback: str = "<unnamed>") -> str:

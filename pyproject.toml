@@ -36,7 +36,6 @@ rich = [
 [tool.ruff]
 output-format = "concise"
 line-length = 88
-exclude = ["examples"]
 
 [tool.ruff.lint]
 select = [

@@ -35,11 +35,11 @@ class Yorkshire:
 
     @property
     def is_puppy(self) -> bool:
-        return self.age < 12
+        return self.age < 12  # noqa
 
     @property
     def is_senior(self) -> bool:
-        return self.age > 96
+        return self.age > 96  # noqa
 
     @property
     def can_work(self) -> bool:
@@ -47,7 +47,7 @@ class Yorkshire:
 
     @property
     def needs_grooming(self) -> bool:
-        return self.coat == Coat.LONG or self.age > 72
+        return self.coat == Coat.LONG or self.age > 72  # noqa
 
     async def nap(self) -> float:
         duration = self.age * 0.002
