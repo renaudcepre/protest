@@ -13,6 +13,9 @@ export function clearAll() {
   dom.timer.textContent = '0.00s'
   dom.timer.classList.remove('timer-running')
   dom.sessionTarget.textContent = 'Waiting for session...'
+  const checkbox = document.getElementById('hide-passed')
+  checkbox.checked = false
+  document.body.classList.remove('hide-passed')
   renderStats()
   renderProgress()
 }
@@ -64,8 +67,24 @@ export function appendTest(payload) {
   if (!suiteEl) {
     dom.suitesContainer.insertAdjacentHTML('beforeend', suiteCard(suitePath))
     suiteEl = dom.suitesContainer.querySelector(`[data-suite="${CSS.escape(suitePath)}"]`)
-    state.suites.set(suitePath, { pass: 0, fail: 0 })
+    state.suites.set(suitePath, { pass: 0, fail: 0, expanded: false })
   }
+
+  const grid = suiteEl.querySelector('.test-grid')
+  const nodeIdEscaped = CSS.escape(payload.nodeId)
+  let cell = grid.querySelector(`[data-node-id="${nodeIdEscaped}"]`)
+
+  if (!cell) {
+    cell = document.createElement('div')
+    cell.className = 'test-cell'
+    cell.dataset.nodeId = payload.nodeId
+    grid.appendChild(cell)
+  }
+  cell.dataset.state = payload.outcome
+
+  const testName = payload.nodeId.split('::').pop()
+  const duration = payload.duration !== undefined ? ` (${payload.duration < 1 ? Math.round(payload.duration * 1000) + 'ms' : payload.duration.toFixed(2) + 's'})` : ''
+  cell.dataset.tooltip = `${testName}${duration}`
 
   const testsContainer = suiteEl.querySelector('.suite-tests')
   testsContainer.insertAdjacentHTML('beforeend', testCard(payload))
@@ -74,7 +93,12 @@ export function appendTest(payload) {
   if (payload.outcome === 'pass') suiteStats.pass++
   if (payload.outcome === 'fail' || payload.outcome === 'error') {
     suiteStats.fail++
-    suiteEl.setAttribute('open', '')
+    suiteEl.classList.add('expanded')
+    const checkbox = document.getElementById('hide-passed')
+    if (!checkbox.checked) {
+      checkbox.checked = true
+      document.body.classList.add('hide-passed')
+    }
   }
 
   suiteEl.querySelector('[data-type="pass"]').textContent = suiteStats.pass

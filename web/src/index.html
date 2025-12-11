@@ -6,6 +6,7 @@
   <title>ProTest Live</title>
 </head>
 <body>
+  <div id="tooltip"></div>
   <div class="app">
     <header class="header">
       <div class="logo">
@@ -57,6 +58,10 @@
         <div class="progress-segment" data-type="error" id="progress-error" style="width: 0%"></div>
       </div>
       <span class="progress-text" id="progress-text">0 / 0</span>
+      <label class="filter-toggle">
+        <input type="checkbox" id="hide-passed">
+        <span>Hide passed</span>
+      </label>
     </div>
 
     <main class="main" id="main">
