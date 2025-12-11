@@ -6,7 +6,6 @@ import { handleMessage } from './handlers.js'
 export function connectWebSocket() {
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
   const wsUrl = `${protocol}//${location.host}/ws`
-  console.log('Connecting to WebSocket:', wsUrl)
 
   dom.connectionDot.dataset.state = 'connecting'
   dom.connectionText.textContent = 'Connecting...'
@@ -15,7 +14,8 @@ export function connectWebSocket() {
 
   ws.onopen = () => {
     state.connected = true
-    renderConnection(true)
+    dom.connectionDot.dataset.state = 'connected'
+    dom.connectionText.textContent = 'Waiting...'
   }
 
   ws.onmessage = (event) => {
@@ -29,7 +29,8 @@ export function connectWebSocket() {
 
   ws.onclose = () => {
     state.connected = false
-    renderConnection(false)
+    dom.connectionDot.dataset.state = 'disconnected'
+    dom.connectionText.textContent = 'Disconnected'
     setTimeout(connectWebSocket, 2000)
   }
 

@@ -2,6 +2,7 @@ import { state } from './state.js'
 import { dom } from './dom.js'
 import {
   clearAll,
+  renderConnection,
   renderSessionInfo,
   renderStats,
   renderProgress,
@@ -20,6 +21,8 @@ export const handlers = {
     state.timerInterval = setInterval(renderTimer, 100)
     dom.timer.classList.add('timer-running')
     dom.emptyState.style.display = 'none'
+    dom.connectionDot.dataset.state = 'connected'
+    dom.connectionText.textContent = 'Running...'
     renderSessionInfo(payload.target)
     renderProgress()
   },
@@ -63,7 +66,8 @@ export const handlers = {
 
   SESSION_END(payload) {
     renderFinalSummary()
-    renderConnection(false)
+    dom.connectionDot.dataset.state = 'connected'
+    dom.connectionText.textContent = 'Waiting...'
   },
 }
 
