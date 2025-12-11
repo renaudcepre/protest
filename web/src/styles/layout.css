@@ -12,7 +12,7 @@
     "stats"
     "progress"
     "main"
-    "failures";
+    "legend";
 }
 
 /* Header */
@@ -202,6 +202,78 @@
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
+}
+
+/* Legend */
+.legend {
+  grid-area: legend;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+  padding: var(--space-sm) var(--space-xl);
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.legend-cell {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--border-default);
+}
+
+.legend-cell[data-state="pending"] {
+  border-color: var(--border-default);
+  background: transparent;
+}
+
+.legend-cell[data-state="setup"] {
+  border-color: var(--color-running);
+  background: transparent;
+}
+
+.legend-cell[data-state="running"] {
+  border-color: var(--color-running);
+  background: var(--color-running);
+}
+
+.legend-cell[data-state="teardown"] {
+  border-color: var(--color-pass);
+  background: transparent;
+}
+
+.legend-cell[data-state="pass"] {
+  border-color: var(--color-pass);
+  background: var(--color-pass);
+}
+
+.legend-cell[data-state="fail"] {
+  border-color: var(--color-fail);
+  background: var(--color-fail);
+}
+
+.legend-cell[data-state="skip"] {
+  border-color: var(--color-skip);
+  background: var(--color-skip);
+}
+
+.legend-cell[data-state="xfail"] {
+  border-color: var(--color-xfail);
+  background: var(--color-xfail);
+}
+
+.legend-cell[data-state="error"] {
+  border-color: var(--color-error);
+  background: var(--color-error);
 }
 
 /* Scrollbar */

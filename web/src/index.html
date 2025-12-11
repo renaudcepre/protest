@@ -10,8 +10,7 @@
   <div class="app">
     <header class="header">
       <div class="logo">
-        <span class="logo-text">ProTest</span>
-        <span class="logo-version">v0.1.0</span>
+        <img src="./assets/logo-term.svg" alt="ProTest" class="logo-svg">
       </div>
       <div class="session-info">
         <span class="session-target" id="session-target">Waiting for session...</span>
@@ -72,16 +71,17 @@
       <div id="suites-container"></div>
     </main>
 
-    <div class="failures" id="failures-panel" data-state="empty">
-      <div class="failures-header" id="failures-header">
-        <svg class="failures-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path d="M4 6l4 4 4-4"/>
-        </svg>
-        <span class="failures-title">Failures</span>
-        <span class="failures-count" id="failures-count">(0)</span>
-      </div>
-      <div class="failures-list" id="failures-list"></div>
-    </div>
+    <footer class="legend">
+      <div class="legend-item"><span class="legend-cell" data-state="pending"></span> Pending</div>
+      <div class="legend-item"><span class="legend-cell" data-state="setup"></span> Setup</div>
+      <div class="legend-item"><span class="legend-cell" data-state="running"></span> Running</div>
+      <div class="legend-item"><span class="legend-cell" data-state="teardown"></span> Teardown</div>
+      <div class="legend-item"><span class="legend-cell" data-state="pass"></span> Pass</div>
+      <div class="legend-item"><span class="legend-cell" data-state="fail"></span> Fail</div>
+      <div class="legend-item"><span class="legend-cell" data-state="skip"></span> Skip</div>
+      <div class="legend-item"><span class="legend-cell" data-state="xfail"></span> XFail</div>
+      <div class="legend-item"><span class="legend-cell" data-state="error"></span> Error</div>
+    </footer>
   </div>
 
   <script type="module" src="./scripts/main.js"></script>

@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
 try:
     from websockets.asyncio.server import serve as ws_serve
+    from websockets.datastructures import Headers
     from websockets.http11 import Request, Response
     from websockets.sync.client import connect as ws_connect
 except ImportError as err:
@@ -61,12 +62,10 @@ def _process_request(connection: Any, request: Request) -> Response | None:
     if request.path == "/ws":
         return None
 
-    if request.path == "/" or request.path == "/index.html":
+    if request.path in {"/", "/index.html"}:
         html_path = ASSETS_DIR / "index.html"
         if html_path.exists():
             body = html_path.read_bytes()
-            from websockets.datastructures import Headers
-
             headers = Headers(
                 [
                     ("Content-Type", "text/html; charset=utf-8"),
@@ -74,8 +73,6 @@ def _process_request(connection: Any, request: Request) -> Response | None:
                 ]
             )
             return Response(HTTPStatus.OK, "OK", headers, body)
-
-    from websockets.datastructures import Headers
 
     return Response(HTTPStatus.NOT_FOUND, "Not Found", Headers(), b"Not Found")
 
@@ -88,14 +85,14 @@ def run_live_server(port: int = DEFAULT_PORT) -> None:
             port,
             process_request=_process_request,
         ):
-            print(f"Live reporter running at http://localhost:{port}")
-            print("Press Ctrl+C to stop")
+            print(f"Live reporter running at http://localhost:{port}")  # noqa: T201
+            print("Press Ctrl+C to stop")  # noqa: T201
             await asyncio.get_running_loop().create_future()
 
     try:
         asyncio.run(serve())
     except KeyboardInterrupt:
-        print("\nStopped")
+        print("\nStopped")  # noqa: T201
 
 
 class WebReporter(PluginBase):
@@ -137,9 +134,16 @@ class WebReporter(PluginBase):
         self._test_logs.clear()
 
         self._total_tests = len(items)
+        tests = [
+            {"nodeId": item.node_id, "suitePath": item.suite_path} for item in items
+        ]
         self._send(
             "SESSION_START",
-            {"target": self._session_target, "totalTests": self._total_tests},
+            {
+                "target": self._session_target,
+                "totalTests": self._total_tests,
+                "tests": tests,
+            },
         )
         return items
 
