@@ -57,7 +57,7 @@ export function tracebackDetails(content) {
 export function suiteCard(name) {
   const displayName = name === '__root__' ? 'Tests' : name
   return `
-    <details class="suite" data-suite="${escapeHtml(name)}" open>
+    <details class="suite" data-suite="${escapeHtml(name)}">
       <summary class="suite-header">
         <svg class="suite-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M6 4l4 4-4 4"/>
