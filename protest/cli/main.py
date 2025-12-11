@@ -106,8 +106,32 @@ def main() -> None:
         _handle_run_command()
         return
 
-    print(f"Error: Unknown command '{command}'. Use 'run' or 'tags'.")
+    if command == "live":
+        _handle_live_command()
+        return
+
+    print(f"Error: Unknown command '{command}'. Use 'run', 'tags', or 'live'.")
     sys.exit(1)
+
+
+def _handle_live_command() -> None:
+    """Handle 'protest live' subcommand - starts persistent live server."""
+    parser = argparse.ArgumentParser(
+        prog="protest live",
+        description="Start live reporter server (keeps running for multiple test runs)",
+    )
+    parser.add_argument(
+        "-p",
+        "--port",
+        type=int,
+        default=8765,
+        help="Port to listen on (default: 8765)",
+    )
+    args = parser.parse_args(sys.argv[2:])
+
+    from protest.reporting.web import run_live_server
+
+    run_live_server(port=args.port)
 
 
 def _print_help() -> None:
@@ -115,6 +139,7 @@ def _print_help() -> None:
     print("ProTest - Async-first Python test framework\n")
     print("Commands:")
     print("  run    Run tests")
+    print("  live   Start live reporter server")
     print("  tags   Tag inspection commands")
     print(HELP_EPILOG)
 
@@ -215,6 +240,12 @@ def _handle_run_command() -> None:
         metavar="PATH",
         help="Output CTRF JSON report to PATH",
     )
+    parser.add_argument(
+        "--live",
+        dest="live",
+        action="store_true",
+        help="Open live web reporter in browser",
+    )
 
     args = parser.parse_args(sys.argv[2:])
 
@@ -233,6 +264,7 @@ def _handle_run_command() -> None:
         log_file=not args.no_log_file,
         force_no_color=args.no_color,
         ctrf_output=args.ctrf_output,
+        live=args.live,
     )
 
 
@@ -251,6 +283,7 @@ def run_tests(  # noqa: PLR0913
     log_file: bool = True,
     force_no_color: bool = False,
     ctrf_output: Path | None = None,
+    live: bool = False,
 ) -> None:
     from protest.api import collect_tests, run_session
     from protest.loader import LoadError, load_session, parse_target
@@ -267,6 +300,13 @@ def run_tests(  # noqa: PLR0913
         from protest.reporting.ctrf import CTRFReporter
 
         session.use(CTRFReporter(output_path=ctrf_output))
+
+    if live:
+        from protest.reporting.web import WebReporter
+
+        web_reporter = WebReporter()
+        web_reporter.set_target(target)
+        session.use(web_reporter)
 
     if collect_only:
         items = collect_tests(

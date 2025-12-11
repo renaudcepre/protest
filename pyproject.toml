@@ -31,6 +31,9 @@ dependencies = [
 rich = [
     "rich>=13.0",
 ]
+web = [
+    "websockets>=12.0",
+]
 
 
 [tool.ruff]

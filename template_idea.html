@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProTest — Live Reporter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ══════════════════════════════════════════════════════════════
+       DESIGN SYSTEM — ProTest Live Reporter
+       Direction: Monochrome Terminal Élégant
+       ══════════════════════════════════════════════════════════════ */
+
+    :root {
+      /* Base palette */
+      --bg-base: #0d0d0d;
+      --bg-surface: #141414;
+      --bg-elevated: #1a1a1a;
+      --bg-hover: #222222;
+
+      /* Text */
+      --text-primary: #e5e5e5;
+      --text-secondary: #888888;
+      --text-muted: #555555;
+
+      /* Borders */
+      --border-subtle: #2a2a2a;
+      --border-default: #333333;
+
+      /* Semantic colors — très ciblés, pas criards */
+      --color-pass: #4ade80;
+      --color-fail: #f87171;
+      --color-skip: #fbbf24;
+      --color-xfail: #a78bfa;
+      --color-timeout: #fb923c;
+      --color-retry: #60a5fa;
+
+      /* Syntax highlighting */
+      --syn-keyword: #c792ea;
+      --syn-string: #c3e88d;
+      --syn-number: #f78c6c;
+      --syn-comment: #546e7a;
+      --syn-function: #82aaff;
+      --syn-path: #89ddff;
+      --syn-error: #ff5370;
+      --syn-lineno: #4a5568;
+
+      /* Spacing scale */
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 12px;
+      --space-lg: 16px;
+      --space-xl: 24px;
+      --space-2xl: 32px;
+
+      /* Typography */
+      --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+      --font-sans: 'Space Grotesk', system-ui, sans-serif;
+
+      --text-xs: 11px;
+      --text-sm: 12px;
+      --text-base: 13px;
+      --text-lg: 14px;
+      --text-xl: 16px;
+
+      /* Misc */
+      --radius-sm: 4px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      background: var(--bg-base);
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       LAYOUT
+       ══════════════════════════════════════════════════════════════ */
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: var(--space-xl);
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       HEADER
+       ══════════════════════════════════════════════════════════════ */
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: var(--space-xl);
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: var(--space-xl);
+    }
+
+    .logo {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-sm);
+    }
+
+    .logo-text {
+      font-family: var(--font-sans);
+      font-size: var(--text-xl);
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .logo-version {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .session-info {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xl);
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+    }
+
+    .session-file {
+      color: var(--text-muted);
+    }
+
+    .session-file span {
+      color: var(--text-primary);
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       STATS BAR
+       ══════════════════════════════════════════════════════════════ */
+
+    .stats-bar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2xl);
+      padding: var(--space-lg);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-xl);
+    }
+
+    .stat {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-sm);
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-label {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat--pass .stat-value { color: var(--color-pass); }
+    .stat--fail .stat-value { color: var(--color-fail); }
+    .stat--skip .stat-value { color: var(--color-skip); }
+    .stat--xfail .stat-value { color: var(--color-xfail); }
+
+    .stat--timer {
+      margin-left: auto;
+    }
+
+    .stat--timer .stat-value {
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .timer-running::after {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: var(--color-pass);
+      border-radius: 50%;
+      margin-left: var(--space-sm);
+      animation: pulse 1s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       PROGRESS BAR
+       ══════════════════════════════════════════════════════════════ */
+
+    .progress-container {
+      margin-bottom: var(--space-xl);
+    }
+
+    .progress-bar {
+      height: 3px;
+      background: var(--bg-elevated);
+      border-radius: 2px;
+      overflow: hidden;
+      display: flex;
+    }
+
+    .progress-segment {
+      height: 100%;
+      transition: width 0.3s ease;
+    }
+
+    .progress-segment--pass { background: var(--color-pass); }
+    .progress-segment--fail { background: var(--color-fail); }
+    .progress-segment--skip { background: var(--color-skip); }
+    .progress-segment--xfail { background: var(--color-xfail); }
+    .progress-segment--pending { background: var(--border-default); }
+
+    /* ══════════════════════════════════════════════════════════════
+       SUITE GROUPS
+       ══════════════════════════════════════════════════════════════ */
+
+    .suite {
+      margin-bottom: var(--space-lg);
+    }
+
+    .suite-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      padding: var(--space-md) var(--space-lg);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s ease;
+    }
+
+    .suite-header:hover {
+      background: var(--bg-hover);
+    }
+
+    .suite-chevron {
+      width: 16px;
+      height: 16px;
+      color: var(--text-muted);
+      transition: transform 0.2s ease;
+    }
+
+    .suite[open] .suite-chevron {
+      transform: rotate(90deg);
+    }
+
+    .suite-icon {
+      font-size: var(--text-sm);
+    }
+
+    .suite-name {
+      font-family: var(--font-sans);
+      font-size: var(--text-lg);
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .suite-count {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    .suite-tests {
+      padding-left: var(--space-lg);
+      margin-top: var(--space-sm);
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       TEST CARDS
+       ══════════════════════════════════════════════════════════════ */
+
+    .test-card {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-md);
+      padding: var(--space-md) var(--space-lg);
+      background: var(--bg-base);
+      border-left: 2px solid transparent;
+      border-radius: var(--radius-sm);
+      margin-bottom: 2px;
+      transition: background 0.15s ease;
+    }
+
+    .test-card:hover {
+      background: var(--bg-surface);
+    }
+
+    .test-card--pass { border-left-color: var(--color-pass); }
+    .test-card--fail { border-left-color: var(--color-fail); }
+    .test-card--skip { border-left-color: var(--color-skip); }
+    .test-card--xfail { border-left-color: var(--color-xfail); }
+    .test-card--timeout { border-left-color: var(--color-timeout); }
+    .test-card--retry { border-left-color: var(--color-retry); }
+
+    .test-status {
+      flex-shrink: 0;
+      width: 18px;
+      font-size: var(--text-sm);
+      text-align: center;
+    }
+
+    .test-status--pass { color: var(--color-pass); }
+    .test-status--fail { color: var(--color-fail); }
+    .test-status--skip { color: var(--color-skip); }
+    .test-status--xfail { color: var(--color-xfail); }
+    .test-status--timeout { color: var(--color-timeout); }
+    .test-status--retry { color: var(--color-retry); }
+
+    .test-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .test-name {
+      font-size: var(--text-sm);
+      font-weight: 500;
+      color: var(--text-primary);
+      word-break: break-word;
+    }
+
+    .test-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      margin-top: var(--space-xs);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+
+    .test-duration {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .test-tag {
+      padding: 2px 6px;
+      background: var(--bg-elevated);
+      border-radius: 3px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .test-tag--retry {
+      color: var(--color-retry);
+      background: rgba(96, 165, 250, 0.1);
+    }
+
+    .test-tag--xfail {
+      color: var(--color-xfail);
+      background: rgba(167, 139, 250, 0.1);
+    }
+
+    .test-message {
+      margin-top: var(--space-sm);
+      font-size: var(--text-xs);
+      color: var(--color-fail);
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       TRACEBACK (Collapsible)
+       ══════════════════════════════════════════════════════════════ */
+
+    .traceback-toggle {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-top: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-xs);
+      color: var(--text-secondary);
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .traceback-toggle::-webkit-details-marker {
+      display: none;
+    }
+
+    .traceback-toggle:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .traceback-toggle .chevron {
+      transition: transform 0.15s ease;
+    }
+
+    details[open] .traceback-toggle .chevron {
+      transform: rotate(90deg);
+    }
+
+    .traceback-content {
+      margin-top: var(--space-sm);
+      padding: var(--space-md);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      overflow-x: auto;
+    }
+
+    .traceback-content pre {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       SYNTAX HIGHLIGHTING (Vanilla)
+       ══════════════════════════════════════════════════════════════ */
+
+    .syn-keyword { color: var(--syn-keyword); }
+    .syn-string { color: var(--syn-string); }
+    .syn-number { color: var(--syn-number); }
+    .syn-comment { color: var(--syn-comment); font-style: italic; }
+    .syn-function { color: var(--syn-function); }
+    .syn-path { color: var(--syn-path); }
+    .syn-error { color: var(--syn-error); font-weight: 500; }
+    .syn-lineno { color: var(--syn-lineno); user-select: none; }
+    .syn-caret { color: var(--color-fail); }
+
+    /* ══════════════════════════════════════════════════════════════
+       FAILURES SECTION
+       ══════════════════════════════════════════════════════════════ */
+
+    .failures-section {
+      margin-top: var(--space-2xl);
+      padding-top: var(--space-xl);
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .failures-title {
+      font-family: var(--font-sans);
+      font-size: var(--text-lg);
+      font-weight: 600;
+      color: var(--color-fail);
+      margin-bottom: var(--space-lg);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .failure-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-left: 3px solid var(--color-fail);
+      border-radius: var(--radius-md);
+      padding: var(--space-lg);
+      margin-bottom: var(--space-md);
+    }
+
+    .failure-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: var(--space-md);
+    }
+
+    .failure-name {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .failure-location {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      margin-top: var(--space-xs);
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       FOOTER
+       ══════════════════════════════════════════════════════════════ */
+
+    .footer {
+      margin-top: var(--space-2xl);
+      padding-top: var(--space-lg);
+      border-top: 1px solid var(--border-subtle);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .footer a {
+      color: var(--text-secondary);
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      color: var(--text-primary);
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       ANIMATIONS
+       ══════════════════════════════════════════════════════════════ */
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .test-card {
+      animation: slideIn 0.2s ease;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       SCROLLBAR
+       ══════════════════════════════════════════════════════════════ */
+
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-base);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-default);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <span class="logo-text">ProTest</span>
+        <span class="logo-version">v0.1.0</span>
+      </div>
+      <div class="session-info">
+        <span class="session-file"><span>examples.yorkshire.session</span>:session</span>
+        <span>Python 3.12.3</span>
+      </div>
+    </header>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+      <div class="stat stat--pass">
+        <span class="stat-value" id="stat-pass">38</span>
+        <span class="stat-label">Passed</span>
+      </div>
+      <div class="stat stat--fail">
+        <span class="stat-value" id="stat-fail">4</span>
+        <span class="stat-label">Failed</span>
+      </div>
+      <div class="stat stat--skip">
+        <span class="stat-value" id="stat-skip">1</span>
+        <span class="stat-label">Skipped</span>
+      </div>
+      <div class="stat stat--xfail">
+        <span class="stat-value" id="stat-xfail">2</span>
+        <span class="stat-label">XFail</span>
+      </div>
+      <div class="stat stat--timer">
+        <span class="stat-value timer-running" id="timer">2.53s</span>
+        <span class="stat-label">Duration</span>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-container">
+      <div class="progress-bar">
+        <div class="progress-segment progress-segment--pass" style="width: 84.4%"></div>
+        <div class="progress-segment progress-segment--fail" style="width: 8.9%"></div>
+        <div class="progress-segment progress-segment--skip" style="width: 2.2%"></div>
+        <div class="progress-segment progress-segment--xfail" style="width: 4.5%"></div>
+      </div>
+    </div>
+
+    <!-- Test Suites -->
+    <div class="suites">
+      <!-- Root Suite -->
+      <details class="suite" open>
+        <summary class="suite-header">
+          <svg class="suite-chevron" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          </svg>
+          <span class="suite-icon">◈</span>
+          <span class="suite-name">session</span>
+          <span class="suite-count">22 tests</span>
+        </summary>
+        <div class="suite-tests">
+          <div class="test-card test-card--pass">
+            <span class="test-status test-status--pass">✓</span>
+            <div class="test-content">
+              <div class="test-name">test_kennel_starts_empty</div>
+              <div class="test-meta">
+                <span class="test-duration">12ms</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="test-card test-card--pass">
+            <span class="test-status test-status--pass">✓</span>
+            <div class="test-content">
+              <div class="test-name">test_multiple_yorkshires</div>
+              <div class="test-meta">
+                <span class="test-duration">12ms</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="test-card test-card--fail">
+            <span class="test-status test-status--fail">✗</span>
+            <div class="test-content">
+              <div class="test-name">test_yorkshire_math_skills</div>
+              <div class="test-meta">
+                <span class="test-duration">6ms</span>
+              </div>
+              <div class="test-message">Fifi counted 7 treats but expected 10</div>
+              <details>
+                <summary class="traceback-toggle">
+                  <svg class="chevron" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                  </svg>
+                  Show traceback
+                </summary>
+                <div class="traceback-content">
+                  <pre id="traceback-1"></pre>
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <div class="test-card test-card--retry">
+            <span class="test-status test-status--pass">✓</span>
+            <div class="test-content">
+              <div class="test-name">test_yorkshire_recall_command</div>
+              <div class="test-meta">
+                <span class="test-duration">9ms</span>
+                <span class="test-tag test-tag--retry">attempt 3/4</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="test-card test-card--pass">
+            <span class="test-status test-status--pass">✓</span>
+            <div class="test-content">
+              <div class="test-name">test_grooming_price_matrix[teacup-long]</div>
+              <div class="test-meta">
+                <span class="test-duration">5ms</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="test-card test-card--skip">
+            <span class="test-status test-status--skip">○</span>
+            <div class="test-content">
+              <div class="test-name">test_astronaut_mission</div>
+              <div class="test-meta">
+                <span class="test-tag">Astronaut program suspended until 2026</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="test-card test-card--xfail">
+            <span class="test-status test-status--xfail">✗</span>
+            <div class="test-content">
+              <div class="test-name">test_senior_marathon</div>
+              <div class="test-meta">
+                <span class="test-duration">104ms</span>
+                <span class="test-tag test-tag--xfail">xfail</span>
+              </div>
+              <div class="test-message" style="color: var(--color-xfail)">Seniors take their time</div>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- Puppies Suite -->
+      <details class="suite" open>
+        <summary class="suite-header">
+          <svg class="suite-chevron" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          </svg>
+          <span class="suite-icon">◈</span>
+          <span class="suite-name">Puppies</span>
+          <span class="suite-count">4 tests</span>
+        </summary>
+        <div class="suite-tests">
+          <div class="test-card test-card--pass">
+            <span class="test-status test-status--pass">✓</span>
+            <div class="test-content">
+              <div class="test-name">test_puppy_cannot_work</div>
+              <div class="test-meta"><span class="test-duration">4ms</span></div>
+            </div>
+          </div>
+          <div class="test-card test-card--pass">
+            <span class="test-status test-status--pass">✓</span>
+            <div class="test-content">
+              <div class="test-name">test_puppy_growth</div>
+              <div class="test-meta"><span class="test-duration">4ms</span></div>
+            </div>
+          </div>
+          <div class="test-card test-card--pass">
+            <span class="test-status test-status--pass">✓</span>
+            <div class="test-content">
+              <div class="test-name">test_puppy_age_validation_sync</div>
+              <div class="test-meta"><span class="test-duration">3ms</span></div>
+            </div>
+          </div>
+          <div class="test-card test-card--pass">
+            <span class="test-status test-status--pass">✓</span>
+            <div class="test-content">
+              <div class="test-name">test_puppy_needs_no_grooming_sync</div>
+              <div class="test-meta"><span class="test-duration">3ms</span></div>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- Seniors Suite -->
+      <details class="suite" open>
+        <summary class="suite-header">
+          <svg class="suite-chevron" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          </svg>
+          <span class="suite-icon">◈</span>
+          <span class="suite-name">Seniors</span>
+          <span class="suite-count">5 tests</span>
+        </summary>
+        <div class="suite-tests">
+          <div class="test-card test-card--pass">
+            <span class="test-status test-status--pass">✓</span>
+            <div class="test-content">
+              <div class="test-name">test_senior_still_works</div>
+              <div class="test-meta"><span class="test-duration">5ms</span></div>
+            </div>
+          </div>
+          <div class="test-card test-card--pass">
+            <span class="test-status test-status--pass">✓</span>
+            <div class="test-content">
+              <div class="test-name">test_senior_nap_time</div>
+              <div class="test-meta"><span class="test-duration">205ms</span></div>
+            </div>
+          </div>
+          <div class="test-card test-card--timeout">
+            <span class="test-status test-status--timeout">⏱</span>
+            <div class="test-content">
+              <div class="test-name">test_senior_wakes_up_eventually</div>
+              <div class="test-meta">
+                <span class="test-tag" style="color: var(--color-timeout)">timeout 0.15s</span>
+                <span class="test-tag test-tag--retry">3 attempts</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- Adults::Workers Suite (Nested) -->
+      <details class="suite" open>
+        <summary class="suite-header">
+          <svg class="suite-chevron" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          </svg>
+          <span class="suite-icon">◈</span>
+          <span class="suite-name">Adults :: Workers</span>
+          <span class="suite-count">8 tests</span>
+        </summary>
+        <div class="suite-tests">
+          <div class="test-card test-card--pass">
+            <span class="test-status test-status--pass">✓</span>
+            <div class="test-content">
+              <div class="test-name">test_job_assignment[influencer]</div>
+              <div class="test-meta"><span class="test-duration">5ms</span></div>
+            </div>
+          </div>
+          <div class="test-card test-card--pass">
+            <span class="test-status test-status--pass">✓</span>
+            <div class="test-content">
+              <div class="test-name">test_job_assignment[bodyguard]</div>
+              <div class="test-meta"><span class="test-duration">4ms</span></div>
+            </div>
+          </div>
+          <div class="test-card test-card--fail">
+            <span class="test-status test-status--fail">✗</span>
+            <div class="test-content">
+              <div class="test-name">test_chef_cooking_disaster</div>
+              <div class="test-meta"><span class="test-duration">3ms</span></div>
+              <div class="test-message">Gordon burned the kitchen down!</div>
+              <details>
+                <summary class="traceback-toggle">
+                  <svg class="chevron" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                  </svg>
+                  Show traceback
+                </summary>
+                <div class="traceback-content">
+                  <pre id="traceback-2"></pre>
+                </div>
+              </details>
+            </div>
+          </div>
+          <div class="test-card test-card--xfail">
+            <span class="test-status test-status--xfail">✗</span>
+            <div class="test-content">
+              <div class="test-name">test_teacup_bodyguard</div>
+              <div class="test-meta">
+                <span class="test-duration">4ms</span>
+                <span class="test-tag test-tag--xfail">xfail</span>
+              </div>
+              <div class="test-message" style="color: var(--color-xfail)">Bug: teacup yorkies too small for bodyguard vest</div>
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- Failures Section -->
+    <section class="failures-section">
+      <h2 class="failures-title">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 1a7 7 0 100 14A7 7 0 008 1zM7 4h2v5H7V4zm0 6h2v2H7v-2z"/>
+        </svg>
+        Failures (4)
+      </h2>
+
+      <div class="failure-card">
+        <div class="failure-header">
+          <div>
+            <div class="failure-name">test_yorkshire_math_skills</div>
+            <div class="failure-location">examples/yorkshire/session.py:457</div>
+          </div>
+        </div>
+        <div class="traceback-content">
+          <pre id="traceback-full-1"></pre>
+        </div>
+      </div>
+
+      <div class="failure-card">
+        <div class="failure-header">
+          <div>
+            <div class="failure-name">test_bodyguard_never_flinches</div>
+            <div class="failure-location">examples/yorkshire/session.py:541</div>
+          </div>
+        </div>
+        <div class="traceback-content">
+          <pre id="traceback-full-2"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      ProTest Live Reporter — <a href="#">Documentation</a> · <a href="#">GitHub</a>
+    </footer>
+  </div>
+
+  <script>
+    // ══════════════════════════════════════════════════════════════
+    // SYNTAX HIGHLIGHTING (Vanilla JS, Regex-based)
+    // ══════════════════════════════════════════════════════════════
+
+    function highlightPython(code) {
+      const escapeHtml = (str) => str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      const escaped = escapeHtml(code);
+
+      const patterns = [
+        // File paths
+        [/^(\s*File\s+)("[^"]+")(,\s+line\s+)(\d+)/gm,
+         '$1<span class="syn-path">$2</span>$3<span class="syn-number">$4</span>'],
+        // Line numbers at start
+        [/^(\s*)(\d+)(\s*\|)/gm,
+         '$1<span class="syn-lineno">$2</span>$3'],
+        // Error types
+        [/^((?:AssertionError|ValueError|TypeError|RuntimeError|KeyError|AttributeError|TimeoutError|Exception)[^:]*:)/gm,
+         '<span class="syn-error">$1</span>'],
+        // Keywords
+        [/\b(def|class|return|if|else|elif|for|while|try|except|finally|with|as|import|from|raise|assert|in|is|not|and|or|True|False|None|async|await)\b/g,
+         '<span class="syn-keyword">$1</span>'],
+        // Strings (simple)
+        [/("[^"]*")/g, '<span class="syn-string">$1</span>'],
+        [/('[^']*')/g, '<span class="syn-string">$1</span>'],
+        // Numbers
+        [/\b(\d+\.?\d*)\b/g, '<span class="syn-number">$1</span>'],
+        // Function calls
+        [/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g, '<span class="syn-function">$1</span>('],
+        // Caret line (assertion pointer)
+        [/^(\s*\^+\s*)$/gm, '<span class="syn-caret">$1</span>'],
+      ];
+
+      let result = escaped;
+      for (const [pattern, replacement] of patterns) {
+        result = result.replace(pattern, replacement);
+      }
+
+      return result;
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // MOCK DATA
+    // ══════════════════════════════════════════════════════════════
+
+    const traceback1 = `Traceback (most recent call last):
+  File "/home/rcepre/PycharmProjects/protest/examples/yorkshire/session.py", line 457, in test_yorkshire_math_skills
+    assert treats_actual == treats_expected, (
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Fifi counted 7 treats but expected 10`;
+
+    const traceback2 = `Traceback (most recent call last):
+  File "/home/rcepre/PycharmProjects/protest/protest/core/runner.py", line 429, in _run_test
+    await ensure_async(item.func, **kwargs)
+  File "/home/rcepre/PycharmProjects/protest/examples/yorkshire/session.py", line 468, in test_chef_cooking_disaster
+    raise ValueError(f"{gordon.name} burned the kitchen down!")
+ValueError: Gordon burned the kitchen down!`;
+
+    const tracebackFull1 = `Traceback (most recent call last):
+  File "/home/rcepre/PycharmProjects/protest/protest/core/runner.py", line 429, in _run_test
+    await ensure_async(item.func, **kwargs)
+  File "/home/rcepre/PycharmProjects/protest/protest/execution/async_bridge.py", line 35, in ensure_async
+    return cast("T", await func(*args, **kwargs))
+  File "/home/rcepre/PycharmProjects/protest/examples/yorkshire/session.py", line 457, in test_yorkshire_math_skills
+    assert treats_actual == treats_expected, (
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Fifi counted 7 treats but expected 10`;
+
+    const tracebackFull2 = `Traceback (most recent call last):
+  File "/home/rcepre/PycharmProjects/protest/protest/core/runner.py", line 429, in _run_test
+    await ensure_async(item.func, **kwargs)
+  File "/home/rcepre/PycharmProjects/protest/protest/assertions.py", line 73, in __exit__
+    raise AssertionError(f"DID NOT RAISE {self._expected.__name__}")
+AssertionError: DID NOT RAISE RuntimeError`;
+
+    // Apply highlighting
+    document.getElementById('traceback-1').innerHTML = highlightPython(traceback1);
+    document.getElementById('traceback-2').innerHTML = highlightPython(traceback2);
+    document.getElementById('traceback-full-1').innerHTML = highlightPython(tracebackFull1);
+    document.getElementById('traceback-full-2').innerHTML = highlightPython(tracebackFull2);
+
+    // ══════════════════════════════════════════════════════════════
+    // LIVE TIMER (Demo)
+    // ══════════════════════════════════════════════════════════════
+
+    let elapsed = 2.53;
+    const timerEl = document.getElementById('timer');
+
+    // Uncomment to see live timer
+    // setInterval(() => {
+    //   elapsed += 0.01;
+    //   timerEl.textContent = elapsed.toFixed(2) + 's';
+    // }, 10);
+  </script>
+</body>
+</html>
