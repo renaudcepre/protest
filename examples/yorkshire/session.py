@@ -47,8 +47,8 @@ def configure_kennel_logging() -> Generator[None, None, None]:
 async def kennel() -> AsyncGenerator[Kennel, None]:
     kennel_instance = Kennel()
     yield kennel_instance
-    print("  [kennel] starting LONG teardown (3 seconds)...")  # noqa
-    await asyncio.sleep(3)
+    print("  [kennel] starting LONG teardown (1 seconds)...")  # noqa
+    await asyncio.sleep(1)
     print("  [kennel] teardown complete!")  # noqa
     await kennel_instance.clear()
 

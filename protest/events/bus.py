@@ -41,6 +41,12 @@ class EventBus:
         name = get_callable_name(handler)
         self._handlers[event].append(_RegisteredHandler(func=handler, name=name))
 
+    def off(self, event: Event, handler: Callable[..., Any]) -> None:
+        """Unregister a handler for an event."""
+        self._handlers[event] = [
+            reg for reg in self._handlers[event] if reg.func != handler
+        ]
+
     async def emit(self, event: Event, data: Any = None) -> None:
         """Emit event. Sync handlers block, async handlers run fire-and-forget."""
         for registered in self._handlers[event]:

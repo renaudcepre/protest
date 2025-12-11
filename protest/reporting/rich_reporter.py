@@ -1,3 +1,4 @@
+import traceback
 from pathlib import Path
 
 from rich.console import Console  # type: ignore[import-not-found]
@@ -38,6 +39,8 @@ class RichReporter(PluginBase):
         self.console = Console(highlight=False)
         self._printed_suites: set[str | None] = set()
         self._total_tests = 0
+        self._failed_results: list[TestResult] = []
+        self._error_results: list[TestResult] = []
 
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
         self._total_tests = len(items)
@@ -99,6 +102,11 @@ class RichReporter(PluginBase):
             retry_suffix = f" [{result.max_attempts} attempts]"
 
         if result.is_fixture_error:
+            self._error_results.append(result)
+        else:
+            self._failed_results.append(result)
+
+        if result.is_fixture_error:
             self.console.print(
                 f"   [yellow]⚠[/]   {name}: [bold yellow]\\[FIXTURE][/] {result.error}"
             )
@@ -154,7 +162,43 @@ class RichReporter(PluginBase):
             duration = _format_duration(info.duration)
             self.console.print(f"  [green]✓[/] {info.name} [dim]({duration})[/]")
 
+    def _format_traceback(self, error: Exception) -> str:
+        lines = traceback.format_exception(type(error), error, error.__traceback__)
+        return "".join(lines)
+
+    def _print_failure_summary(self) -> None:
+        if self._failed_results:
+            self.console.print("\n[bold red]═══ FAILURES ═══[/]")
+            for result in self._failed_results:
+                self._print_failure_detail(result, is_error=False)
+
+        if self._error_results:
+            self.console.print("\n[bold yellow]═══ ERRORS ═══[/]")
+            for result in self._error_results:
+                self._print_failure_detail(result, is_error=True)
+
+    def _print_failure_detail(self, result: TestResult, *, is_error: bool) -> None:
+        name = _format_test_name(result)
+        full_name = f"{result.suite_path}::{name}" if result.suite_path else name
+        color = "yellow" if is_error else "red"
+        self.console.print(f"\n[bold {color}]___ {full_name} ___[/]")
+
+        if result.error:
+            tb_text = self._format_traceback(result.error)
+            for line in tb_text.rstrip().splitlines():
+                escaped_line = line.replace("[", "\\[")
+                self.console.print(f"[dim]{escaped_line}[/]")
+
+        if result.output:
+            self.console.print("[dim]--- Captured output ---[/]")
+            for line in result.output.rstrip().splitlines():
+                escaped_line = line.replace("[", "\\[")
+                self.console.print(f"[dim]{escaped_line}[/]")
+
     def on_session_complete(self, result: SessionResult) -> None:
+        if self._failed_results or self._error_results:
+            self._print_failure_summary()
+
         total = (
             result.passed
             + result.failed

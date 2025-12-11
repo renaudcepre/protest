@@ -1,3 +1,4 @@
+import traceback
 from pathlib import Path
 
 from protest.entities import (
@@ -53,6 +54,8 @@ class AsciiReporter(PluginBase):
 
     def __init__(self) -> None:
         self._is_parallel = False
+        self._failed_results: list[TestResult] = []
+        self._error_results: list[TestResult] = []
 
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
         self._is_parallel = len(items) > 1
@@ -105,6 +108,11 @@ class AsciiReporter(PluginBase):
             retry_suffix = f" [{result.max_attempts} attempts]"
 
         if result.is_fixture_error:
+            self._error_results.append(result)
+        else:
+            self._failed_results.append(result)
+
+        if result.is_fixture_error:
             print(f"  !! {name}:  {result.error}")
         elif isinstance(result.error, TimeoutError) and result.timeout is not None:
             print(f"  TO {name}: TIMEOUT (exceeded {result.timeout}s){retry_suffix}")
@@ -147,7 +155,40 @@ class AsciiReporter(PluginBase):
             duration = _format_duration(info.duration)
             print(f"  OK {info.name} ({duration})")
 
+    def _format_traceback(self, error: Exception) -> str:
+        lines = traceback.format_exception(type(error), error, error.__traceback__)
+        return "".join(lines)
+
+    def _print_failure_summary(self) -> None:
+        if self._failed_results:
+            print("\n=== FAILURES ===")
+            for result in self._failed_results:
+                self._print_failure_detail(result, is_error=False)
+
+        if self._error_results:
+            print("\n=== ERRORS ===")
+            for result in self._error_results:
+                self._print_failure_detail(result, is_error=True)
+
+    def _print_failure_detail(self, result: TestResult, *, is_error: bool) -> None:
+        name = _format_test_name(result, include_suite=True)
+        prefix = "!!" if is_error else "XX"
+        print(f"\n{prefix} ___ {name} ___")
+
+        if result.error:
+            tb_text = self._format_traceback(result.error)
+            for line in tb_text.rstrip().splitlines():
+                print(f"  {line}")
+
+        if result.output:
+            print("  --- Captured output ---")
+            for line in result.output.rstrip().splitlines():
+                print(f"  {line}")
+
     def on_session_complete(self, result: SessionResult) -> None:
+        if self._failed_results or self._error_results:
+            self._print_failure_summary()
+
         total = (
             result.passed
             + result.failed
