@@ -12,6 +12,7 @@ export const ICONS = {
   xpass: '\u2713',
   error: '!',
   running: '\u25CF',
+  pending: '\u25CB',
   chevron: `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4l4 4-4 4"/></svg>`,
 }
 
@@ -88,17 +89,3 @@ export function suiteCard(name) {
   `
 }
 
-export function failureCard({ nodeId, location, traceback }) {
-  const testName = extractTestName(nodeId)
-  return `
-    <div class="failure-card" data-node-id="${escapeHtml(nodeId)}">
-      <div class="failure-name">${escapeHtml(testName)}</div>
-      ${location ? `<div class="failure-location">${escapeHtml(location)}</div>` : ''}
-      ${traceback ? `
-        <div class="failure-traceback">
-          <pre>${highlightTraceback(traceback)}</pre>
-        </div>
-      ` : ''}
-    </div>
-  `
-}

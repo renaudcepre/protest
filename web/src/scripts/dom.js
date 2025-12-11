@@ -6,9 +6,6 @@ export const dom = {
   progressText: null,
   emptyState: null,
   suitesContainer: null,
-  failuresPanel: null,
-  failuresCount: null,
-  failuresList: null,
   stats: {},
   progress: {},
 }
@@ -21,9 +18,6 @@ export function initDom() {
   dom.progressText = document.getElementById('progress-text')
   dom.emptyState = document.getElementById('empty-state')
   dom.suitesContainer = document.getElementById('suites-container')
-  dom.failuresPanel = document.getElementById('failures-panel')
-  dom.failuresCount = document.getElementById('failures-count')
-  dom.failuresList = document.getElementById('failures-list')
 
   dom.stats = {
     pass: document.getElementById('stat-pass'),

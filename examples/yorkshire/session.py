@@ -66,6 +66,7 @@ async def yorkshire_factory(
     dog = Yorkshire(name=name, size=size, job=job, age=age)
     await kennel_fixture.add(dog)
     await asyncio.sleep(age / 50)
+    print(f"Creating {dog.name}... ")  # noqa: T201
     yield dog
     await asyncio.sleep(age / 20)
     await kennel_fixture.remove(dog.name)

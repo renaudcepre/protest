@@ -2,13 +2,11 @@ import { state } from './state.js'
 import { dom } from './dom.js'
 import {
   clearAll,
-  renderConnection,
   renderSessionInfo,
   renderStats,
   renderProgress,
   renderTimer,
   appendTest,
-  appendFailure,
   renderFinalSummary,
   updateTestCell,
 } from './render.js'
@@ -26,6 +24,12 @@ export const handlers = {
     dom.connectionText.textContent = 'Running...'
     renderSessionInfo(payload.target)
     renderProgress()
+
+    if (payload.tests) {
+      for (const test of payload.tests) {
+        updateTestCell(test.nodeId, 'pending')
+      }
+    }
   },
 
   TEST_SETUP(payload) {
@@ -50,7 +54,6 @@ export const handlers = {
   TEST_FAIL(payload) {
     state.stats.fail++
     appendTest({ ...payload, outcome: 'fail' })
-    appendFailure(payload)
     renderStats()
     renderProgress()
   },
@@ -72,7 +75,6 @@ export const handlers = {
   TEST_ERROR(payload) {
     state.stats.error++
     appendTest({ ...payload, outcome: 'error' })
-    appendFailure(payload)
     renderStats()
     renderProgress()
   },

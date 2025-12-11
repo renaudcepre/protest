@@ -1,14 +1,11 @@
 import { state, resetState } from './state.js'
 import { dom } from './dom.js'
-import { testCard, suiteCard, failureCard } from './components.js'
+import { testCard, suiteCard } from './components.js'
 import { extractSuitePath } from './utils.js'
 
 export function clearAll() {
   resetState()
   dom.suitesContainer.innerHTML = ''
-  dom.failuresList.innerHTML = ''
-  dom.failuresPanel.dataset.state = 'empty'
-  dom.failuresCount.textContent = '(0)'
   dom.emptyState.style.display = 'flex'
   dom.timer.textContent = '0.00s'
   dom.timer.classList.remove('timer-running')
@@ -87,29 +84,19 @@ export function appendTest(payload) {
   cell.dataset.tooltip = `${testName}${duration}`
 
   const testsContainer = suiteEl.querySelector('.suite-tests')
-  testsContainer.insertAdjacentHTML('beforeend', testCard(payload))
+  const existingTestEl = testsContainer.querySelector(`[data-node-id="${nodeIdEscaped}"]`)
+  if (existingTestEl) {
+    existingTestEl.outerHTML = testCard(payload)
+  } else {
+    testsContainer.insertAdjacentHTML('beforeend', testCard(payload))
+  }
 
   const suiteStats = state.suites.get(suitePath)
   if (payload.outcome === 'pass') suiteStats.pass++
-  if (payload.outcome === 'fail' || payload.outcome === 'error') {
-    suiteStats.fail++
-    suiteEl.classList.add('expanded')
-    const checkbox = document.getElementById('hide-passed')
-    if (!checkbox.checked) {
-      checkbox.checked = true
-      document.body.classList.add('hide-passed')
-    }
-  }
+  if (payload.outcome === 'fail' || payload.outcome === 'error') suiteStats.fail++
 
   suiteEl.querySelector('[data-type="pass"]').textContent = suiteStats.pass
   suiteEl.querySelector('[data-type="fail"]').textContent = suiteStats.fail
-}
-
-export function appendFailure(payload) {
-  state.failures.push(payload)
-  dom.failuresPanel.dataset.state = 'expanded'
-  dom.failuresCount.textContent = `(${state.failures.length})`
-  dom.failuresList.insertAdjacentHTML('beforeend', failureCard(payload))
 }
 
 export function renderFinalSummary() {
@@ -143,5 +130,14 @@ export function updateTestCell(nodeId, cellState) {
   }
 
   cell.dataset.state = cellState
+
+  const testsContainer = suiteEl.querySelector('.suite-tests')
+  const testElEscaped = CSS.escape(nodeId)
+  let testEl = testsContainer.querySelector(`[data-node-id="${testElEscaped}"]`)
+
+  if (!testEl && cellState === 'pending') {
+    testsContainer.insertAdjacentHTML('beforeend', testCard({ nodeId, outcome: 'pending' }))
+  }
+
   dom.emptyState.style.display = 'none'
 }
