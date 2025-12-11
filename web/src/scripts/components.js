@@ -19,13 +19,11 @@ export function testCard({ nodeId, outcome, duration, message, traceback }) {
 
   if (hasFailed) {
     return `
-      <div class="test" data-outcome="${outcome}" data-node-id="${escapeHtml(nodeId)}">
-        <div class="test-header">
-          <span class="test-icon" data-outcome="${outcome}">${icon}</span>
-          <span class="test-name">${escapeHtml(testName)}</span>
-          ${duration !== undefined ? `<span class="test-duration">${formatDuration(duration)}</span>` : ''}
-        </div>
-        ${message ? `<div class="test-message">${escapeHtml(message)}</div>` : ''}
+      <div class="test test--failed" data-outcome="${outcome}" data-node-id="${escapeHtml(nodeId)}">
+        <span class="test-icon" data-outcome="${outcome}">${icon}</span>
+        <span class="test-name">${escapeHtml(testName)}</span>
+        ${message ? `<span class="test-message">${escapeHtml(message)}</span>` : ''}
+        ${duration !== undefined ? `<span class="test-duration">${formatDuration(duration)}</span>` : ''}
         ${traceback ? tracebackDetails(traceback) : ''}
       </div>
     `
@@ -57,19 +55,20 @@ export function tracebackDetails(content) {
 export function suiteCard(name) {
   const displayName = name === '__root__' ? 'Tests' : name
   return `
-    <details class="suite" data-suite="${escapeHtml(name)}">
-      <summary class="suite-header">
+    <div class="suite" data-suite="${escapeHtml(name)}">
+      <div class="suite-header">
         <svg class="suite-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M6 4l4 4-4 4"/>
         </svg>
         <span class="suite-name">${escapeHtml(displayName)}</span>
+        <div class="test-grid"></div>
         <div class="suite-stats">
           <span class="suite-stat" data-type="pass">0</span>
           <span class="suite-stat" data-type="fail">0</span>
         </div>
-      </summary>
+      </div>
       <div class="suite-tests"></div>
-    </details>
+    </div>
   `
 }
 
