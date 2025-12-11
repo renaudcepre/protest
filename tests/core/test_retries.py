@@ -550,7 +550,8 @@ class TestRetriesValidation:
         def test_zero() -> None:
             pass
 
-        assert session.tests[0].retries == 0
+        assert session.tests[0].retry is not None
+        assert session.tests[0].retry.times == 0
 
     def test_zero_retry_delay_allowed(self) -> None:
         """Zero retry_delay is valid (no delay)."""
@@ -560,7 +561,8 @@ class TestRetriesValidation:
         def test_zero_delay() -> None:
             pass
 
-        assert session.tests[0].retry_delay == 0.0
+        assert session.tests[0].retry is not None
+        assert session.tests[0].retry.delay == 0.0
 
     def test_retry_on_single_exception_normalized_to_tuple(self) -> None:
         """Single exception class is normalized to tuple."""

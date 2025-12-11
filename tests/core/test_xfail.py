@@ -21,7 +21,8 @@ class TestXfailDecorator:
 
         expected_item_count = 1
         assert len(items) == expected_item_count
-        assert items[0].xfail_reason == "Expected failure"
+        assert items[0].xfail is not None
+        assert items[0].xfail.reason == "Expected failure"
 
     def test_xfail_with_string_sets_reason(self) -> None:
         session = ProTestSession()
@@ -35,7 +36,8 @@ class TestXfailDecorator:
 
         expected_item_count = 1
         assert len(items) == expected_item_count
-        assert items[0].xfail_reason == "Bug #123: known race condition"
+        assert items[0].xfail is not None
+        assert items[0].xfail.reason == "Bug #123: known race condition"
 
     def test_no_xfail_has_none_reason(self) -> None:
         session = ProTestSession()
@@ -49,7 +51,7 @@ class TestXfailDecorator:
 
         expected_item_count = 1
         assert len(items) == expected_item_count
-        assert items[0].xfail_reason is None
+        assert items[0].xfail is None
 
     def test_suite_xfail_decorator(self) -> None:
         session = ProTestSession()
@@ -65,7 +67,8 @@ class TestXfailDecorator:
 
         expected_item_count = 1
         assert len(items) == expected_item_count
-        assert items[0].xfail_reason == "Suite test xfailed"
+        assert items[0].xfail is not None
+        assert items[0].xfail.reason == "Suite test xfailed"
 
 
 class TestXfailExecution:

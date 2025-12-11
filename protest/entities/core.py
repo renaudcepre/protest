@@ -8,43 +8,14 @@ if TYPE_CHECKING:
 
     from protest.core.suite import ProTestSuite
     from protest.entities.events import TestCounts, TestResult
+    from protest.entities.retry import Retry
+    from protest.entities.skip import Skip
+    from protest.entities.xfail import Xfail
     from protest.events.types import Event
 
 from protest.utils import get_callable_name
 
 FixtureCallable: TypeAlias = "Callable[..., Any]"
-
-
-@dataclass(frozen=True, slots=True)
-class Retry:
-    """Configuration for test retry behavior."""
-
-    times: int
-    delay: float = 0.0
-    on: type[Exception] | tuple[type[Exception], ...] = (Exception,)
-
-    def __post_init__(self) -> None:
-        if self.times < 0:
-            raise ValueError(f"retry times must be non-negative, got {self.times}")
-        if self.delay < 0:
-            raise ValueError(f"retry delay must be non-negative, got {self.delay}")
-        if not isinstance(self.on, tuple):
-            object.__setattr__(self, "on", (self.on,))
-
-
-@dataclass(frozen=True, slots=True)
-class Skip:
-    """Configuration for skipping a test."""
-
-    reason: str = "Skipped"
-
-
-@dataclass(frozen=True, slots=True)
-class Xfail:
-    """Configuration for expected failure."""
-
-    reason: str = "Expected failure"
-    strict: bool = True
 
 
 @dataclass(slots=True)
@@ -53,12 +24,10 @@ class TestRegistration:
 
     func: Callable[..., Any]
     tags: set[str] = field(default_factory=set)
-    skip_reason: str | None = None
-    xfail_reason: str | None = None
+    skip: Skip | None = None
+    xfail: Xfail | None = None
     timeout: float | None = None
-    retries: int = 0
-    retry_on: tuple[type[Exception], ...] | None = None
-    retry_delay: float = 0
+    retry: Retry | None = None
 
 
 @dataclass(slots=True)
@@ -95,12 +64,10 @@ class TestItem:
     tags: set[str] = field(default_factory=set)
     case_kwargs: dict[str, Any] = field(default_factory=dict)
     case_ids: list[str] = field(default_factory=list)
-    skip_reason: str | None = None
-    xfail_reason: str | None = None
+    skip: Skip | None = None
+    xfail: Xfail | None = None
     timeout: float | None = None
-    retries: int = 0
-    retry_on: tuple[type[Exception], ...] | None = None
-    retry_delay: float = 0
+    retry: Retry | None = None
 
     @property
     def test_name(self) -> str:

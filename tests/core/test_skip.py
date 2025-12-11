@@ -20,7 +20,8 @@ class TestSkipDecorator:
         items = collector.collect(session)
 
         assert len(items) == 1
-        assert items[0].skip_reason == "Skipped"
+        assert items[0].skip is not None
+        assert items[0].skip.reason == "Skipped"
 
     def test_skip_with_string_sets_reason(self) -> None:
         session = ProTestSession()
@@ -33,7 +34,8 @@ class TestSkipDecorator:
         items = collector.collect(session)
 
         assert len(items) == 1
-        assert items[0].skip_reason == "WIP: need auth refactor"
+        assert items[0].skip is not None
+        assert items[0].skip.reason == "WIP: need auth refactor"
 
     def test_no_skip_has_none_reason(self) -> None:
         session = ProTestSession()
@@ -46,7 +48,7 @@ class TestSkipDecorator:
         items = collector.collect(session)
 
         assert len(items) == 1
-        assert items[0].skip_reason is None
+        assert items[0].skip is None
 
     def test_suite_skip_decorator(self) -> None:
         session = ProTestSession()
@@ -61,7 +63,8 @@ class TestSkipDecorator:
         items = collector.collect(session)
 
         assert len(items) == 1
-        assert items[0].skip_reason == "Suite test skipped"
+        assert items[0].skip is not None
+        assert items[0].skip.reason == "Suite test skipped"
 
 
 class TestSkipExecution:
