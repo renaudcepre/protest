@@ -72,7 +72,10 @@ export function appendTest(payload) {
 
   const suiteStats = state.suites.get(suitePath)
   if (payload.outcome === 'pass') suiteStats.pass++
-  if (payload.outcome === 'fail' || payload.outcome === 'error') suiteStats.fail++
+  if (payload.outcome === 'fail' || payload.outcome === 'error') {
+    suiteStats.fail++
+    suiteEl.setAttribute('open', '')
+  }
 
   suiteEl.querySelector('[data-type="pass"]').textContent = suiteStats.pass
   suiteEl.querySelector('[data-type="fail"]').textContent = suiteStats.fail
