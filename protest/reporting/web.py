@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 import traceback
 from http import HTTPStatus
 from pathlib import Path
@@ -107,15 +108,14 @@ class WebReporter(PluginBase):
     def set_target(self, target: str) -> None:
         self._session_target = target
 
-    def on_session_start(self) -> None:
+    def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
         try:
             self._ws = ws_connect(f"ws://localhost:{self._port}/ws")
-            print(f"Connected to live reporter at http://localhost:{self._port}")
+            time.sleep(0.05)  # Let server register the connection
         except Exception:
-            print(f"Live reporter not running. Start with: protest live")
             self._ws = None
+            return items
 
-    def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
         self._total_tests = len(items)
         self._send(
             "SESSION_START",
