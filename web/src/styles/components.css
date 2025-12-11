@@ -106,10 +106,41 @@
   background: transparent;
 }
 
+.test-cell[data-state="setup"] {
+  border-color: var(--color-running);
+  background: transparent;
+  animation: pulse 0.6s ease-in-out infinite;
+}
+
 .test-cell[data-state="running"] {
   border-color: var(--color-running);
   background: var(--color-running);
   animation: pulse 0.8s ease-in-out infinite;
+}
+
+.test-cell[data-state="teardown-pass"] {
+  border-color: var(--color-pass);
+  background: transparent;
+}
+
+.test-cell[data-state="teardown-fail"] {
+  border-color: var(--color-fail);
+  background: transparent;
+}
+
+.test-cell[data-state="teardown-skip"] {
+  border-color: var(--color-skip);
+  background: transparent;
+}
+
+.test-cell[data-state="teardown-xfail"] {
+  border-color: var(--color-xfail);
+  background: transparent;
+}
+
+.test-cell[data-state="teardown-error"] {
+  border-color: var(--color-error);
+  background: transparent;
 }
 
 .test-cell[data-state="pass"] {

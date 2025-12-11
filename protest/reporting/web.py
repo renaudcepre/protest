@@ -2,16 +2,25 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 import traceback
 from http import HTTPStatus
+from logging import LogRecord
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from protest.execution.capture import add_log_callback, remove_log_callback
 from protest.plugin import PluginBase
 
 if TYPE_CHECKING:
-    from protest.entities import SessionResult, TestItem, TestResult
+    from protest.entities import (
+        SessionResult,
+        TestItem,
+        TestResult,
+        TestStartInfo,
+        TestTeardownInfo,
+    )
 
 try:
     from websockets.asyncio.server import serve as ws_serve
@@ -95,6 +104,7 @@ class WebReporter(PluginBase):
         self._ws: Any = None
         self._total_tests = 0
         self._session_target: str = ""
+        self._test_logs: dict[str, list[str]] = {}
 
     def _send(self, msg_type: str, payload: dict[str, Any]) -> None:
         if not self._ws:
@@ -108,6 +118,13 @@ class WebReporter(PluginBase):
     def set_target(self, target: str) -> None:
         self._session_target = target
 
+    def _on_log(self, node_id: str, record: LogRecord) -> None:
+        if node_id not in self._test_logs:
+            self._test_logs[node_id] = []
+        level = logging.getLevelName(record.levelno)
+        log_line = f"{level}:{record.name}:{record.getMessage()}"
+        self._test_logs[node_id].append(log_line)
+
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
         try:
             self._ws = ws_connect(f"ws://localhost:{self._port}/ws")
@@ -116,12 +133,25 @@ class WebReporter(PluginBase):
             self._ws = None
             return items
 
+        add_log_callback(self._on_log)
+        self._test_logs.clear()
+
         self._total_tests = len(items)
         self._send(
             "SESSION_START",
             {"target": self._session_target, "totalTests": self._total_tests},
         )
         return items
+
+    def on_test_acquired(self, info: TestStartInfo) -> None:
+        self._send("TEST_SETUP", {"nodeId": info.node_id})
+
+    def on_test_setup_done(self, info: TestStartInfo) -> None:
+        self._send("TEST_RUNNING", {"nodeId": info.node_id})
+
+    def on_test_teardown_start(self, info: TestTeardownInfo) -> None:
+        outcome = info.outcome.name.lower().removeprefix("test_")
+        self._send("TEST_TEARDOWN", {"nodeId": info.node_id, "outcome": outcome})
 
     def on_test_pass(self, result: TestResult) -> None:
         self._send("TEST_PASS", self._result_payload(result))
@@ -150,6 +180,7 @@ class WebReporter(PluginBase):
         )
 
     def on_session_complete(self, result: SessionResult) -> None:
+        remove_log_callback(self._on_log)
         self._send("SESSION_END", {})
         if self._ws:
             self._ws.close()
@@ -162,6 +193,11 @@ class WebReporter(PluginBase):
             "nodeId": result.node_id,
             "duration": result.duration,
         }
+        if result.output:
+            payload["stdout"] = result.output
+        logs = self._test_logs.pop(result.node_id, [])
+        if logs:
+            payload["logs"] = "\n".join(logs)
         if include_error and result.error:
             payload["message"] = str(result.error)
             payload["traceback"] = _format_traceback(result.error)

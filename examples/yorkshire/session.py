@@ -18,10 +18,11 @@ from protest import (
     Retry,
     Use,
     caplog,
+    factory,
+    fixture,
     mocker,
     raises,
 )
-from protest.di.decorators import fixture
 from protest.entities import LogCapture
 
 session = ProTestSession(concurrency=4)
@@ -46,14 +47,15 @@ def configure_kennel_logging() -> Generator[None, None, None]:
 @session.fixture(tags=["database", "slow-setup"])
 async def kennel() -> AsyncGenerator[Kennel, None]:
     kennel_instance = Kennel()
+    await asyncio.sleep(3)
     yield kennel_instance
     print("  [kennel] starting LONG teardown (1 seconds)...")  # noqa
-    await asyncio.sleep(1)
+    await asyncio.sleep(3)
     print("  [kennel] teardown complete!")  # noqa
     await kennel_instance.clear()
 
 
-@session.factory()
+@factory()
 async def yorkshire_factory(
     kennel_fixture: Annotated[Kennel, Use(kennel)],
     name: str = "Unnamed",
@@ -63,7 +65,9 @@ async def yorkshire_factory(
 ) -> Yorkshire:
     dog = Yorkshire(name=name, size=size, job=job, age=age)
     await kennel_fixture.add(dog)
+    await asyncio.sleep(age / 50)
     yield dog
+    await asyncio.sleep(age / 20)
     await kennel_fixture.remove(dog.name)
 
 
@@ -107,11 +111,11 @@ def setup_work_environment() -> Generator[None, None, None]:
 # =============================================================================
 
 
-@workers_suite.fixture()
+@fixture()
 async def working_dog(
-    factory: Annotated[FixtureFactory[Yorkshire], Use(yorkshire_factory)],
+    dog_factory: Annotated[FixtureFactory[Yorkshire], Use(yorkshire_factory)],
 ) -> Yorkshire:
-    return await factory(name="Rex", job=Job.DETECTIVE, age=36)
+    return await dog_factory(name="Rex", job=Job.DETECTIVE, age=36)
 
 
 # =============================================================================
