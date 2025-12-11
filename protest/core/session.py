@@ -77,9 +77,11 @@ class ProTestSession:
         self._keyword_filter_plugin: KeywordFilterPlugin | None = None
         self._exitfirst: bool = False
         self._capture: bool = True
+        self._default_reporter: PluginBase | None = None
 
         if default_reporter:
-            self.use(get_reporter())
+            self._default_reporter = get_reporter()
+            self.use(self._default_reporter)
         if default_cache:
             self._cache_plugin = CachePlugin()
         if include_tags or exclude_tags:
@@ -312,6 +314,26 @@ class ProTestSession:
             handler = getattr(plugin, method_name, None)
             if handler and callable(handler):
                 self._events.on(event, handler)
+
+    def _unuse(self, plugin: PluginBase) -> None:
+        """Retire un plugin du bus d'événements."""
+        for event in Event:
+            method_name = f"on_{event.value}"
+            handler = getattr(plugin, method_name, None)
+            if handler and callable(handler):
+                self._events.off(event, handler)
+
+    def set_default_reporter(self, reporter: PluginBase) -> None:
+        """Replace the default reporter (RichReporter/AsciiReporter).
+
+        This only replaces the default console reporter, not any custom
+        reporters added via use(). Use this to switch between Rich and ASCII
+        output modes at runtime.
+        """
+        if self._default_reporter is not None:
+            self._unuse(self._default_reporter)
+        self._default_reporter = reporter
+        self.use(reporter)
 
     async def __aenter__(self) -> Self:
         self._register_fixtures()

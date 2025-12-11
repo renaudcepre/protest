@@ -65,7 +65,7 @@ def run_session(  # noqa: PLR0913
 
     if force_no_color:
         reporter = get_reporter(force_no_color=force_no_color)
-        session.use(reporter)
+        session.set_default_reporter(reporter)
 
     if concurrency is not None:
         session.concurrency = concurrency
