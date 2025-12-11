@@ -10,6 +10,7 @@ import {
   appendTest,
   appendFailure,
   renderFinalSummary,
+  updateTestCell,
 } from './render.js'
 
 export const handlers = {
@@ -25,6 +26,18 @@ export const handlers = {
     dom.connectionText.textContent = 'Running...'
     renderSessionInfo(payload.target)
     renderProgress()
+  },
+
+  TEST_SETUP(payload) {
+    updateTestCell(payload.nodeId, 'setup')
+  },
+
+  TEST_RUNNING(payload) {
+    updateTestCell(payload.nodeId, 'running')
+  },
+
+  TEST_TEARDOWN(payload) {
+    updateTestCell(payload.nodeId, `teardown-${payload.outcome}`)
   },
 
   TEST_PASS(payload) {
@@ -72,6 +85,7 @@ export const handlers = {
 }
 
 export function handleMessage(msg) {
+  console.log('[WS]', msg.type, msg.payload?.nodeId?.split('::').pop() || '')
   const handler = handlers[msg.type]
   if (handler) {
     handler(msg.payload)

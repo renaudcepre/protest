@@ -118,3 +118,30 @@ export function renderFinalSummary() {
   }
   dom.timer.classList.remove('timer-running')
 }
+
+export function updateTestCell(nodeId, cellState) {
+  const suitePath = extractSuitePath(nodeId)
+  let suiteEl = dom.suitesContainer.querySelector(`[data-suite="${CSS.escape(suitePath)}"]`)
+
+  if (!suiteEl) {
+    dom.suitesContainer.insertAdjacentHTML('beforeend', suiteCard(suitePath))
+    suiteEl = dom.suitesContainer.querySelector(`[data-suite="${CSS.escape(suitePath)}"]`)
+    state.suites.set(suitePath, { pass: 0, fail: 0, expanded: false })
+  }
+
+  const grid = suiteEl.querySelector('.test-grid')
+  const nodeIdEscaped = CSS.escape(nodeId)
+  let cell = grid.querySelector(`[data-node-id="${nodeIdEscaped}"]`)
+
+  if (!cell) {
+    cell = document.createElement('div')
+    cell.className = 'test-cell'
+    cell.dataset.nodeId = nodeId
+    const testName = nodeId.split('::').pop()
+    cell.dataset.tooltip = testName
+    grid.appendChild(cell)
+  }
+
+  cell.dataset.state = cellState
+  dom.emptyState.style.display = 'none'
+}

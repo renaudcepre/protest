@@ -15,6 +15,7 @@ from protest.entities.events import (
     TestResult,
     TestRetryInfo,
     TestStartInfo,
+    TestTeardownInfo,
 )
 from protest.entities.log_capture import LogCapture
 from protest.entities.retry import Retry, normalize_retry
@@ -39,6 +40,7 @@ __all__ = [
     "TestResult",
     "TestRetryInfo",
     "TestStartInfo",
+    "TestTeardownInfo",
     "Xfail",
     "normalize_retry",
     "normalize_skip",

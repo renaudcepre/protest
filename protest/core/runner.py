@@ -18,6 +18,7 @@ from protest.entities import (
     TestOutcome,
     TestRetryInfo,
     TestStartInfo,
+    TestTeardownInfo,
 )
 from protest.events.types import Event
 from protest.exceptions import FixtureError
@@ -301,6 +302,14 @@ class TestRunner:
                     self._session.resolver, item.suite_path
                 ) as ctx:
                     outcome = await self._run_test(item, ctx, buffer, start_info)
+                    teardown_info = TestTeardownInfo(
+                        name=start_info.name,
+                        node_id=start_info.node_id,
+                        outcome=outcome.event,
+                    )
+                    await self._session.events.emit(
+                        Event.TEST_TEARDOWN_START, teardown_info
+                    )
             return outcome  # pyright: ignore[reportPossiblyUnboundVariable]
         finally:
             reset_current_node_id(node_id_token)
@@ -461,8 +470,6 @@ class TestRunner:
                     await asyncio.sleep(retry_delay)
                 continue
             break
-
-        await self._session.events.emit(Event.TEST_TEARDOWN_START, start_info)
 
         return self._outcome_builder.build(
             TestExecutionResult(
