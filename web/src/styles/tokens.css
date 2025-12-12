@@ -21,14 +21,16 @@
   --color-running: #60a5fa;
 
   /* Syntax highlighting */
-  --syn-keyword: #c792ea;
-  --syn-string: #c3e88d;
-  --syn-number: #f78c6c;
+  --syn-keyword: #813d9c;
+  --syn-string: #a5d6ff;
+  --syn-number: #79c0ff;
   --syn-comment: #546e7a;
-  --syn-function: #82aaff;
-  --syn-path: #89ddff;
-  --syn-error: #ff5370;
+  --syn-function: #ff00f3;
+  --syn-path: #2ec27e;
+  --syn-error: #c01c28;
+  --syn-caret: #f6d32d;
   --syn-lineno: #4a5568;
+  --syn-dim: #c0bfbc;
 
   /* Spacing */
   --space-xs: 4px;

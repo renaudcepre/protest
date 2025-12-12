@@ -366,9 +366,10 @@ body.hide-passed .test[data-outcome="pass"] {
 .syn-comment { color: var(--syn-comment); font-style: italic; }
 .syn-function { color: var(--syn-function); }
 .syn-path { color: var(--syn-path); }
-.syn-error { color: var(--syn-error); font-weight: 500; }
+.syn-error { color: var(--syn-error); font-weight: 600; }
 .syn-lineno { color: var(--syn-lineno); user-select: none; }
-.syn-caret { color: var(--color-fail); }
+.syn-caret { color: var(--syn-caret); }
+.syn-dim { color: var(--syn-dim); }
 
 /* Empty State */
 .empty-state {

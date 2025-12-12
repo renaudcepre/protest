@@ -50,7 +50,7 @@ async def kennel() -> AsyncGenerator[Kennel, None]:
     await asyncio.sleep(3)
     yield kennel_instance
     print("  [kennel] starting LONG teardown (1 seconds)...")  # noqa
-    await asyncio.sleep(3)
+    await asyncio.sleep(6)
     print("  [kennel] teardown complete!")  # noqa
     await kennel_instance.clear()
 
@@ -78,7 +78,7 @@ async def yorkshire_factory(
 
 puppies_suite = ProTestSuite("Puppies", tags=["puppy"])
 adults_suite = ProTestSuite("Adults")
-workers_suite = ProTestSuite("Workers", tags=["working"])
+workers_suite = ProTestSuite("Workers", tags=["working"], max_concurrency=2)
 unemployed_suite = ProTestSuite("Unemployed")
 seniors_suite = ProTestSuite("Seniors", tags=["senior"])
 legacy_suite = ProTestSuite(
