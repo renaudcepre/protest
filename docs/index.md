@@ -13,7 +13,7 @@ ProTest isn't just another test runner. It's built for **modern Python**: typed,
 Run HTTP tests in parallel for nearly free. No heavy processes, no RAM explosion—just asyncio.
 
 ```bash
-protest tests:session -n 10
+protest run tests:session -n 10
 ```
 
 *pytest-xdist spawns processes. ProTest uses coroutines.*
@@ -46,7 +46,7 @@ def test_users(repo: Annotated[Repo, Use(user_repo)]): ...  # Also tagged "datab
 ```
 
 ```bash
-protest tests:session --exclude-tag database  # Skips ALL tests touching DB
+protest run tests:session --no-tag database  # Skips ALL tests touching DB
 ```
 
 *No manual tagging. No forgotten markers.*
