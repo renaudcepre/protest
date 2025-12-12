@@ -20,7 +20,7 @@ Run HTTP tests in parallel for nearly free. No heavy processes, no RAM explosion
 asyncio.
 
 ```bash
-protest tests:session -n 10
+protest run tests:session -n 10
 ```
 
 *pytest-xdist spawns processes. ProTest uses coroutines.*
@@ -52,7 +52,7 @@ def test_users(repo: Annotated[Repo, Use(user_repo)]): ...  # Also tagged "datab
 ```
 
 ```bash
-protest tests:session --exclude-tag database  # Skips ALL tests touching DB
+protest run tests:session --no-tag database  # Skips ALL tests touching DB
 ```
 
 *No manual tagging. No forgotten markers.*
@@ -135,7 +135,7 @@ def test_answer():
 ```
 
 ```bash
-protest test_sample:session
+protest run test_sample:session
 ```
 
 ## Explicit Dependencies
@@ -190,25 +190,21 @@ def test_user(user: Annotated[User, Use(get_test_user)]):
 ## Installation
 
 ```bash
-pip install protest
-```
-
-Or with uv:
-
-```bash
-uv add protest
+git clone https://github.com/renaudcepre/protest.git
+cd protest
+uv sync
 ```
 
 ## CLI Usage
 
 ```bash
-protest module:session                    # Run tests
-protest module:session -n 4               # Parallel (4 workers)
-protest module:session --lf               # Re-run failed tests only
-protest module:session --collect-only     # List tests without running
-protest module:session --cache-clear      # Clear cache before run
-protest --app-dir src module:session      # Look for module in src/
-protest module:session --ctrf-output r.json  # CTRF report for CI/CD
+protest run module:session                    # Run tests
+protest run module:session -n 4               # Parallel (4 workers)
+protest run module:session --lf               # Re-run failed tests only
+protest run module:session --collect-only     # List tests without running
+protest run module:session --cache-clear      # Clear cache before run
+protest run module:session --app-dir src      # Look for module in src/
+protest run module:session --ctrf-output r.json  # CTRF report for CI/CD
 ```
 
 ## API Reference
@@ -222,7 +218,6 @@ Main entry point. Orchestrates test execution.
 ```python
 session = ProTestSession(
     concurrency=1,  # Default parallel workers
-    autouse=[fixture1]  # Auto-resolve these fixtures at session start
 )
 
 
@@ -230,7 +225,7 @@ session = ProTestSession(
 def test_something(): ...
 
 
-session.include_suite(my_suite)
+session.add_suite(my_suite)
 session.use(my_plugin)
 ```
 
@@ -248,7 +243,7 @@ api_suite = ProTestSuite(name="api", max_concurrency=8)
 async def test_endpoint(): ...
 
 
-session.include_suite(api_suite)
+session.add_suite(api_suite)
 ```
 
 ### Fixtures
@@ -258,6 +253,11 @@ Fixtures are scoped based on where they are decorated:
 - `@session.fixture()` - Session scope (lives entire session)
 - `@suite.fixture()` - Suite scope (lives while suite runs)
 - `@fixture()` - Function scope (fresh per test)
+
+For fixtures that should be auto-resolved at scope start (without explicit `Use()`):
+
+- `@session.autouse()` - Auto-resolved before any test runs
+- `@suite.autouse()` - Auto-resolved when suite starts
 
 ```python
 # Session-scoped fixture with teardown
@@ -455,8 +455,8 @@ session.use(SlackNotifier())
 Re-run only failed tests:
 
 ```bash
-protest module:session --lf           # Run last-failed tests
-protest module:session --cache-clear  # Clear cache
+protest run module:session --lf           # Run last-failed tests
+protest run module:session --cache-clear  # Clear cache
 ```
 
 Cache stored in `.protest/cache.json`.

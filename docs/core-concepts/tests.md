@@ -34,8 +34,9 @@ Tests declare their dependencies using type annotations:
 
 ```python
 from typing import Annotated
-from protest import Use
+from protest import Use, fixture
 
+@fixture()
 def database():
     return Database()
 

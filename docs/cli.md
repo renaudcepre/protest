@@ -298,14 +298,25 @@ protest tags list <target> [options]
 # List all declared tags
 protest tags list tests:session
 # Output:
-# Tags: api, database, integration, slow, unit
+# api
+# database
+# integration
+# slow
+# unit
 
 # Show tags per test (includes inherited)
 protest tags list tests:session -r
 # Output:
-# test_api_call: api, integration
-# test_db_query: database, slow
-# test_simple: unit
+# Effective tags for 3 test(s):
+#
+#   API::test_api_call
+#     tags: api, integration
+#
+#   API::test_db_query
+#     tags: database, slow
+#
+#   test_simple
+#     tags: unit
 ```
 
 ---

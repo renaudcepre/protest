@@ -24,13 +24,7 @@ ProTest automatically selects the best reporter:
 ## Force a Mode
 
 ```bash
-# Force live mode (interactive terminal only)
-protest run demo:session --live
-
-# Force sequential mode (CI/logs)
-protest run demo:session --no-live
-
-# Disable colors
+# Disable colors (forces ASCII mode)
 protest run demo:session --no-color
 ```
 
@@ -60,12 +54,10 @@ from protest import ProTestSession
 
 session = ProTestSession()
 
-# Force a specific reporter mode
+# Force ASCII mode (no colors)
 run_session(
     session,
-    force_live=True,      # Force live mode
-    force_no_live=True,   # Force sequential mode
-    force_no_color=True,  # Force ASCII mode
+    force_no_color=True,
 )
 ```
 
