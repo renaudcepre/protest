@@ -18,7 +18,8 @@ api_suite = ProTestSuite("API")
 session.add_suite(api_suite)
 
 
-# Define a fixture (a reusable piece of setup)
+# Define a function-scoped fixture (fresh instance per test)
+# Use @session.fixture() for session scope, @suite.fixture() for suite scope
 @fixture()
 def config():
     return {"api_url": "https://api.example.com"}

@@ -3,17 +3,14 @@
 ## Requirements
 
 - Python 3.10 or higher
+- [uv](https://docs.astral.sh/uv/) (recommended package manager)
 
-## Install with pip
-
-```bash
-pip install protest
-```
-
-## Install with uv
+## Install from source
 
 ```bash
-uv add protest
+git clone https://github.com/renaudcepre/protest.git
+cd protest
+uv sync
 ```
 
 ## Optional: Rich Output
@@ -21,24 +18,5 @@ uv add protest
 ProTest automatically uses [Rich](https://rich.readthedocs.io/) for better terminal output if installed. If Rich is not available, it falls back to plain ASCII output.
 
 ```bash
-pip install rich
-```
-
-## Verify Installation
-
-```bash
-protest --help
-```
-
-You should see the available commands:
-
-```
-Usage: protest [OPTIONS] COMMAND [ARGS]...
-
-Options:
-  --help  Show this message and exit.
-
-Commands:
-  run   Run tests from a session
-  tags  Tag-related commands
+uv add rich
 ```
