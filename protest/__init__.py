@@ -11,6 +11,13 @@ from protest.fixtures.builtins import caplog, mocker
 from protest.fixtures.mocker import AsyncMockType, Mocker, MockType
 from protest.loader import LoadError, load_session
 from protest.plugin import PluginBase
+from protest.steps import (
+    StepInfo,
+    add_step_callback,
+    remove_step_callback,
+    step,
+    step_sync,
+)
 
 __version__ = "0.1.0"
 
@@ -33,9 +40,11 @@ __all__ = [
     "RaisesContext",
     "Retry",
     "Skip",
+    "StepInfo",
     "Use",
     "Xfail",
     "__version__",
+    "add_step_callback",
     "caplog",
     "collect_tests",
     "factory",
@@ -44,5 +53,8 @@ __all__ = [
     "load_session",
     "mocker",
     "raises",
+    "remove_step_callback",
     "run_session",
+    "step",
+    "step_sync",
 ]
