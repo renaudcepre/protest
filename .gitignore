@@ -12,6 +12,6 @@ wheels/
 .cursor
 .idea
 /.coverage
-/.claude/
+
 .protest/
 /ctrf-report.json
