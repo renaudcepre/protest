@@ -1,5 +1,4 @@
 import asyncio
-import contextlib
 import io
 import time
 from inspect import signature
@@ -85,7 +84,6 @@ class TestRunner:
         await self._session.events.emit(Event.SESSION_START)
 
         tracker = SuiteTracker.from_items(items)
-        semaphore = asyncio.Semaphore(self._session.concurrency)
         suite_semaphores = self._build_suite_semaphores(items)
 
         total_counts = TestCounts()
@@ -108,7 +106,6 @@ class TestRunner:
 
                 total_counts = await self._run_all_parallel(
                     items,
-                    semaphore,
                     suite_semaphores,
                     tracker,
                 )
@@ -187,107 +184,195 @@ class TestRunner:
     async def _run_all_parallel(
         self,
         items: list[TestItem],
-        global_semaphore: asyncio.Semaphore,
         suite_semaphores: dict[str | None, asyncio.Semaphore],
         tracker: SuiteTracker,
     ) -> TestCounts:
-        """Run all tests in parallel with cross-suite execution."""
+        """Run all tests in parallel using a worker pool (FIFO order).
+
+        Uses a Queue + Workers pattern instead of creating all tasks at once.
+        This provides O(concurrency) memory usage instead of O(N) tasks,
+        and guarantees FIFO execution order.
+        """
         if not items:
             return TestCounts()
 
+        # Create work queue (FIFO)
+        work_queue: asyncio.Queue[TestItem | None] = asyncio.Queue()
+        for item in items:
+            await work_queue.put(item)
+
+        # Add sentinel values to stop workers
+        for _ in range(self._session.concurrency):
+            await work_queue.put(None)
+
+        # Shared state
         stop_flag = asyncio.Event() if self._session.exitfirst else None
+        results: list[TestOutcome] = []
+        results_lock = asyncio.Lock()
         handler = self._interrupt_handler
 
-        async def run_one(item: TestItem) -> TestOutcome | None:
-            if handler.soft_stop_event.is_set():
-                return None
-
-            suite_path = item.suite.full_path if item.suite else None
-            suite_sem = suite_semaphores.get(suite_path)
-
-            if suite_path:
-                await self._ensure_suite_hierarchy_started(suite_path)
-
-            test_name = get_callable_name(item.func)
-            node_id = item.node_id
-            start_info = TestStartInfo(name=test_name, node_id=node_id)
-            await self._session.events.emit(Event.TEST_START, start_info)
-
-            async with global_semaphore:
+        async def worker() -> None:
+            """Worker that processes tests from the queue in FIFO order."""
+            while True:
+                # Early exit checks before getting next item
                 if handler.soft_stop_event.is_set():
-                    return None
+                    return
                 if stop_flag and stop_flag.is_set():
+                    return
+
+                # Get next item (FIFO)
+                item = await work_queue.get()
+                if item is None:  # Sentinel - no more work
+                    work_queue.task_done()
+                    return
+
+                try:
+                    outcome = await self._process_test_item(
+                        item, suite_semaphores, tracker, stop_flag
+                    )
+                    if outcome:
+                        async with results_lock:
+                            results.append(outcome)
+
+                        # exitfirst: signal stop on failure
+                        if stop_flag and (
+                            outcome.counts.failed or outcome.counts.errored
+                        ):
+                            stop_flag.set()
+                finally:
+                    work_queue.task_done()
+
+        # Launch workers (number of workers = concurrency limit)
+        worker_tasks = [
+            asyncio.create_task(worker()) for _ in range(self._session.concurrency)
+        ]
+
+        # Wait for completion with interrupt support
+        await self._wait_with_interrupt(worker_tasks, stop_flag)
+
+        # Aggregate results
+        return self._aggregate_results(results)
+
+    def _should_stop(self, stop_flag: asyncio.Event | None) -> bool:
+        """Check if execution should stop (interrupt or exitfirst)."""
+        return self._interrupt_handler.soft_stop_event.is_set() or bool(
+            stop_flag and stop_flag.is_set()
+        )
+
+    async def _process_test_item(
+        self,
+        item: TestItem,
+        suite_semaphores: dict[str | None, asyncio.Semaphore],
+        tracker: SuiteTracker,
+        stop_flag: asyncio.Event | None,
+    ) -> TestOutcome | None:
+        """Process a single test item. Returns None if interrupted."""
+        # Re-check flags (another worker may have set them)
+        if self._should_stop(stop_flag):
+            return None
+
+        suite_path = item.suite.full_path if item.suite else None
+        suite_sem = suite_semaphores.get(suite_path)
+
+        # Ensure suite hierarchy is started (with autouse fixtures)
+        if suite_path:
+            await self._ensure_suite_hierarchy_started(suite_path)
+
+        # Emit TEST_START before execution (preserves current behavior)
+        test_name = get_callable_name(item.func)
+        node_id = item.node_id
+        start_info = TestStartInfo(name=test_name, node_id=node_id)
+        await self._session.events.emit(Event.TEST_START, start_info)
+
+        # Check flags again after potential await
+        if self._should_stop(stop_flag):
+            return None
+
+        # Execute with suite semaphore if applicable
+        if suite_sem:
+            async with suite_sem:
+                if self._should_stop(stop_flag):
                     return None
+                outcome = await self._execute_test(item, start_info)
+        else:
+            outcome = await self._execute_test(item, start_info)
 
-                if suite_sem:
-                    async with suite_sem:
-                        if handler.soft_stop_event.is_set():
-                            return None
-                        if stop_flag and stop_flag.is_set():
-                            return None
-                        outcome = await self._execute_test(item, start_info)
-                else:
-                    outcome = await self._execute_test(item, start_info)
+        # Emit result event
+        await self._session.events.emit(outcome.event, outcome.result)
 
-                if stop_flag and (outcome.counts.failed or outcome.counts.errored):
-                    stop_flag.set()
+        # Track suite completion and trigger teardown if last test
+        if suite_path and await tracker.mark_completed(suite_path):
+            await self._teardown_suite(suite_path)
+        elif suite_path is None:
+            await tracker.mark_completed(None)
 
-            await self._session.events.emit(outcome.event, outcome.result)
+        return outcome
 
-            if suite_path and await tracker.mark_completed(suite_path):
-                await self._teardown_suite(suite_path)
-            elif suite_path is None:
-                await tracker.mark_completed(None)
-
-            return outcome
-
-        tasks = [asyncio.create_task(run_one(item)) for item in items]
-
-        if self._session.exitfirst and stop_flag:
-            return await self._run_with_exitfirst(tasks, stop_flag)
-
-        return await self._gather_with_interrupt(tasks)
-
-    async def _gather_with_interrupt(
-        self, tasks: list[asyncio.Task[TestOutcome | None]]
-    ) -> TestCounts:
-        """Gather tasks with support for interrupt-based cancellation."""
+    async def _wait_with_interrupt(
+        self,
+        worker_tasks: list[asyncio.Task[None]],
+        stop_flag: asyncio.Event | None = None,
+    ) -> None:
+        """Wait for workers to complete with interrupt and exitfirst support."""
         handler = self._interrupt_handler
 
-        async def wait_for_force_teardown() -> bool:
+        async def wait_workers() -> None:
+            await asyncio.gather(*worker_tasks, return_exceptions=True)
+
+        async def wait_force_teardown() -> bool:
             await handler.force_teardown_event.wait()
             return True
 
-        async def gather_all() -> list[TestOutcome | BaseException | None]:
-            return await asyncio.gather(*tasks, return_exceptions=True)
+        async def wait_stop_flag() -> bool:
+            if stop_flag:
+                await stop_flag.wait()
+            return True
 
-        force_wait_task = asyncio.create_task(wait_for_force_teardown())
-        gather_task = asyncio.create_task(gather_all())
+        workers_done = asyncio.create_task(wait_workers())
+        force_teardown = asyncio.create_task(wait_force_teardown())
 
-        done, _ = await asyncio.wait(
-            {force_wait_task, gather_task}, return_when=asyncio.FIRST_COMPLETED
-        )
+        wait_tasks: set[asyncio.Task[None] | asyncio.Task[bool]] = {
+            workers_done,
+            force_teardown,
+        }
 
-        if force_wait_task in done:
+        # Add exitfirst monitor if enabled
+        exitfirst_task: asyncio.Task[bool] | None = None
+        if stop_flag:
+            exitfirst_task = asyncio.create_task(wait_stop_flag())
+            wait_tasks.add(exitfirst_task)
+
+        done, _ = await asyncio.wait(wait_tasks, return_when=asyncio.FIRST_COMPLETED)
+
+        if force_teardown in done:
+            # Force teardown triggered - cancel all workers
             await self._session.events.emit(Event.SESSION_INTERRUPTED, True)
-            gather_task.cancel()
-            for task in tasks:
+            for task in worker_tasks:
                 if not task.done():
                     task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
+            await asyncio.gather(*worker_tasks, return_exceptions=True)
+            if exitfirst_task:
+                exitfirst_task.cancel()
+        elif exitfirst_task and exitfirst_task in done:
+            # Exitfirst triggered - cancel workers running slow tests
+            for task in worker_tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*worker_tasks, return_exceptions=True)
+            force_teardown.cancel()
         else:
-            force_wait_task.cancel()
+            # Workers completed normally
+            force_teardown.cancel()
+            if exitfirst_task:
+                exitfirst_task.cancel()
             if handler.soft_stop_event.is_set():
                 await self._session.events.emit(Event.SESSION_INTERRUPTED, False)
 
+    def _aggregate_results(self, results: list[TestOutcome]) -> TestCounts:
+        """Aggregate test outcomes into total counts."""
         total = TestCounts()
-        for task in tasks:
-            if task.cancelled():
-                continue
-            with contextlib.suppress(Exception):
-                outcome = task.result()
-                if outcome:
-                    total = total + outcome.counts
+        for outcome in results:
+            total = total + outcome.counts
         return total
 
     async def _execute_test(
@@ -323,36 +408,6 @@ class TestRunner:
         finally:
             set_session_teardown_capture(False)
         await self._session.events.emit(Event.SUITE_TEARDOWN_DONE, suite_path)
-
-    async def _run_with_exitfirst(
-        self,
-        tasks: list[asyncio.Task[TestOutcome | None]],
-        stop_flag: asyncio.Event,
-    ) -> TestCounts:
-        """Run tasks and cancel remaining on first failure."""
-        total = TestCounts()
-        pending = set(tasks)
-
-        while pending:
-            done, pending = await asyncio.wait(
-                pending, return_when=asyncio.FIRST_COMPLETED
-            )
-            for task in done:
-                outcome = task.result()
-                if outcome is None:
-                    continue
-                total = total + outcome.counts
-
-                if outcome.counts.failed or outcome.counts.errored:
-                    stop_flag.set()
-                    for remaining in pending:
-                        remaining.cancel()
-                    for remaining in pending:
-                        with contextlib.suppress(asyncio.CancelledError):
-                            await remaining
-                    return total
-
-        return total
 
     async def _resolve_test_kwargs(
         self,
