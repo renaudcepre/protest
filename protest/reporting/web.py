@@ -5,6 +5,7 @@ import json
 import logging
 import time
 import traceback
+import warnings
 from http import HTTPStatus
 from logging import LogRecord
 from pathlib import Path
@@ -23,10 +24,14 @@ if TYPE_CHECKING:
     )
 
 try:
-    from websockets.asyncio.server import serve as ws_serve
-    from websockets.datastructures import Headers
-    from websockets.http11 import Request, Response
-    from websockets.sync.client import connect as ws_connect
+    from websockets.asyncio.server import (  # type: ignore[import-not-found]
+        serve as ws_serve,
+    )
+    from websockets.datastructures import Headers  # type: ignore[import-not-found]
+    from websockets.http11 import Request, Response  # type: ignore[import-not-found]
+    from websockets.sync.client import (  # type: ignore[import-not-found]
+        connect as ws_connect,
+    )
 except ImportError as err:
     raise ImportError(
         "WebReporter requires 'websockets' package. "
@@ -127,6 +132,11 @@ class WebReporter(PluginBase):
             self._ws = ws_connect(f"ws://localhost:{self._port}/ws")
             time.sleep(0.05)  # Let server register the connection
         except Exception:
+            warnings.warn(
+                f"Cannot connect to live server on localhost:{self._port}. "
+                "Start it first with: protest live",
+                stacklevel=1,
+            )
             self._ws = None
             return items
 
