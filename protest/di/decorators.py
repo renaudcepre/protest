@@ -4,7 +4,7 @@ import functools
 from collections.abc import Callable
 from typing import Any, Generic, TypeVar
 
-from protest.core.collector import validate_no_from_params
+from protest.di.validation import validate_no_from_params
 from protest.entities import FixtureRegistration
 
 FuncT = TypeVar("FuncT", bound=Callable[..., object])
@@ -25,6 +25,13 @@ class FixtureWrapper(Generic[FuncT]):
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         return self.func(*args, **kwargs)
+
+
+def unwrap_fixture(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Extract the original function from a FixtureWrapper if needed."""
+    if isinstance(func, FixtureWrapper):
+        return func.func
+    return func
 
 
 def fixture(
