@@ -222,7 +222,7 @@ class TestFactoryWithTeardown:
 
 
 class TestFactoryCaching:
-    """Test that factory caching works correctly."""
+    """Test that factory caching works correctly when cache=True."""
 
     def test_factory_caches_by_kwargs(
         self, event_collector: tuple[PluginBase, CollectedEvents]
@@ -233,7 +233,7 @@ class TestFactoryCaching:
 
         call_count = 0
 
-        @session.factory()
+        @session.factory(cache=True)
         def user(username: str) -> dict[str, str]:
             nonlocal call_count
             call_count += 1
