@@ -7,7 +7,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from protest.entities import HandlerInfo, SessionResult, TestItem, TestResult
+from protest.entities import (
+    HandlerInfo,
+    SessionResult,
+    TestItem,
+    TestResult,
+    TestRetryInfo,
+)
 from protest.events.types import Event
 from protest.reporting.rich_reporter import (
     MIN_DURATION_THRESHOLD,
@@ -277,3 +283,177 @@ class TestRichReporterSessionComplete:
         assert "xpassed" in output
         assert "failed" in output
         assert "errors" in output
+
+
+class TestRichReporterRetry:
+    """Test retry-related output."""
+
+    @pytest.fixture
+    def reporter(self) -> RichReporter:
+        reporter = RichReporter()
+        output = StringIO()
+        reporter.console = MagicMock()
+        reporter.console.print = lambda msg: output.write(str(msg) + "\n")
+        reporter._output = output
+        return reporter
+
+    def test_on_test_retry_with_delay(self, reporter: RichReporter) -> None:
+        """Retry message includes delay when > 0."""
+        reporter.on_test_retry(
+            TestRetryInfo(
+                name="test_flaky",
+                node_id="module::test_flaky",
+                suite_path=None,
+                attempt=1,
+                max_attempts=3,
+                error=ValueError("boom"),
+                delay=1.5,
+            )
+        )
+        output = reporter._output.getvalue()
+        assert "test_flaky" in output
+        assert "attempt 1/3" in output
+        assert "retrying in 1.5s" in output
+        assert "ValueError" in output
+
+    def test_on_test_pass_with_retry(self, reporter: RichReporter) -> None:
+        """Pass message includes attempt info when retried."""
+        reporter.on_test_pass(
+            TestResult(
+                name="test_flaky",
+                node_id="module::test_flaky",
+                duration=0.1,
+                attempt=2,
+                max_attempts=3,
+            )
+        )
+        output = reporter._output.getvalue()
+        assert "test_flaky" in output
+        assert "attempt 2/3" in output
+
+    def test_on_test_fail_with_retry(self, reporter: RichReporter) -> None:
+        """Fail message includes attempt count when retried."""
+        reporter.on_test_fail(
+            TestResult(
+                name="test_flaky",
+                node_id="module::test_flaky",
+                duration=0.1,
+                error=ValueError("final fail"),
+                attempt=3,
+                max_attempts=3,
+            )
+        )
+        output = reporter._output.getvalue()
+        assert "test_flaky" in output
+        assert "3 attempts" in output
+
+
+class TestRichReporterInterrupt:
+    """Test interrupt messages."""
+
+    @pytest.fixture
+    def reporter(self) -> RichReporter:
+        reporter = RichReporter()
+        output = StringIO()
+        reporter.console = MagicMock()
+        reporter.console.print = lambda msg: output.write(str(msg) + "\n")
+        reporter._output = output
+        return reporter
+
+    def test_on_session_interrupted_force(self, reporter: RichReporter) -> None:
+        """Force teardown shows forcing message."""
+        reporter.on_session_interrupted(force_teardown=True)
+        output = reporter._output.getvalue()
+        assert "Forcing teardown" in output
+        assert "kill" in output.lower()
+
+
+class TestRichReporterStatusLine:
+    """Test status line with various states."""
+
+    def test_make_status_line_with_failures(self) -> None:
+        """Status line shows FAILURES when there are failures."""
+        reporter = RichReporter()
+        reporter._failed = 1
+        reporter._total_tests = 5
+        reporter._start_time = 0.0
+
+        status_line = reporter._make_status_line()
+        assert "FAILURES" in str(status_line)
+        assert "1 failed" in str(status_line)
+
+    def test_make_status_line_with_skipped(self) -> None:
+        """Status line shows skipped count."""
+        reporter = RichReporter()
+        reporter._skipped = 2
+        reporter._total_tests = 5
+        reporter._start_time = 0.0
+
+        status_line = reporter._make_status_line()
+        assert "2 skipped" in str(status_line)
+
+    def test_make_status_line_with_xfailed(self) -> None:
+        """Status line shows xfailed count."""
+        reporter = RichReporter()
+        reporter._xfailed = 1
+        reporter._total_tests = 5
+        reporter._start_time = 0.0
+
+        status_line = reporter._make_status_line()
+        assert "1 xfailed" in str(status_line)
+
+    def test_make_status_line_with_xpassed(self) -> None:
+        """Status line shows xpassed count with FAILURES."""
+        reporter = RichReporter()
+        reporter._xpassed = 1
+        reporter._total_tests = 5
+        reporter._start_time = 0.0
+
+        status_line = reporter._make_status_line()
+        assert "1 xpassed" in str(status_line)
+        assert "FAILURES" in str(status_line)  # xpassed triggers FAILURES status
+
+    def test_make_status_line_with_errors(self) -> None:
+        """Status line shows errors count with FAILURES."""
+        reporter = RichReporter()
+        reporter._errors = 1
+        reporter._total_tests = 5
+        reporter._start_time = 0.0
+
+        status_line = reporter._make_status_line()
+        assert "1 errors" in str(status_line)
+        assert "FAILURES" in str(status_line)
+
+
+class TestRichReporterFailureSummary:
+    """Test failure summary with captured output."""
+
+    def test_failure_detail_with_output(self) -> None:
+        """Failure detail shows captured output."""
+        reporter = RichReporter()
+        output = StringIO()
+
+        def capture_print(msg: str) -> None:
+            output.write(str(msg) + "\n")
+
+        reporter.console = MagicMock()
+        reporter.console.print = capture_print
+        reporter.console.is_terminal = False
+
+        reporter.on_test_fail(
+            TestResult(
+                name="test_fail",
+                node_id="module::test_fail",
+                duration=0.1,
+                error=ValueError("boom"),
+                output="captured line 1\ncaptured line 2",
+            )
+        )
+
+        reporter.on_session_complete(
+            SessionResult(passed=0, failed=1, errors=0, duration=1.0)
+        )
+        result = output.getvalue()
+        assert "Captured output" in result
+        assert "captured line 1" in result
+        assert "captured line 2" in result

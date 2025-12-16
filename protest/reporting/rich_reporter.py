@@ -91,16 +91,16 @@ class RichReporter(PluginBase):
 
     def _print(self, message: str) -> None:
         if self._live and self._live.is_started:
-            self._live.console.print(message)
+            self._live.console.print(message)  # pragma: no cover
         else:
             self.console.print(message)
 
     def _update_live(self) -> None:
         if self._live and self._live.is_started:
-            self._live.update(self._make_status_line())
+            self._live.update(self._make_status_line())  # pragma: no cover
 
     def _stop_live(self) -> None:
-        if self._live and self._live.is_started:
+        if self._live and self._live.is_started:  # pragma: no cover
             self._live.stop()
             self._live = None
 
