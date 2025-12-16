@@ -60,7 +60,7 @@ def fixture(
 
 
 def factory(
-    cache: bool = True,
+    cache: bool = False,
     managed: bool = True,
     tags: list[str] | None = None,
 ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
@@ -70,7 +70,7 @@ def factory(
     For session/suite scoped factories, use @session.factory() or @suite.factory().
 
     Args:
-        cache: If True (default), cache instances by kwargs within the test.
+        cache: If True, cache instances by kwargs within the test. Default False.
         managed: If True (default), wrap in FixtureFactory. If False, return as-is
                  wrapped in SafeProxy (for custom factory classes).
         tags: Tags for filtering tests that use this factory.

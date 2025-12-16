@@ -274,7 +274,7 @@ class ProTestSession:
 
     def factory(
         self,
-        cache: bool = True,
+        cache: bool = False,
         managed: bool = True,
         tags: list[str] | None = None,
     ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:

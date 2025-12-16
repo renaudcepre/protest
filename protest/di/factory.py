@@ -44,19 +44,20 @@ class FixtureFactory(Generic[T]):
             ) from exc
 
     async def __call__(self, **kwargs: Any) -> T:
+        if not self._cache_enabled:
+            return await self._create_instance(kwargs)
+
         cache_key = self._make_cache_key(kwargs)
 
-        if self._cache_enabled and cache_key in self._instance_cache:
+        if cache_key in self._instance_cache:
             return self._instance_cache[cache_key]
 
         async with self._lock:
-            if self._cache_enabled and cache_key in self._instance_cache:
+            if cache_key in self._instance_cache:
                 return self._instance_cache[cache_key]
 
             instance = await self._create_instance(kwargs)
-
-            if self._cache_enabled:
-                self._instance_cache[cache_key] = instance
+            self._instance_cache[cache_key] = instance
 
             return instance
 
