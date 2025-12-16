@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import time
-from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager, suppress
 from inspect import signature
 from typing import (
     TYPE_CHECKING,
@@ -30,6 +30,7 @@ from protest.exceptions import (
     ScopeMismatchError,
 )
 from protest.execution.async_bridge import ensure_async
+from protest.execution.context import cancellation_event
 from protest.utils import get_callable_name
 
 if TYPE_CHECKING:
@@ -505,12 +506,82 @@ class Resolver:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:
+        interrupt_event = cancellation_event.get()
+
         for path in reversed(list(self._path_exit_stacks.keys())):
-            await self._path_exit_stacks[path].aclose()
+            if await self._run_teardown_interruptible(
+                self._path_exit_stacks[path], interrupt_event
+            ):
+                # Cancelled - abort remaining teardowns
+                self._path_exit_stacks.clear()
+                self._path_caches.clear()
+                return False
+
         self._path_exit_stacks.clear()
         self._path_caches.clear()
-        result = await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
-        return result or False
+
+        if await self._run_teardown_interruptible(
+            self._exit_stack, interrupt_event, exc_type, exc_val, exc_tb
+        ):
+            return False
+
+        return False
+
+    async def _run_teardown_interruptible(
+        self,
+        exit_stack: AsyncExitStack,
+        interrupt_event: asyncio.Event | None,
+        exc_type: type[BaseException] | None = None,
+        exc_val: BaseException | None = None,
+        exc_tb: TracebackType | None = None,
+    ) -> bool:
+        """Run exit stack teardown, interruptible by cancellation event.
+
+        Returns True if cancelled (should abort), False if completed normally.
+        Teardown runs in a thread pool so sync blocking code doesn't freeze
+        the event loop, allowing us to detect and respond to cancellation.
+        """
+        if interrupt_event is None:
+            await exit_stack.__aexit__(exc_type, exc_val, exc_tb)
+            return False
+
+        if interrupt_event.is_set():
+            return True
+
+        # Run teardown in thread pool so sync code doesn't block event loop
+        loop = asyncio.get_running_loop()
+
+        def run_sync_teardown() -> None:
+            # Create a new event loop for the thread to run async teardowns
+            new_loop = asyncio.new_event_loop()
+            try:
+                new_loop.run_until_complete(
+                    exit_stack.__aexit__(exc_type, exc_val, exc_tb)
+                )
+            finally:
+                new_loop.close()
+
+        async def run_in_thread() -> None:
+            await loop.run_in_executor(None, run_sync_teardown)
+
+        teardown_task = asyncio.create_task(run_in_thread())
+        wait_cancel = asyncio.create_task(interrupt_event.wait())
+
+        done, _ = await asyncio.wait(
+            {teardown_task, wait_cancel},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+
+        if wait_cancel in done:
+            # Cancellation requested - abandon the teardown
+            # The thread continues but we stop waiting
+            return True
+
+        # Teardown completed normally
+        wait_cancel.cancel()
+        with suppress(asyncio.CancelledError):
+            await wait_cancel
+        return False
 
     def _analyze_and_store_dependencies(
         self, func: FixtureCallable, scope_path: str | None

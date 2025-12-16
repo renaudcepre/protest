@@ -1,14 +1,22 @@
 from __future__ import annotations
 
 from contextlib import AsyncExitStack
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    import asyncio
     from types import TracebackType
 
     from protest.compat import Self
     from protest.di.resolver import Resolver
     from protest.entities import FixtureCallable
+
+# Global cancellation signal for graceful shutdown.
+# When set, teardown code should abort ASAP.
+cancellation_event: ContextVar[asyncio.Event | None] = ContextVar(
+    "cancellation_event", default=None
+)
 
 
 class TestExecutionContext:

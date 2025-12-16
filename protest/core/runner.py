@@ -30,7 +30,7 @@ from protest.execution.capture import (
     set_session_setup_capture,
     set_session_teardown_capture,
 )
-from protest.execution.context import TestExecutionContext
+from protest.execution.context import TestExecutionContext, cancellation_event
 from protest.execution.interrupt import InterruptHandler
 from protest.utils import get_callable_name
 
@@ -49,6 +49,7 @@ class TestRunner:
         self._suite_start_lock: asyncio.Lock | None = None
         self._interrupt_handler = InterruptHandler()
         self._interrupted = False
+        self._force_interrupt_emitted = False
 
     def run(self) -> RunResult:
         """Run the test session synchronously. Returns RunResult with success and interrupted status."""
@@ -81,31 +82,46 @@ class TestRunner:
         suite_semaphores = self._build_suite_semaphores(items)
 
         total_counts = TestCounts()
-        with GlobalCapturePatch(show_output=not self._session.capture):
-            async with self._session:
-                await self._session.events.emit(Event.SESSION_SETUP_START)
-                setup_start = time.perf_counter()
-                set_session_setup_capture(True)
-                try:
-                    await self._session.resolve_autouse()
-                finally:
-                    set_session_setup_capture(False)
-                setup_duration = time.perf_counter() - setup_start
-                await self._session.events.emit(
-                    Event.SESSION_SETUP_DONE, setup_duration
-                )
+        # Inject cancellation event into context for teardown awareness
+        cancel_token = cancellation_event.set(
+            self._interrupt_handler.force_teardown_event
+        )
+        try:
+            with GlobalCapturePatch(show_output=not self._session.capture):
+                async with self._session:
+                    await self._session.events.emit(Event.SESSION_SETUP_START)
+                    setup_start = time.perf_counter()
+                    set_session_setup_capture(True)
+                    try:
+                        await self._session.resolve_autouse()
+                    finally:
+                        set_session_setup_capture(False)
+                    setup_duration = time.perf_counter() - setup_start
+                    await self._session.events.emit(
+                        Event.SESSION_SETUP_DONE, setup_duration
+                    )
 
-                self._started_suites = set()
-                self._suite_start_lock = asyncio.Lock()
+                    self._started_suites = set()
+                    self._suite_start_lock = asyncio.Lock()
 
-                total_counts = await self._run_all_parallel(
-                    items,
-                    suite_semaphores,
-                    tracker,
-                )
+                    total_counts = await self._run_all_parallel(
+                        items,
+                        suite_semaphores,
+                        tracker,
+                    )
 
-                for suite_path in reversed(list(self._started_suites)):
-                    await self._session.events.emit(Event.SUITE_END, suite_path)
+                    for suite_path in reversed(list(self._started_suites)):
+                        await self._session.events.emit(Event.SUITE_END, suite_path)
+        finally:
+            # Emit SESSION_INTERRUPTED if force_teardown was triggered during teardown
+            # (only if not already emitted during test execution)
+            if (
+                self._interrupt_handler.force_teardown_event.is_set()
+                and not self._force_interrupt_emitted
+            ):
+                await self._session.events.emit(Event.SESSION_INTERRUPTED, True)
+                self._force_interrupt_emitted = True
+            cancellation_event.reset(cancel_token)
 
         if self._interrupt_handler.should_stop_new_tests:
             self._interrupted = True
@@ -343,6 +359,7 @@ class TestRunner:
         if force_teardown in done:
             # Force teardown triggered - cancel all workers
             await self._session.events.emit(Event.SESSION_INTERRUPTED, True)
+            self._force_interrupt_emitted = True
             for task in worker_tasks:
                 if not task.done():
                     task.cancel()
