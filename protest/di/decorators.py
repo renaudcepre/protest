@@ -30,7 +30,7 @@ class FixtureWrapper(Generic[FuncT]):
 def unwrap_fixture(func: Callable[..., Any]) -> Callable[..., Any]:
     """Extract the original function from a FixtureWrapper if needed."""
     if isinstance(func, FixtureWrapper):
-        return func.func
+        return func.func  # type: ignore[no-any-return]
     return func
 
 

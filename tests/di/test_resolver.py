@@ -857,25 +857,20 @@ class TestTypeHintEdgeCases:
         This covers lines 524-525 where get_type_hints raises an exception
         (e.g., due to forward references that can't be resolved).
         """
-        # Create a fixture with a forward reference that can't be resolved
-        # by using exec to define the function in a context without the type
-        exec_globals: dict[str, Any] = {"Annotated": Annotated}
 
-        exec(
-            """
-def fixture_with_bad_hints(dep: "NonExistentType") -> str:
-    return "works"
-""",
-            exec_globals,
-        )
-        bad_fixture = exec_globals["fixture_with_bad_hints"]
+        # Create a fixture and manually set an invalid forward reference
+        def fixture_with_bad_hints(dep: object) -> str:
+            return "works"
+
+        # Override annotation with unresolvable forward reference
+        fixture_with_bad_hints.__annotations__["dep"] = "NonExistentType"
 
         # Should not raise - the exception in get_type_hints is caught
-        resolver.register(bad_fixture, scope_path=None)
+        resolver.register(fixture_with_bad_hints, scope_path=None)
 
         # Fixture registered with no dependencies (since hints couldn't be resolved)
-        assert bad_fixture in resolver._registry
-        assert resolver._dependencies.get(bad_fixture, {}) == {}
+        assert fixture_with_bad_hints in resolver._registry
+        assert resolver._dependencies.get(fixture_with_bad_hints, {}) == {}
 
 
 class TestSameScopeDependency:
