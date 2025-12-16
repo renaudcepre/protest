@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
 from protest.core.collector import validate_no_from_params
 from protest.di.decorators import FixtureWrapper
+from protest.exceptions import ConcurrencyMismatchError
 from protest.entities import (
     FixtureRegistration,
     Retry,
@@ -74,6 +75,15 @@ class ProTestSuite:
     @property
     def max_concurrency(self) -> int | None:
         return self._max_concurrency
+
+    @property
+    def effective_max_concurrency(self) -> int | None:
+        """Effective max_concurrency including inheritance from parent suites."""
+        if self._max_concurrency is not None:
+            return self._max_concurrency
+        if self._parent_suite:
+            return self._parent_suite.effective_max_concurrency
+        return None
 
     @property
     def tags(self) -> set[str]:
@@ -201,6 +211,17 @@ class ProTestSuite:
 
     def add_suite(self, suite: ProTestSuite) -> None:
         """Add a child suite. Child can access parent's fixtures."""
+        parent_effective = self.effective_max_concurrency
+        child_explicit = suite._max_concurrency
+        if (
+            parent_effective is not None
+            and child_explicit is not None
+            and child_explicit > parent_effective
+        ):
+            raise ConcurrencyMismatchError(
+                suite.name, child_explicit, self.name, parent_effective
+            )
+
         suite._parent_suite = self
         if self._session:
             suite._attach_to_session(self._session)

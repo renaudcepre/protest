@@ -66,3 +66,20 @@ class CircularDependencyError(ProTestError):
     def __init__(self, cycle_path: list[str]):
         cycle_str = " -> ".join(cycle_path)
         super().__init__(f"Circular dependency detected: {cycle_str}")
+
+
+class ConcurrencyMismatchError(ProTestError):
+    """Raised when a child suite has higher max_concurrency than its parent."""
+
+    def __init__(
+        self,
+        child_name: str,
+        child_max_concurrency: int,
+        parent_name: str,
+        parent_effective_concurrency: int,
+    ):
+        super().__init__(
+            f"Suite '{child_name}' has max_concurrency={child_max_concurrency} "
+            f"which exceeds parent '{parent_name}' "
+            f"(effective max_concurrency={parent_effective_concurrency})."
+        )
