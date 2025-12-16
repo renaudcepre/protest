@@ -139,6 +139,10 @@ class TaskAwareLogHandler(logging.Handler):
 
 
 class GlobalCapturePatch:
+    # Track the current handler for deterministic cleanup of orphaned handlers.
+    # If a previous run crashed before __exit__, we can clean up the exact handler.
+    _current_handler: TaskAwareLogHandler | None = None
+
     def __init__(self, show_output: bool = False) -> None:
         self._show_output = show_output
         self._orig_stdout: TextIO | None = None
@@ -147,6 +151,13 @@ class GlobalCapturePatch:
         self._orig_log_level: int | None = None
 
     def __enter__(self) -> "GlobalCapturePatch":
+        # Clean up orphaned handler from a crashed previous run.
+        # This is deterministic: we only clean up the specific handler we track.
+        if GlobalCapturePatch._current_handler is not None:
+            if GlobalCapturePatch._current_handler in logging.root.handlers:
+                logging.root.removeHandler(GlobalCapturePatch._current_handler)
+            GlobalCapturePatch._current_handler = None
+
         self._orig_stdout = sys.stdout
         self._orig_stderr = sys.stderr
         sys.stdout = TaskAwareStream(sys.stdout, self._show_output)
@@ -155,16 +166,10 @@ class GlobalCapturePatch:
         self._orig_log_level = logging.root.level
         logging.root.setLevel(logging.NOTSET)
 
-        # Clean up leaked handlers from previous runs. This can happen on Windows when
-        # a test crashes before __exit__, or when running nested TestRunner instances
-        # (e.g., in our keyboard interrupt tests that create their own runners).
-        for handler in logging.root.handlers[:]:
-            if isinstance(handler, TaskAwareLogHandler):
-                logging.root.removeHandler(handler)
-
         self._log_handler = TaskAwareLogHandler()
         self._log_handler.setLevel(logging.DEBUG)
         logging.root.addHandler(self._log_handler)
+        GlobalCapturePatch._current_handler = self._log_handler
         return self
 
     def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
@@ -174,6 +179,8 @@ class GlobalCapturePatch:
             sys.stderr = self._orig_stderr
         if self._log_handler is not None:
             logging.root.removeHandler(self._log_handler)
+            if GlobalCapturePatch._current_handler is self._log_handler:
+                GlobalCapturePatch._current_handler = None
         if self._orig_log_level is not None:
             logging.root.setLevel(self._orig_log_level)
 

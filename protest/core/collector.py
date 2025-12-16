@@ -5,8 +5,8 @@ from itertools import groupby, product
 from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
 from protest.di.decorators import unwrap_fixture
-from protest.di.markers import ForEach, From, Use
-from protest.di.validation import _extract_from_params, validate_no_from_params
+from protest.di.markers import Use
+from protest.di.validation import _extract_from_params
 from protest.entities import FixtureCallable, TestItem, TestRegistration
 
 if TYPE_CHECKING:

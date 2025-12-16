@@ -13,9 +13,9 @@ if TYPE_CHECKING:
 
 from protest.cache.plugin import CachePlugin
 from protest.cache.storage import CacheStorage
-from protest.di.validation import validate_no_from_params
 from protest.di.decorators import FixtureWrapper
 from protest.di.resolver import Resolver
+from protest.di.validation import validate_no_from_params
 from protest.entities import (
     FixtureRegistration,
     Retry,

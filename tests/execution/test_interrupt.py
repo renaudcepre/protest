@@ -194,40 +194,6 @@ class TestInterruptInstallUninstall:
             loop.close()
 
 
-class TestInterruptCallback:
-    """Tests for optional interrupt callback."""
-
-    @pytest.mark.parametrize(
-        "signal_count,expected_states",
-        [
-            pytest.param(1, [InterruptState.SOFT_STOP], id="soft_stop"),
-            pytest.param(
-                2,
-                [InterruptState.SOFT_STOP, InterruptState.FORCE_TEARDOWN],
-                id="force_teardown",
-            ),
-        ],
-    )
-    def test_callback_called_on_state_transitions(
-        self,
-        interrupt_handler_with_loop: tuple[InterruptHandler, asyncio.AbstractEventLoop],
-        signal_count: int,
-        expected_states: list[InterruptState],
-    ) -> None:
-        """Given callback set, when signals received, then callback called with correct states."""
-        handler, _ = interrupt_handler_with_loop
-        callback_states: list[InterruptState] = []
-
-        def on_interrupt(state: InterruptState) -> None:
-            callback_states.append(state)
-
-        handler.set_interrupt_callback(on_interrupt)
-        for _ in range(signal_count):
-            handler.simulate_signal()
-
-        assert callback_states == expected_states
-
-
 class TestRunnerInterruptIntegration:
     """Integration tests with TestRunner."""
 

@@ -33,7 +33,6 @@ class InterruptHandler:
         self._force_teardown_event: asyncio.Event | None = None
         self._original_handler: SignalHandler = None
         self._loop: asyncio.AbstractEventLoop | None = None
-        self._on_interrupt: Callable[[InterruptState], None] | None = None
 
     @property
     def state(self) -> InterruptState:
@@ -63,11 +62,6 @@ class InterruptHandler:
             raise RuntimeError("InterruptHandler not installed")
         return self._force_teardown_event
 
-    def set_interrupt_callback(
-        self, callback: Callable[[InterruptState], None]
-    ) -> None:
-        self._on_interrupt = callback
-
     def install(self, loop: asyncio.AbstractEventLoop) -> None:
         self._loop = loop
         self._soft_stop_event = asyncio.Event()
@@ -88,15 +82,11 @@ class InterruptHandler:
             self._state = InterruptState.SOFT_STOP
             if self._loop is not None and self._soft_stop_event is not None:
                 self._loop.call_soon_threadsafe(self._soft_stop_event.set)
-            if self._on_interrupt:
-                self._on_interrupt(self._state)
 
         elif self._state == InterruptState.SOFT_STOP:
             self._state = InterruptState.FORCE_TEARDOWN
             if self._loop is not None and self._force_teardown_event is not None:
                 self._loop.call_soon_threadsafe(self._force_teardown_event.set)
-            if self._on_interrupt:
-                self._on_interrupt(self._state)
 
         else:
             self._state = InterruptState.HARD_EXIT

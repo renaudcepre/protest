@@ -3,7 +3,7 @@ from typing import Annotated
 
 from protest import ProTestSession, ProTestSuite, Use
 from protest.core.runner import TestRunner
-from protest.entities import TestItem
+from protest.entities import TestItem, TestRegistration
 from protest.plugin import PluginBase
 from tests.conftest import (
     CollectedEvents,
@@ -569,3 +569,39 @@ class TestRunnerExitFirst:
 
         assert "suite1_fail" in executed
         assert "suite2" not in executed
+
+
+class TestRunnerTypeHintFailure:
+    """Tests for type hint resolution edge cases."""
+
+    def test_runner_handles_invalid_type_hints_gracefully(self) -> None:
+        """Test with invalid type hint that causes get_type_hints to fail still runs."""
+        session = ProTestSession()
+        executed: list[str] = []
+
+        # Create a test function and manually set an invalid forward reference
+        # that causes get_type_hints() to raise NameError
+        def test_with_bad_hint(x: object = None) -> None:
+            executed.append("ran")
+
+        # Override annotation with unresolvable forward reference
+        test_with_bad_hint.__annotations__["x"] = "NonExistentType"
+
+        # Register the test manually
+        session._tests.append(
+            TestRegistration(
+                func=test_with_bad_hint,
+                tags=set(),
+                skip=None,
+                xfail=None,
+                timeout=None,
+                retry=None,
+            )
+        )
+
+        runner = TestRunner(session)
+        result = runner.run()
+
+        # The test should have run (parameter has default so no deps needed)
+        assert result.success is True
+        assert executed == ["ran"]

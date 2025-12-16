@@ -76,6 +76,49 @@ class TestHandlerRegistration:
         assert called
 
 
+class TestHandlerUnregistration:
+    """Handler unregistration via off()."""
+
+    @pytest.mark.asyncio
+    async def test_off_removes_handler(self) -> None:
+        """off() removes a handler so it's no longer called."""
+        bus = EventBus()
+        received: list[str] = []
+
+        def handler(data: str) -> None:
+            received.append(data)
+
+        bus.on(Event.TEST_PASS, handler)
+        await bus.emit(Event.TEST_PASS, "first")
+        assert received == ["first"]
+
+        bus.off(Event.TEST_PASS, handler)
+        await bus.emit(Event.TEST_PASS, "second")
+        assert received == ["first"]  # Handler not called
+
+    @pytest.mark.asyncio
+    async def test_off_removes_only_specified_handler(self) -> None:
+        """off() removes only the specified handler, not others."""
+        bus = EventBus()
+        received_a: list[str] = []
+        received_b: list[str] = []
+
+        def handler_a(data: str) -> None:
+            received_a.append(data)
+
+        def handler_b(data: str) -> None:
+            received_b.append(data)
+
+        bus.on(Event.TEST_PASS, handler_a)
+        bus.on(Event.TEST_PASS, handler_b)
+
+        bus.off(Event.TEST_PASS, handler_a)
+        await bus.emit(Event.TEST_PASS, "test")
+
+        assert received_a == []
+        assert received_b == ["test"]
+
+
 class TestAsyncFireAndForget:
     """Async handlers run as fire-and-forget tasks."""
 
@@ -343,6 +386,26 @@ class TestHandlerStartEndErrors:
             handler_executed = True
 
         bus.on(Event.HANDLER_END, failing_end_listener)
+        bus.on(Event.TEST_PASS, main_handler)
+
+        await bus.emit(Event.TEST_PASS, "test_data")
+
+        assert handler_executed
+
+    @pytest.mark.asyncio
+    async def test_async_handler_end_listener_error_swallowed(self) -> None:
+        """Async HANDLER_END listener error is caught and logged."""
+        bus = EventBus()
+        handler_executed = False
+
+        async def failing_async_end_listener(info: HandlerInfo) -> None:
+            raise ValueError("Async HANDLER_END listener error")
+
+        def main_handler(data: str) -> None:
+            nonlocal handler_executed
+            handler_executed = True
+
+        bus.on(Event.HANDLER_END, failing_async_end_listener)
         bus.on(Event.TEST_PASS, main_handler)
 
         await bus.emit(Event.TEST_PASS, "test_data")
