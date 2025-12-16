@@ -156,8 +156,8 @@ class TestRunner:
                 continue
             seen_suites.add(suite_path)
 
-            if item.suite and item.suite.max_concurrency:
-                max_conc = min(item.suite.max_concurrency, self._session.concurrency)
+            if item.suite and item.suite.effective_max_concurrency:
+                max_conc = min(item.suite.effective_max_concurrency, self._session.concurrency)
                 semaphores[suite_path] = asyncio.Semaphore(max_conc)
 
         return semaphores
