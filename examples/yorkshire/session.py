@@ -22,7 +22,6 @@ from protest import (
     fixture,
     mocker,
     raises,
-    step,
 )
 from protest.entities import LogCapture
 
@@ -601,62 +600,3 @@ async def test_senior_wakes_up_eventually(
     if nap_attempts < 2:  # noqa
         await asyncio.sleep(1.0)
     assert papy.is_senior
-
-
-# =============================================================================
-# BDD STEPS EXAMPLES (programmatic Given/When/Then)
-# =============================================================================
-
-
-@session.test(tags=["bdd"])
-async def test_influencer_grooming_appointment(
-    factory: Annotated[FixtureFactory[Yorkshire], Use(yorkshire_factory)],
-) -> None:
-    """BDD-style test using step context managers."""
-    async with step("Given an influencer yorkshire with long coat"):
-        fifi = await factory(name="Fifi", job=Job.INFLUENCER, age=24)
-        fifi.coat = Coat.LONG
-
-    async with step("When she checks if grooming is needed"):
-        needs_grooming = fifi.needs_grooming
-
-    async with step("Then grooming should be required"):
-        assert needs_grooming, f"{fifi.name} should need grooming with long coat"
-
-
-@session.test(tags=["bdd"])
-async def test_detective_investigates_missing_treats(
-    factory: Annotated[FixtureFactory[Yorkshire], Use(yorkshire_factory)],
-    kennel_fixture: Annotated[Kennel, Use(kennel)],
-) -> None:
-    """BDD-style test for detective yorkshire workflow."""
-    async with step("Given a detective yorkshire in the kennel"):
-        rex = await factory(name="Rex", job=Job.DETECTIVE, age=36)
-        assert rex.can_work
-
-    async with step("When the detective searches the kennel"):
-        dogs = await kennel_fixture.list_all()
-        rex_found = any(d.name == "Rex" for d in dogs)
-
-    async with step("Then Rex should be found in the kennel"):
-        assert rex_found, "Rex should be registered in the kennel"
-
-    async with step("And the case is closed"):
-        await asyncio.sleep(0.01)  # Case file updated
-
-
-@session.test(tags=["bdd"])
-async def test_puppy_tries_to_get_job(
-    factory: Annotated[FixtureFactory[Yorkshire], Use(yorkshire_factory)],
-) -> None:
-    """BDD-style test that fails to show step output in error report."""
-    async with step("Given a young puppy yorkshire"):
-        puppy = await factory(name="Bébé", age=6)
-        assert puppy.is_puppy
-
-    async with step("When the puppy applies for a job"):
-        puppy.job = Job.DETECTIVE
-
-    async with step("Then the puppy should be allowed to work"):
-        # This will fail - puppies can't work!
-        assert puppy.can_work, f"{puppy.name} is too young to work"

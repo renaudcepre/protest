@@ -1,5 +1,4 @@
 import traceback
-from collections import defaultdict
 from pathlib import Path
 
 from protest.entities import (
@@ -11,7 +10,6 @@ from protest.entities import (
     TestRetryInfo,
 )
 from protest.plugin import PluginBase
-from protest.steps import StepInfo, add_step_callback, remove_step_callback
 
 _MIN_NODE_ID_PARTS = 2
 
@@ -58,21 +56,14 @@ class AsciiReporter(PluginBase):
         self._is_parallel = False
         self._failed_results: list[TestResult] = []
         self._error_results: list[TestResult] = []
-        self._steps: dict[str, list[StepInfo]] = defaultdict(list)
 
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
         self._is_parallel = len(items) > 1
         return items
 
     def on_session_start(self) -> None:
-        add_step_callback(self._on_step)
         print(">> Starting session")
         print()
-
-    def _on_step(self, info: StepInfo) -> None:
-        """Handle step events - store for later display."""
-        if info.status != "start":
-            self._steps[info.node_id].append(info)
 
     def on_session_setup_start(self) -> None:
         print("  session setup...")
@@ -128,16 +119,7 @@ class AsciiReporter(PluginBase):
         else:
             print(f"  XX {name}: {result.error}{retry_suffix}")
 
-        # Display steps inline for failed tests
-        steps = self._steps.get(result.node_id, [])
-        if steps:
-            for step_info in steps:
-                if step_info.status == "success":
-                    duration = _format_duration(step_info.duration or 0)
-                    print(f"    | OK {step_info.name} ({duration})")
-                else:
-                    print(f"    | XX {step_info.name} (FAILED)")
-        elif result.output:
+        if result.output:
             for line in result.output.rstrip().splitlines():
                 print(f"    | {line}")
 
@@ -198,24 +180,12 @@ class AsciiReporter(PluginBase):
             for line in tb_text.rstrip().splitlines():
                 print(f"  {line}")
 
-        # Display steps in failure summary
-        steps = self._steps.get(result.node_id, [])
-        if steps:
-            print("  --- Steps ---")
-            for step_info in steps:
-                if step_info.status == "success":
-                    duration = _format_duration(step_info.duration or 0)
-                    print(f"  OK {step_info.name} ({duration})")
-                else:
-                    print(f"  XX {step_info.name} (FAILED)")
-
         if result.output:
             print("  --- Captured output ---")
             for line in result.output.rstrip().splitlines():
                 print(f"  {line}")
 
     def on_session_complete(self, result: SessionResult) -> None:
-        remove_step_callback(self._on_step)
         if self._failed_results or self._error_results:
             self._print_failure_summary()
 
