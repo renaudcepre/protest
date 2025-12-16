@@ -1,6 +1,5 @@
 import time
 import traceback
-from collections import defaultdict
 from pathlib import Path
 
 from rich.console import Console  # type: ignore[import-not-found]
@@ -15,7 +14,6 @@ from protest.entities import (
     TestRetryInfo,
 )
 from protest.plugin import PluginBase
-from protest.steps import StepInfo, add_step_callback, remove_step_callback
 
 
 def _format_test_name(result: TestResult) -> str:
@@ -56,9 +54,6 @@ class RichReporter(PluginBase):
         self._skipped = 0
         self._xfailed = 0
         self._xpassed = 0
-
-        # Step tracking per test
-        self._steps: dict[str, list[StepInfo]] = defaultdict(list)
 
     def _make_status_line(self) -> Text:
         elapsed = time.perf_counter() - self._start_time if self._start_time else 0
@@ -123,14 +118,6 @@ class RichReporter(PluginBase):
             self._live.start()
 
         return items
-
-    def on_session_start(self) -> None:
-        add_step_callback(self._on_step)
-
-    def _on_step(self, info: StepInfo) -> None:
-        """Handle step events - store for later display."""
-        if info.status != "start":
-            self._steps[info.node_id].append(info)
 
     def on_session_setup_start(self) -> None:
         pass
@@ -200,18 +187,7 @@ class RichReporter(PluginBase):
         else:
             self._print(f"   [red]✗[/]   {name}: {result.error}{retry_suffix}")
 
-        # Display steps inline for failed tests
-        steps = self._steps.get(result.node_id, [])
-        if steps:
-            for step_info in steps:
-                if step_info.status == "success":
-                    duration = _format_duration(step_info.duration or 0)
-                    self._print(
-                        f"[dim]       │ [green]✓[/] {step_info.name} ({duration})[/]"
-                    )
-                else:
-                    self._print(f"[dim]       │ [red]✗[/] {step_info.name} (FAILED)[/]")
-        elif result.output:
+        if result.output:
             for line in result.output.rstrip().splitlines():
                 self._print(f"[dim]       │ {line}[/]")
 
@@ -292,19 +268,6 @@ class RichReporter(PluginBase):
                 escaped_line = line.replace("[", "\\[")
                 self.console.print(f"[dim]{escaped_line}[/]")
 
-        # Display steps in failure summary
-        steps = self._steps.get(result.node_id, [])
-        if steps:
-            self.console.print("[dim]--- Steps ---[/]")
-            for step_info in steps:
-                if step_info.status == "success":
-                    duration = _format_duration(step_info.duration or 0)
-                    self.console.print(
-                        f"[dim][green]✓[/] {step_info.name} ({duration})[/]"
-                    )
-                else:
-                    self.console.print(f"[dim][red]✗[/] {step_info.name} (FAILED)[/]")
-
         if result.output:
             self.console.print("[dim]--- Captured output ---[/]")
             for line in result.output.rstrip().splitlines():
@@ -313,7 +276,6 @@ class RichReporter(PluginBase):
 
     def on_session_complete(self, result: SessionResult) -> None:
         self._stop_live()
-        remove_step_callback(self._on_step)
 
         if self._failed_results or self._error_results:
             self._print_failure_summary()
