@@ -326,6 +326,16 @@ class TestCachePluginFiltering:
         expected_filtered_count = 2
         assert len(filtered) == expected_filtered_count
 
+    def test_filter_without_setup_raises_error(self) -> None:
+        """Calling _filter_last_failed without setup() raises RuntimeError."""
+        plugin = CachePlugin(last_failed=True)
+        # Note: setup() NOT called, so _cache is None
+
+        items = [make_test_item("mod::test")]
+
+        with pytest.raises(RuntimeError, match="CachePlugin improperly configured"):
+            plugin._filter_last_failed(items)
+
 
 class TestCachePluginIntegration:
     """Integration tests simulating multiple runs."""

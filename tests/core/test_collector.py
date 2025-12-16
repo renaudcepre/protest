@@ -1,5 +1,8 @@
 """Tests for test collection and TestItem data structure."""
 
+from typing import Annotated
+
+from protest import Use
 from protest.core.collector import (
     Collector,
     TestItem,
@@ -362,3 +365,92 @@ class TestGetLastChunkIndexPerSuite:
         assert result["API::Users"] == 2
         assert result["API::Users::Perms"] == 2
         assert result["API::Orders"] == 3
+
+
+class TestTransitiveFixtureTags:
+    """Tests for transitive tag collection from fixtures."""
+
+    def test_diamond_dependency_collects_shared_fixture_tags_once(self) -> None:
+        """Diamond pattern: A→B→D and A→C→D collects D's tags correctly.
+
+        This test covers the `if func in visited: return set()` branch in
+        _get_transitive_fixture_tags which handles shared dependencies.
+
+        Structure:
+            fixture D (tags: ["database"])
+            fixture B → depends on D
+            fixture C → depends on D
+            fixture A → depends on B and C
+            test → uses A
+
+        D's tags should be collected exactly once via the visited set.
+        """
+        session = ProTestSession()
+
+        @session.fixture(tags=["database"])
+        def shared_fixture() -> str:
+            return "shared"
+
+        @session.fixture()
+        def fixture_b(
+            dep: Annotated[str, Use(shared_fixture)],
+        ) -> str:
+            return f"b-{dep}"
+
+        @session.fixture()
+        def fixture_c(
+            dep: Annotated[str, Use(shared_fixture)],
+        ) -> str:
+            return f"c-{dep}"
+
+        @session.fixture()
+        def fixture_a(
+            b: Annotated[str, Use(fixture_b)],
+            c: Annotated[str, Use(fixture_c)],
+        ) -> str:
+            return f"a-{b}-{c}"
+
+        @session.test()
+        def test_diamond(
+            a: Annotated[str, Use(fixture_a)],
+        ) -> None:
+            pass
+
+        collector = Collector()
+        items = collector.collect(session)
+
+        assert len(items) == 1
+        # The "database" tag from shared_fixture should be propagated
+        assert "database" in items[0].tags
+
+    def test_deep_transitive_tags_propagation(self) -> None:
+        """Tags propagate through multiple levels of fixture dependencies."""
+        session = ProTestSession()
+
+        @session.fixture(tags=["level3"])
+        def deep_fixture() -> str:
+            return "deep"
+
+        @session.fixture(tags=["level2"])
+        def mid_fixture(
+            dep: Annotated[str, Use(deep_fixture)],
+        ) -> str:
+            return dep
+
+        @session.fixture(tags=["level1"])
+        def top_fixture(
+            dep: Annotated[str, Use(mid_fixture)],
+        ) -> str:
+            return dep
+
+        @session.test()
+        def test_deep(
+            f: Annotated[str, Use(top_fixture)],
+        ) -> None:
+            pass
+
+        collector = Collector()
+        items = collector.collect(session)
+
+        assert len(items) == 1
+        assert items[0].tags == {"level1", "level2", "level3"}

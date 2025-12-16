@@ -53,7 +53,10 @@ class CachePlugin(PluginBase):
         If failed tests exist but none match current items, returns empty list.
         """
         if self._cache is None:
-            return items
+            raise RuntimeError(
+                "CachePlugin improperly configured: setup() must be called before "
+                "filtering. This indicates a bug in the plugin lifecycle."
+            )
         failed_ids = self._cache.get_failed_node_ids()
         if not failed_ids:
             return items

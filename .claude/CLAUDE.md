@@ -9,7 +9,7 @@ ProTest est un framework de test async-first avec injection de dépendances expl
 ```
 protest/
 ├── core/           # Orchestration: Session, Suite, Runner, Collector
-├── di/             # DI: Resolver, Markers (Use)
+├── di/             # DI: Resolver, Markers (Use), Validation
 ├── entities/       # Dataclasses centralisées (core, events, execution)
 ├── events/         # Event bus découplé: Bus, Types
 ├── execution/      # Exécution: AsyncBridge, Capture, Context
@@ -20,6 +20,34 @@ protest/
 ├── cli/            # Entry point CLI
 └── reporting/      # Console output
 ```
+
+## Règles d'Architecture - Imports
+
+**IMPORTANT** : Éviter les solutions "quick fix" pour les imports circulaires.
+
+### Code Smells à éviter
+
+1. **Duck typing pour éviter un import** : `if hasattr(obj, "attr")` au lieu de `isinstance()`
+2. **Import local dans une fonction** : `def foo(): from module import X`
+3. **Import dans TYPE_CHECKING uniquement** pour contourner un cycle
+
+Ces solutions masquent un problème d'architecture.
+
+### Solution propre
+
+Quand un cycle d'import apparaît, **extraire le code partagé** vers un module tiers :
+
+```
+AVANT (cycle):
+collector.py ←→ decorators.py  # validate_no_from_params vs FixtureWrapper
+
+APRÈS (pas de cycle):
+validation.py ← decorators.py
+      ↑              ↓
+      └── collector.py
+```
+
+Exemple concret : `di/validation.py` a été créé pour casser le cycle entre `collector.py` et `decorators.py`.
 
 ## Organisation des Entities
 
