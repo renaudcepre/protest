@@ -93,6 +93,11 @@ ignore = [
 ]
 
 
+[tool.coverage.run]
+omit = [
+    "protest/compat.py",  # Version-specific imports, impossible to cover without multi-version CI
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "strict"

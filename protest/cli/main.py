@@ -341,5 +341,5 @@ def run_tests(  # noqa: PLR0913
     sys.exit(0 if result.success else 1)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

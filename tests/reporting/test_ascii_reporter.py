@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from protest.entities import HandlerInfo, SessionResult, TestResult
+from protest.entities import (
+    FixtureInfo,
+    HandlerInfo,
+    SessionResult,
+    TestResult,
+    TestRetryInfo,
+)
 from protest.events.types import Event
 from protest.reporting.ascii import (
     AsciiReporter,
@@ -474,3 +480,190 @@ class TestAsciiReporterSummaryParts:
         captured = capsys.readouterr()
         for text in expected_texts:
             assert text in captured.out
+
+
+class TestAsciiReporterAutouse:
+    """Test on_fixture_setup with autouse."""
+
+    def test_on_fixture_setup_autouse(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Autouse fixture displays setup message."""
+        ascii_reporter.on_fixture_setup(
+            FixtureInfo(name="my_autouse_fixture", scope="session", autouse=True)
+        )
+        captured = capsys.readouterr()
+        assert "autouse" in captured.out
+        assert "my_autouse_fixture" in captured.out
+        assert "session" in captured.out
+
+    def test_on_fixture_setup_not_autouse(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Non-autouse fixture does not display message."""
+        ascii_reporter.on_fixture_setup(
+            FixtureInfo(name="regular_fixture", scope="suite", autouse=False)
+        )
+        captured = capsys.readouterr()
+        assert captured.out == ""
+
+
+class TestAsciiReporterRetry:
+    """Test retry-related output."""
+
+    def test_on_test_retry_with_delay(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Retry message includes delay when > 0."""
+        ascii_reporter.on_test_retry(
+            TestRetryInfo(
+                name="test_flaky",
+                node_id="module::test_flaky",
+                suite_path=None,
+                attempt=1,
+                max_attempts=3,
+                error=ValueError("boom"),
+                delay=1.5,
+            )
+        )
+        captured = capsys.readouterr()
+        assert "RY" in captured.out
+        assert "test_flaky" in captured.out
+        assert "attempt 1/3" in captured.out
+        assert "retrying in 1.5s" in captured.out
+        assert "ValueError" in captured.out
+
+    def test_on_test_pass_with_retry(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Pass message includes attempt info when retried."""
+        ascii_reporter.on_test_pass(
+            TestResult(
+                name="test_flaky",
+                node_id="module::test_flaky",
+                duration=0.1,
+                attempt=2,
+                max_attempts=3,
+            )
+        )
+        captured = capsys.readouterr()
+        assert "OK" in captured.out
+        assert "test_flaky" in captured.out
+        assert "[attempt 2/3]" in captured.out
+
+    def test_on_test_fail_with_retry(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Fail message includes attempt count when retried."""
+        ascii_reporter.on_test_fail(
+            TestResult(
+                name="test_flaky",
+                node_id="module::test_flaky",
+                duration=0.1,
+                error=ValueError("final fail"),
+                attempt=3,
+                max_attempts=3,
+            )
+        )
+        captured = capsys.readouterr()
+        assert "XX" in captured.out
+        assert "test_flaky" in captured.out
+        assert "[3 attempts]" in captured.out
+
+
+class TestAsciiReporterInterrupt:
+    """Test interrupt messages."""
+
+    def test_on_session_interrupted_soft(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Soft interrupt shows stopping message."""
+        ascii_reporter.on_session_interrupted(force_teardown=False)
+        captured = capsys.readouterr()
+        assert "Stopping" in captured.out
+        assert "force teardown" in captured.out.lower()
+
+    def test_on_session_interrupted_force(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Force teardown shows forcing message."""
+        ascii_reporter.on_session_interrupted(force_teardown=True)
+        captured = capsys.readouterr()
+        assert "Forcing teardown" in captured.out
+        assert "kill" in captured.out.lower()
+
+
+class TestAsciiReporterFailureSummary:
+    """Test failure summary output."""
+
+    def test_failure_summary_with_failures(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Failure summary shows FAILURES section with traceback and output."""
+        ascii_reporter.on_test_fail(
+            TestResult(
+                name="test_fail",
+                node_id="module::test_fail",
+                duration=0.1,
+                error=ValueError("something went wrong"),
+                output="captured output line 1\ncaptured output line 2",
+            )
+        )
+        capsys.readouterr()  # Clear the on_test_fail output
+
+        ascii_reporter.on_session_complete(
+            SessionResult(passed=0, failed=1, errors=0, duration=1.0)
+        )
+        captured = capsys.readouterr()
+        assert "=== FAILURES ===" in captured.out
+        assert "test_fail" in captured.out
+        assert "ValueError" in captured.out
+        assert "Captured output" in captured.out
+        assert "captured output line 1" in captured.out
+
+    def test_failure_summary_with_errors(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Failure summary shows ERRORS section for fixture errors."""
+        ascii_reporter.on_test_fail(
+            TestResult(
+                name="test_error",
+                node_id="module::Suite::test_error",
+                duration=0.1,
+                error=RuntimeError("fixture exploded"),
+                is_fixture_error=True,
+                output="error output",
+            )
+        )
+        capsys.readouterr()  # Clear the on_test_fail output
+
+        ascii_reporter.on_session_complete(
+            SessionResult(passed=0, failed=0, errors=1, duration=1.0)
+        )
+        captured = capsys.readouterr()
+        assert "=== ERRORS ===" in captured.out
+        assert "test_error" in captured.out
+        assert "!!" in captured.out  # Error prefix
+
+
+class TestAsciiReporterCompleteInterrupted:
+    """Test session complete with interrupted status."""
+
+    def test_session_complete_interrupted(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Session complete with interrupted shows INTERRUPTED status."""
+        ascii_reporter.on_session_complete(
+            SessionResult(
+                passed=5,
+                failed=0,
+                errors=0,
+                skipped=1,
+                duration=2.5,
+                interrupted=True,
+            )
+        )
+        captured = capsys.readouterr()
+        assert "INTERRUPTED" in captured.out
+        assert "5/6 passed" in captured.out
+        assert "1 skipped" in captured.out

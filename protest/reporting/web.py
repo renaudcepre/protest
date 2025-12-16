@@ -32,7 +32,7 @@ try:
     from websockets.sync.client import (  # type: ignore[import-not-found]
         connect as ws_connect,
     )
-except ImportError as err:
+except ImportError as err:  # pragma: no cover
     raise ImportError(
         "WebReporter requires 'websockets' package. "
         "Install with: pip install protest[web]"
@@ -49,7 +49,7 @@ def _format_traceback(error: Exception) -> str:
     return "".join(lines)
 
 
-async def _ws_handler(websocket: Any) -> None:
+async def _ws_handler(websocket: Any) -> None:  # pragma: no cover
     _broadcast_clients.add(websocket)
     try:
         async for message in websocket:
@@ -82,7 +82,7 @@ def _process_request(connection: Any, request: Request) -> Response | None:
     return Response(HTTPStatus.NOT_FOUND, "Not Found", Headers(), b"Not Found")
 
 
-def run_live_server(port: int = DEFAULT_PORT) -> None:
+def run_live_server(port: int = DEFAULT_PORT) -> None:  # pragma: no cover
     async def serve() -> None:
         async with ws_serve(
             _ws_handler,

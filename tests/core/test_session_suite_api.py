@@ -7,8 +7,10 @@ import pytest
 
 from protest import ProTestSession, ProTestSuite, Use
 from protest.di.decorators import fixture
+from protest.events.types import Event
 from protest.exceptions import PlainFunctionError
 from protest.execution.context import TestExecutionContext
+from protest.plugin import PluginBase
 
 
 class TestSessionSuiteAPI:
@@ -582,3 +584,77 @@ class TestSuiteAddAfterAttach:
         assert child._session is session
         assert grandchild._session is session
         assert grandchild.full_path == "Parent::Child::GrandChild"
+
+
+class TestSetDefaultReporter:
+    """Tests for set_default_reporter and _unuse."""
+
+    def test_set_default_reporter_replaces_existing(self) -> None:
+        """set_default_reporter replaces the previous reporter."""
+
+        class FakeReporter(PluginBase):
+            def __init__(self, name: str) -> None:
+                self.name = name
+                self.events_received: list[str] = []
+
+            def on_session_start(self) -> None:
+                self.events_received.append("session_start")
+
+        session = ProTestSession(default_reporter=False)
+
+        reporter1 = FakeReporter("first")
+        session.set_default_reporter(reporter1)
+        assert session._default_reporter is reporter1
+
+        reporter2 = FakeReporter("second")
+        session.set_default_reporter(reporter2)
+        assert session._default_reporter is reporter2
+
+    @pytest.mark.asyncio
+    async def test_unuse_removes_handler_from_bus(self) -> None:
+        """_unuse removes a plugin's handlers from the event bus."""
+
+        class TrackingPlugin(PluginBase):
+            def __init__(self) -> None:
+                self.events: list[str] = []
+
+            def on_session_start(self) -> None:
+                self.events.append("session_start")
+
+        session = ProTestSession(default_reporter=False)
+        plugin = TrackingPlugin()
+        session.use(plugin)
+
+        await session.events.emit(Event.SESSION_START)
+        assert plugin.events == ["session_start"]
+
+        session._unuse(plugin)
+
+        await session.events.emit(Event.SESSION_START)
+        assert plugin.events == ["session_start"]  # No new event
+
+    @pytest.mark.asyncio
+    async def test_set_default_reporter_unregisters_old_handlers(self) -> None:
+        """set_default_reporter ensures old reporter stops receiving events."""
+
+        class CountingReporter(PluginBase):
+            def __init__(self) -> None:
+                self.count = 0
+
+            def on_session_start(self) -> None:
+                self.count += 1
+
+        session = ProTestSession(default_reporter=False)
+
+        reporter1 = CountingReporter()
+        session.set_default_reporter(reporter1)
+
+        await session.events.emit(Event.SESSION_START)
+        assert reporter1.count == 1
+
+        reporter2 = CountingReporter()
+        session.set_default_reporter(reporter2)
+
+        await session.events.emit(Event.SESSION_START)
+        assert reporter1.count == 1  # Old reporter not called
+        assert reporter2.count == 1  # New reporter called
