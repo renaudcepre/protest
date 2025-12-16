@@ -9,7 +9,6 @@ if TYPE_CHECKING:
 
 from protest.core.collector import validate_no_from_params
 from protest.di.decorators import FixtureWrapper
-from protest.exceptions import ConcurrencyMismatchError
 from protest.entities import (
     FixtureRegistration,
     Retry,
@@ -20,6 +19,7 @@ from protest.entities import (
     normalize_skip,
     normalize_xfail,
 )
+from protest.exceptions import ConcurrencyMismatchError
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
 
