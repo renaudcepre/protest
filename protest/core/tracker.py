@@ -31,7 +31,3 @@ class SuiteTracker:
         async with self._lock:
             self._completed[suite_path] = self._completed.get(suite_path, 0) + 1
             return self._completed[suite_path] >= self._counts.get(suite_path, 0)
-
-    def get_all_suite_paths(self) -> set[str | None]:
-        """Get all suite paths being tracked."""
-        return set(self._counts.keys())

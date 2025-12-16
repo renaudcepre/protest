@@ -578,6 +578,40 @@ class TestTransitiveTags:
         tags = resolver.get_transitive_tags(fixture_c)
         assert tags == {"level1", "level2", "level3"}
 
+    def test_get_transitive_tags_diamond_pattern(self, resolver: Resolver) -> None:
+        """Diamond dependency: A→B→D and A→C→D collects D's tags once.
+
+        This test covers the `if actual_func in visited: return set()` branch
+        in _collect_transitive_tags which handles shared dependencies.
+        """
+
+        @fixture(tags=["shared"])
+        def fixture_d() -> str:
+            return "d"
+
+        @fixture(tags=["branch_b"])
+        def fixture_b(dep: Annotated[str, Use(fixture_d)]) -> str:
+            return f"b_{dep}"
+
+        @fixture(tags=["branch_c"])
+        def fixture_c(dep: Annotated[str, Use(fixture_d)]) -> str:
+            return f"c_{dep}"
+
+        @fixture(tags=["top"])
+        def fixture_a(
+            b: Annotated[str, Use(fixture_b)],
+            c: Annotated[str, Use(fixture_c)],
+        ) -> str:
+            return f"a_{b}_{c}"
+
+        resolver.register(fixture_d.func, scope_path=None, tags={"shared"})
+        resolver.register(fixture_b.func, scope_path=None, tags={"branch_b"})
+        resolver.register(fixture_c.func, scope_path=None, tags={"branch_c"})
+        resolver.register(fixture_a.func, scope_path=None, tags={"top"})
+
+        tags = resolver.get_transitive_tags(fixture_a)
+        assert tags == {"top", "branch_b", "branch_c", "shared"}
+
     def test_get_fixture_tags_direct(self, resolver: Resolver) -> None:
         @fixture(tags=["slow", "integration"])
         def tagged_fixture() -> str:
@@ -810,3 +844,86 @@ class TestCircularDependencyDetection:
             assert result == "a_b_d_c_d"
             expected_call_count = 1
             assert call_counts["diamond_d"] == expected_call_count
+
+
+class TestTypeHintEdgeCases:
+    """Tests for edge cases in type hint resolution."""
+
+    def test_fixture_with_failing_type_hints_still_works(
+        self, resolver: Resolver
+    ) -> None:
+        """When get_type_hints() fails, fixture registration proceeds without deps.
+
+        This covers lines 524-525 where get_type_hints raises an exception
+        (e.g., due to forward references that can't be resolved).
+        """
+        # Create a fixture with a forward reference that can't be resolved
+        # by using exec to define the function in a context without the type
+        exec_globals: dict[str, Any] = {"Annotated": Annotated}
+
+        exec(
+            """
+def fixture_with_bad_hints(dep: "NonExistentType") -> str:
+    return "works"
+""",
+            exec_globals,
+        )
+        bad_fixture = exec_globals["fixture_with_bad_hints"]
+
+        # Should not raise - the exception in get_type_hints is caught
+        resolver.register(bad_fixture, scope_path=None)
+
+        # Fixture registered with no dependencies (since hints couldn't be resolved)
+        assert bad_fixture in resolver._registry
+        assert resolver._dependencies.get(bad_fixture, {}) == {}
+
+
+class TestSameScopeDependency:
+    """Tests for fixtures depending on fixtures in the same scope."""
+
+    def test_suite_fixture_can_depend_on_same_suite_fixture(
+        self, resolver: Resolver
+    ) -> None:
+        """Fixture in suite can depend on another fixture in the same suite.
+
+        This covers line 594: `if potential_parent == child: return True`
+        """
+
+        def base_fixture() -> str:
+            return "base"
+
+        def dependent_fixture(
+            base: Annotated[str, Use(base_fixture)],
+        ) -> str:
+            return f"dependent_{base}"
+
+        # Both fixtures in the same suite scope
+        resolver.register(base_fixture, scope_path="MySuite")
+        resolver.register(dependent_fixture, scope_path="MySuite")
+
+        # Should not raise ScopeMismatchError
+        assert resolver.get_scope_path(base_fixture) == "MySuite"
+        assert resolver.get_scope_path(dependent_fixture) == "MySuite"
+
+    @pytest.mark.asyncio
+    async def test_same_suite_fixtures_resolve_correctly(
+        self, resolver: Resolver
+    ) -> None:
+        """Fixtures in the same suite resolve and cache correctly."""
+
+        def base_fixture() -> str:
+            call_counts["same_suite_base"] += 1
+            return "base_value"
+
+        def dependent_fixture(
+            base: Annotated[str, Use(base_fixture)],
+        ) -> str:
+            return f"dependent_{base}"
+
+        resolver.register(base_fixture, scope_path="MySuite")
+        resolver.register(dependent_fixture, scope_path="MySuite")
+
+        async with resolver:
+            result = await resolver.resolve(dependent_fixture, current_path="MySuite")
+            assert result == "dependent_base_value"
+            assert call_counts["same_suite_base"] == 1

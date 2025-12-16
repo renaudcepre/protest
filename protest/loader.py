@@ -36,10 +36,9 @@ def parse_target(target: str) -> tuple[str, str | None]:
     if "::" not in target:
         return target, None
 
+    # Find first ":" (module:session separator)
     colon_idx = target.find(":")
-    if colon_idx == -1:
-        return target, None
-
+    # Find "::" after the first ":" (suite filter separator)
     double_colon_idx = target.find("::", colon_idx + 1)
     if double_colon_idx == -1:
         return target, None
