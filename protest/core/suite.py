@@ -7,8 +7,8 @@ if TYPE_CHECKING:
 
     from protest.core.session import ProTestSession
 
-from protest.di.validation import validate_no_from_params
 from protest.di.decorators import FixtureWrapper
+from protest.di.validation import validate_no_from_params
 from protest.entities import (
     FixtureRegistration,
     Retry,

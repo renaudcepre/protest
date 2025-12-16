@@ -167,6 +167,32 @@ class TestGlobalCapturePatch:
             assert sys.stdout._show_output is False
             assert sys.stderr._show_output is False
 
+    def test_cleanup_orphaned_handler_from_crashed_previous_run(self) -> None:
+        """If a previous run crashed before __exit__, the orphaned handler is cleaned up."""
+        # Simulate a crashed previous run: manually add a handler and set the class variable
+        orphaned_handler = TaskAwareLogHandler()
+        logging.root.addHandler(orphaned_handler)
+        GlobalCapturePatch._current_handler = orphaned_handler
+
+        # Now enter a new patch - it should clean up the orphaned handler
+        with GlobalCapturePatch():
+            assert orphaned_handler not in logging.root.handlers
+            # A new handler should be installed
+            assert GlobalCapturePatch._current_handler is not orphaned_handler
+            assert GlobalCapturePatch._current_handler is not None
+
+        # After exit, the class variable should be cleared
+        assert GlobalCapturePatch._current_handler is None
+
+    def test_current_handler_cleared_after_normal_exit(self) -> None:
+        """The _current_handler class variable is cleared after normal __exit__."""
+        assert GlobalCapturePatch._current_handler is None
+
+        with GlobalCapturePatch():
+            assert GlobalCapturePatch._current_handler is not None
+
+        assert GlobalCapturePatch._current_handler is None
+
 
 class TestCaptureIntegration:
     """Integration tests for stdout/stderr capture in test execution."""
