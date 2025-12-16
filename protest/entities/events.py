@@ -94,3 +94,10 @@ class TestRetryInfo:
     max_attempts: int
     error: Exception
     delay: float
+
+
+@dataclass(frozen=True, slots=True)
+class TestTeardownInfo:
+    name: str
+    node_id: str
+    outcome: Event

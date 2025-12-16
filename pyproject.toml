@@ -31,6 +31,9 @@ dependencies = [
 rich = [
     "rich>=13.0",
 ]
+web = [
+    "websockets>=12.0",
+]
 
 
 [tool.ruff]
@@ -124,6 +127,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "rich>=13.0",
     "ty>=0.0.1a29",
+    "websockets>=12.0",
 ]
 docs = [
     "mkdocs>=1.6.1",

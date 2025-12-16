@@ -123,14 +123,14 @@ class TestFactoryDecorator:
     def test_factory_with_cache(
         self, event_collector: tuple[PluginBase, CollectedEvents]
     ) -> None:
-        """@factory() caches by kwargs by default."""
+        """@factory(cache=True) caches by kwargs."""
         plugin, _collected = event_collector
         session = ProTestSession()
         session.use(plugin)
 
         call_count = 0
 
-        @factory()
+        @factory(cache=True)
         def user(name: str) -> dict[str, str]:
             nonlocal call_count
             call_count += 1
@@ -152,6 +152,38 @@ class TestFactoryDecorator:
 
         assert result.success is True
         expected_call_count = 2  # alice once, bob once
+        assert call_count == expected_call_count
+
+    def test_factory_default_no_cache(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
+        """@factory() without arguments defaults to cache=False."""
+        plugin, _collected = event_collector
+        session = ProTestSession()
+        session.use(plugin)
+
+        call_count = 0
+
+        @factory()  # No cache argument - should default to False
+        def user(name: str) -> dict[str, str]:
+            nonlocal call_count
+            call_count += 1
+            return {"name": name, "call": call_count}
+
+        @session.test()
+        async def test_no_caching_by_default(
+            user_factory: Annotated[FixtureFactory[dict[str, str]], Use(user)],
+        ) -> None:
+            alice1 = await user_factory(name="alice")
+            alice2 = await user_factory(name="alice")
+
+            assert alice1 is not alice2  # Not cached by default
+
+        runner = TestRunner(session)
+        result = runner.run()
+
+        assert result.success is True
+        expected_call_count = 2  # Both calls create new instance
         assert call_count == expected_call_count
 
     def test_factory_without_cache(

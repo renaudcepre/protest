@@ -15,3 +15,6 @@ wheels/
 
 .protest/
 /ctrf-report.json
+
+# Web reporter
+web/node_modules/

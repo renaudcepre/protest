@@ -18,11 +18,12 @@ from protest import (
     Retry,
     Use,
     caplog,
+    factory,
+    fixture,
     mocker,
     raises,
     step,
 )
-from protest.di.decorators import fixture
 from protest.entities import LogCapture
 
 session = ProTestSession(concurrency=4)
@@ -47,14 +48,15 @@ def configure_kennel_logging() -> Generator[None, None, None]:
 @session.fixture(tags=["database", "slow-setup"])
 async def kennel() -> AsyncGenerator[Kennel, None]:
     kennel_instance = Kennel()
+    await asyncio.sleep(3)
     yield kennel_instance
     print("  [kennel] starting LONG teardown (1 seconds)...")  # noqa
-    await asyncio.sleep(1)
+    await asyncio.sleep(6)
     print("  [kennel] teardown complete!")  # noqa
     await kennel_instance.clear()
 
 
-@session.factory()
+@factory()
 async def yorkshire_factory(
     kennel_fixture: Annotated[Kennel, Use(kennel)],
     name: str = "Unnamed",
@@ -64,7 +66,10 @@ async def yorkshire_factory(
 ) -> Yorkshire:
     dog = Yorkshire(name=name, size=size, job=job, age=age)
     await kennel_fixture.add(dog)
+    await asyncio.sleep(age / 50)
+    print(f"Creating {dog.name}... ")  # noqa: T201
     yield dog
+    await asyncio.sleep(age / 20)
     await kennel_fixture.remove(dog.name)
 
 
@@ -74,7 +79,7 @@ async def yorkshire_factory(
 
 puppies_suite = ProTestSuite("Puppies", tags=["puppy"])
 adults_suite = ProTestSuite("Adults")
-workers_suite = ProTestSuite("Workers", tags=["working"])
+workers_suite = ProTestSuite("Workers", tags=["working"], max_concurrency=2)
 unemployed_suite = ProTestSuite("Unemployed")
 seniors_suite = ProTestSuite("Seniors", tags=["senior"])
 legacy_suite = ProTestSuite(
@@ -108,11 +113,11 @@ def setup_work_environment() -> Generator[None, None, None]:
 # =============================================================================
 
 
-@workers_suite.fixture()
+@fixture()
 async def working_dog(
-    factory: Annotated[FixtureFactory[Yorkshire], Use(yorkshire_factory)],
+    dog_factory: Annotated[FixtureFactory[Yorkshire], Use(yorkshire_factory)],
 ) -> Yorkshire:
-    return await factory(name="Rex", job=Job.DETECTIVE, age=36)
+    return await dog_factory(name="Rex", job=Job.DETECTIVE, age=36)
 
 
 # =============================================================================

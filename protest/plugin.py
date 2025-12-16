@@ -14,6 +14,7 @@ if TYPE_CHECKING:
         TestResult,
         TestRetryInfo,
         TestStartInfo,
+        TestTeardownInfo,
     )
 
 
@@ -74,7 +75,7 @@ class PluginBase:
     def on_test_setup_done(self, info: TestStartInfo) -> None | Awaitable[None]:
         """Called after fixtures resolved, before test execution."""
 
-    def on_test_teardown_start(self, info: TestStartInfo) -> None | Awaitable[None]:
+    def on_test_teardown_start(self, info: TestTeardownInfo) -> None | Awaitable[None]:
         """Called after test body, before fixture teardown."""
 
     def on_test_retry(self, info: TestRetryInfo) -> None | Awaitable[None]:

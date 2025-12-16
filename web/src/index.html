@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProTest Live</title>
+</head>
+<body>
+  <div id="tooltip"></div>
+  <div class="app">
+    <header class="header">
+      <div class="logo">
+        <img src="./assets/logo-term.svg" alt="ProTest" class="logo-svg">
+      </div>
+      <div class="session-info">
+        <span class="session-target" id="session-target">Waiting for session...</span>
+        <div class="connection-status">
+          <span class="connection-dot" id="connection-dot" data-state="connecting"></span>
+          <span id="connection-text">Connecting</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="stats">
+      <div class="stat" data-type="pass">
+        <span class="stat-value" id="stat-pass">0</span>
+        <span class="stat-label">Pass</span>
+      </div>
+      <div class="stat" data-type="fail">
+        <span class="stat-value" id="stat-fail">0</span>
+        <span class="stat-label">Fail</span>
+      </div>
+      <div class="stat" data-type="skip">
+        <span class="stat-value" id="stat-skip">0</span>
+        <span class="stat-label">Skip</span>
+      </div>
+      <div class="stat" data-type="xfail">
+        <span class="stat-value" id="stat-xfail">0</span>
+        <span class="stat-label">XFail</span>
+      </div>
+      <div class="stat" data-type="error">
+        <span class="stat-value" id="stat-error">0</span>
+        <span class="stat-label">Error</span>
+      </div>
+      <div class="stat stat--timer">
+        <span class="stat-value" id="timer">0.00s</span>
+        <span class="stat-label">Time</span>
+      </div>
+    </div>
+
+    <div class="progress">
+      <div class="progress-bar">
+        <div class="progress-segment" data-type="pass" id="progress-pass" style="width: 0%"></div>
+        <div class="progress-segment" data-type="fail" id="progress-fail" style="width: 0%"></div>
+        <div class="progress-segment" data-type="skip" id="progress-skip" style="width: 0%"></div>
+        <div class="progress-segment" data-type="xfail" id="progress-xfail" style="width: 0%"></div>
+        <div class="progress-segment" data-type="error" id="progress-error" style="width: 0%"></div>
+      </div>
+      <span class="progress-text" id="progress-text">0 / 0</span>
+      <label class="filter-toggle">
+        <input type="checkbox" id="hide-passed">
+        <span>Hide passed</span>
+      </label>
+    </div>
+
+    <main class="main" id="main">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-state-icon">&#9671;</div>
+        <div class="empty-state-text">Waiting for tests...</div>
+      </div>
+      <div id="suites-container"></div>
+    </main>
+
+    <footer class="legend">
+      <div class="legend-item"><span class="legend-cell" data-state="pending"></span> Pending</div>
+      <div class="legend-item"><span class="legend-cell" data-state="setup"></span> Setup</div>
+      <div class="legend-item"><span class="legend-cell" data-state="running"></span> Running</div>
+      <div class="legend-item"><span class="legend-cell" data-state="teardown"></span> Teardown</div>
+      <div class="legend-item"><span class="legend-cell" data-state="pass"></span> Pass</div>
+      <div class="legend-item"><span class="legend-cell" data-state="fail"></span> Fail</div>
+      <div class="legend-item"><span class="legend-cell" data-state="skip"></span> Skip</div>
+      <div class="legend-item"><span class="legend-cell" data-state="xfail"></span> XFail</div>
+      <div class="legend-item"><span class="legend-cell" data-state="error"></span> Error</div>
+    </footer>
+  </div>
+
+  <script type="module" src="./scripts/main.js"></script>
+</body>
+</html>

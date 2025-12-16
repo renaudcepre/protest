@@ -46,3 +46,13 @@ clean:
 # Serve docs with hot reload
 docs:
     uv run mkdocs serve
+
+# Web Reporter
+web-setup:
+    cd web && npm install
+
+web-dev:
+    cd web && npm run dev
+
+web-build:
+    cd web && npm run build
