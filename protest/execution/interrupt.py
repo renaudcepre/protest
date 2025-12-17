@@ -93,7 +93,3 @@ class InterruptHandler:
             if self._original_handler is not None:
                 signal.signal(signal.SIGINT, self._original_handler)
             raise KeyboardInterrupt
-
-    def simulate_signal(self) -> None:
-        """Simulate receiving SIGINT for testing purposes."""
-        self._handle_signal(signal.SIGINT, None)
