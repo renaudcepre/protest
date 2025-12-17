@@ -12,6 +12,7 @@ from protest.di.resolver import Resolver
 from protest.entities import (
     RunResult,
     SessionResult,
+    SuiteResult,
     TestCounts,
     TestItem,
     TestOutcome,
@@ -46,6 +47,9 @@ class TestRunner:
         self._session = session
         self._outcome_builder = OutcomeBuilder()
         self._started_suites: set[str] = set()
+        self._suite_start_times: dict[str, float] = {}
+        self._suite_setup_durations: dict[str, float] = {}
+        self._suite_teardown_durations: dict[str, float] = {}
         self._suite_start_lock: asyncio.Lock | None = None
         self._interrupt_handler = InterruptHandler()
         self._interrupted = False
@@ -89,17 +93,13 @@ class TestRunner:
         try:
             with GlobalCapturePatch(show_output=not self._session.capture):
                 async with self._session:
-                    await self._session.events.emit(Event.SESSION_SETUP_START)
                     setup_start = time.perf_counter()
                     set_session_setup_capture(True)
                     try:
                         await self._session.resolve_autouse()
                     finally:
                         set_session_setup_capture(False)
-                    setup_duration = time.perf_counter() - setup_start
-                    await self._session.events.emit(
-                        Event.SESSION_SETUP_DONE, setup_duration
-                    )
+                    self._session.set_setup_duration(time.perf_counter() - setup_start)
 
                     self._started_suites = set()
                     self._suite_start_lock = asyncio.Lock()
@@ -111,7 +111,21 @@ class TestRunner:
                     )
 
                     for suite_path in reversed(list(self._started_suites)):
-                        await self._session.events.emit(Event.SUITE_END, suite_path)
+                        suite_start = self._suite_start_times.get(suite_path, 0)
+                        suite_duration = (
+                            time.perf_counter() - suite_start if suite_start else 0
+                        )
+                        setup_duration = self._suite_setup_durations.get(suite_path, 0)
+                        teardown_duration = self._suite_teardown_durations.get(
+                            suite_path, 0
+                        )
+                        suite_result = SuiteResult(
+                            name=suite_path,
+                            duration=suite_duration,
+                            setup_duration=setup_duration,
+                            teardown_duration=teardown_duration,
+                        )
+                        await self._session.events.emit(Event.SUITE_END, suite_result)
         finally:
             # Emit SESSION_INTERRUPTED if force_teardown was triggered during teardown
             # (only if not already emitted during test execution)
@@ -135,6 +149,8 @@ class TestRunner:
             xfailed=total_counts.xfailed,
             xpassed=total_counts.xpassed,
             duration=session_duration,
+            setup_duration=self._session.setup_duration,
+            teardown_duration=self._session.teardown_duration,
             interrupted=self._interrupted,
         )
         await self._session.events.emit(Event.SESSION_END, session_result)
@@ -185,12 +201,17 @@ class TestRunner:
             async with self._suite_start_lock:
                 if parent_path in self._started_suites:
                     continue
+                self._suite_start_times[parent_path] = time.perf_counter()
                 await self._session.events.emit(Event.SUITE_START, parent_path)
+                suite_setup_start = time.perf_counter()
                 set_session_setup_capture(True)
                 try:
                     await self._session.resolver.resolve_suite_autouse(parent_path)
                 finally:
                     set_session_setup_capture(False)
+                self._suite_setup_durations[parent_path] = (
+                    time.perf_counter() - suite_setup_start
+                )
                 self._started_suites.add(parent_path)
 
     async def _run_all_parallel(
@@ -414,13 +435,15 @@ class TestRunner:
 
     async def _teardown_suite(self, suite_path: str) -> None:
         """Teardown suite fixtures after all its tests complete."""
-        await self._session.events.emit(Event.SUITE_TEARDOWN_START, suite_path)
+        teardown_start = time.perf_counter()
         set_session_teardown_capture(True)
         try:
             await self._session.resolver.teardown_suite(suite_path)
         finally:
             set_session_teardown_capture(False)
-        await self._session.events.emit(Event.SUITE_TEARDOWN_DONE, suite_path)
+            self._suite_teardown_durations[suite_path] = (
+                time.perf_counter() - teardown_start
+            )
 
     async def _resolve_test_kwargs(
         self,

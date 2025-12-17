@@ -430,10 +430,21 @@ class Resolver:
         scope = self._format_scope(scope_path)
         is_autouse = fixture.func in self._autouse_fixtures
 
-        start_time = time.perf_counter()
-        await self._emit_fixture_setup_async(fixture_name, scope, is_autouse)
+        lifetime_start = time.perf_counter()
+        setup_start = time.perf_counter()
+        await self._emit_fixture_setup_start_async(fixture_name, scope, is_autouse)
 
         if is_generator_like(fixture.func):
+            # Push emit_done FIRST (runs LAST due to LIFO)
+            exit_stack.push_async_callback(
+                self._emit_fixture_teardown_done_async,
+                fixture_name,
+                scope,
+                lifetime_start,
+                is_autouse,
+            )
+
+            # Enter the context manager (runs in the middle)
             if inspect.isasyncgenfunction(fixture.func):
                 async_cm = asynccontextmanager(fixture.func)(**kwargs)
                 result = await exit_stack.enter_async_context(async_cm)
@@ -441,29 +452,58 @@ class Resolver:
                 sync_cm = contextmanager(fixture.func)(**kwargs)
                 result = exit_stack.enter_context(sync_cm)
 
+            # Push emit_start LAST (runs FIRST due to LIFO)
             exit_stack.push_async_callback(
-                self._emit_fixture_teardown_async,
+                self._emit_fixture_teardown_start_async,
                 fixture_name,
                 scope,
-                start_time,
                 is_autouse,
             )
         else:
             result = await ensure_async(fixture.func, **kwargs)
 
+        # Emit setup done after fixture setup completes
+        setup_duration = time.perf_counter() - setup_start
+        await self._emit_fixture_setup_done_async(
+            fixture_name, scope, setup_duration, is_autouse
+        )
+
         return result
 
-    async def _emit_fixture_setup_async(
+    async def _emit_fixture_setup_start_async(
         self, name: str, scope: str, autouse: bool
     ) -> None:
         if self._event_bus is None:
             return
 
         await self._event_bus.emit(
-            Event.FIXTURE_SETUP, FixtureInfo(name=name, scope=scope, autouse=autouse)
+            Event.FIXTURE_SETUP_START,
+            FixtureInfo(name=name, scope=scope, autouse=autouse),
         )
 
-    async def _emit_fixture_teardown_async(
+    async def _emit_fixture_setup_done_async(
+        self, name: str, scope: str, duration: float, autouse: bool
+    ) -> None:
+        if self._event_bus is None:
+            return
+
+        await self._event_bus.emit(
+            Event.FIXTURE_SETUP_DONE,
+            FixtureInfo(name=name, scope=scope, duration=duration, autouse=autouse),
+        )
+
+    async def _emit_fixture_teardown_start_async(
+        self, name: str, scope: str, autouse: bool
+    ) -> None:
+        if self._event_bus is None:
+            return
+
+        await self._event_bus.emit(
+            Event.FIXTURE_TEARDOWN_START,
+            FixtureInfo(name=name, scope=scope, autouse=autouse),
+        )
+
+    async def _emit_fixture_teardown_done_async(
         self, name: str, scope: str, start_time: float, autouse: bool
     ) -> None:
         if self._event_bus is None:
@@ -471,7 +511,7 @@ class Resolver:
 
         duration = time.perf_counter() - start_time
         await self._event_bus.emit(
-            Event.FIXTURE_TEARDOWN,
+            Event.FIXTURE_TEARDOWN_DONE,
             FixtureInfo(name=name, scope=scope, duration=duration, autouse=autouse),
         )
 

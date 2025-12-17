@@ -210,7 +210,10 @@ class TestRunnerWithSuites:
         runner.run()
 
         assert ("start", "my_suite") in collected.suite_events
-        assert ("end", "my_suite") in collected.suite_events
+        # Check that SUITE_END was emitted with a SuiteResult
+        suite_end_events = [e for e in collected.suite_events if e[0] == "end"]
+        assert len(suite_end_events) == 1
+        assert suite_end_events[0][1].name == "my_suite"
 
     def test_runner_uses_suite_max_concurrency(self) -> None:
         """Suite max_concurrency caps effective concurrency."""
