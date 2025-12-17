@@ -37,7 +37,7 @@ class TestInterruptStateTransitions:
         """Given RUNNING state, when signal received, then state becomes SOFT_STOP."""
         handler, _ = interrupt_handler_with_loop
 
-        handler.simulate_signal()
+        handler._handle_signal(signal.SIGINT, None)
 
         assert handler.state == InterruptState.SOFT_STOP
 
@@ -47,9 +47,9 @@ class TestInterruptStateTransitions:
     ) -> None:
         """Given SOFT_STOP state, when signal received, then state becomes FORCE_TEARDOWN."""
         handler, _ = interrupt_handler_with_loop
-        handler.simulate_signal()
+        handler._handle_signal(signal.SIGINT, None)
 
-        handler.simulate_signal()
+        handler._handle_signal(signal.SIGINT, None)
 
         assert handler.state == InterruptState.FORCE_TEARDOWN
 
@@ -59,11 +59,11 @@ class TestInterruptStateTransitions:
     ) -> None:
         """Given FORCE_TEARDOWN state, when signal received, then KeyboardInterrupt raised."""
         handler, _ = interrupt_handler_with_loop
-        handler.simulate_signal()
-        handler.simulate_signal()
+        handler._handle_signal(signal.SIGINT, None)
+        handler._handle_signal(signal.SIGINT, None)
 
         with pytest.raises(KeyboardInterrupt):
-            handler.simulate_signal()
+            handler._handle_signal(signal.SIGINT, None)
 
         assert handler.state == InterruptState.HARD_EXIT
 
@@ -79,7 +79,7 @@ class TestInterruptEvents:
         handler, loop = interrupt_handler_with_loop
         assert not handler.soft_stop_event.is_set()
 
-        handler.simulate_signal()
+        handler._handle_signal(signal.SIGINT, None)
         loop.run_until_complete(asyncio.sleep(0))
 
         assert handler.soft_stop_event.is_set()
@@ -90,9 +90,9 @@ class TestInterruptEvents:
     ) -> None:
         """Given SOFT_STOP state, when second signal, then force_teardown_event is set."""
         handler, loop = interrupt_handler_with_loop
-        handler.simulate_signal()
+        handler._handle_signal(signal.SIGINT, None)
 
-        handler.simulate_signal()
+        handler._handle_signal(signal.SIGINT, None)
         loop.run_until_complete(asyncio.sleep(0))
 
         assert handler.force_teardown_event.is_set()
@@ -143,7 +143,7 @@ class TestInterruptProperties:
         handler, _ = interrupt_handler_with_loop
 
         for _ in range(signal_count):
-            handler.simulate_signal()
+            handler._handle_signal(signal.SIGINT, None)
 
         assert handler.should_stop_new_tests is expected_should_stop
         assert handler.should_cancel_running is expected_should_cancel
@@ -228,7 +228,7 @@ class TestRunnerInterruptIntegration:
         original_main_loop = runner._main_loop
 
         async def patched_main_loop() -> bool:
-            runner._interrupt_handler.simulate_signal()
+            runner._interrupt_handler._handle_signal(signal.SIGINT, None)
             return await original_main_loop()
 
         runner._main_loop = patched_main_loop
@@ -268,7 +268,7 @@ class TestRunnerInterruptIntegration:
         def test_first() -> None:
             executed.append("first")
             if runner:
-                runner._interrupt_handler.simulate_signal()
+                runner._interrupt_handler._handle_signal(signal.SIGINT, None)
 
         @session.test()
         def test_second() -> None:
