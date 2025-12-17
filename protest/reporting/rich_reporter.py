@@ -7,8 +7,10 @@ from rich.live import Live  # type: ignore[import-not-found]
 from rich.text import Text  # type: ignore[import-not-found]
 
 from protest.entities import (
+    FixtureInfo,
     HandlerInfo,
     SessionResult,
+    SuiteResult,
     TestItem,
     TestResult,
     TestRetryInfo,
@@ -45,6 +47,8 @@ class RichReporter(PluginBase):
         self._total_tests = 0
         self._failed_results: list[TestResult] = []
         self._error_results: list[TestResult] = []
+        self._setup_started: set[str] = set()
+        self._teardown_started: set[str] = set()
 
         self._live: Live | None = None
         self._start_time: float = 0
@@ -119,17 +123,27 @@ class RichReporter(PluginBase):
 
         return items
 
-    def on_session_setup_start(self) -> None:
-        pass
+    def on_fixture_setup_start(self, info: FixtureInfo) -> None:
+        if info.scope not in self._setup_started:
+            self._print(f"[yellow]  {info.scope} setup...[/]")
+            self._setup_started.add(info.scope)
 
-    def on_session_setup_done(self, duration: float) -> None:
-        pass
+    def on_fixture_teardown_start(self, info: FixtureInfo) -> None:
+        if info.scope not in self._teardown_started:
+            self._print(f"[yellow]  {info.scope} teardown...[/]")
+            self._teardown_started.add(info.scope)
 
-    def on_session_teardown_start(self) -> None:
-        self._print("[yellow]  session teardown...[/]")
+    def on_suite_end(self, result: SuiteResult) -> None:
+        if result.teardown_duration > 0:
+            self._print(
+                f"[dim]  {result.name} teardown done ({_format_duration(result.teardown_duration)})[/]"
+            )
 
-    def on_session_teardown_done(self, duration: float) -> None:
-        self._print(f"[dim]  session teardown done ({_format_duration(duration)})[/]")
+    def on_session_end(self, result: SessionResult) -> None:
+        if result.teardown_duration > 0:
+            self._print(
+                f"[dim]  session teardown done ({_format_duration(result.teardown_duration)})[/]"
+            )
 
     def on_suite_start(self, name: str) -> None:
         pass

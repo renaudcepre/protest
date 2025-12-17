@@ -78,6 +78,8 @@ class ProTestSession:
         self._exitfirst: bool = False
         self._capture: bool = True
         self._default_reporter: PluginBase | None = None
+        self._setup_duration: float = 0
+        self._teardown_duration: float = 0
 
         if default_reporter:
             self._default_reporter = get_reporter()
@@ -116,6 +118,20 @@ class ProTestSession:
     @capture.setter
     def capture(self, value: bool) -> None:
         self._capture = value
+
+    @property
+    def setup_duration(self) -> float:
+        """Duration of session setup (available after resolve_autouse)."""
+        return self._setup_duration
+
+    def set_setup_duration(self, duration: float) -> None:
+        """Set the setup duration. Called by runner after autouse resolution."""
+        self._setup_duration = duration
+
+    @property
+    def teardown_duration(self) -> float:
+        """Duration of session teardown (available after __aexit__)."""
+        return self._teardown_duration
 
     def configure_cache(
         self, last_failed: bool = False, cache_clear: bool = False
@@ -380,15 +396,12 @@ class ProTestSession:
     ) -> bool:
         import time
 
-        from protest.events.types import Event
         from protest.execution.capture import set_session_teardown_capture
 
-        await self.events.emit(Event.SESSION_TEARDOWN_START)
         teardown_start = time.perf_counter()
         set_session_teardown_capture(True)
         try:
             return await self._resolver.__aexit__(exc_type, exc_val, exc_tb)
         finally:
             set_session_teardown_capture(False)
-            teardown_duration = time.perf_counter() - teardown_start
-            await self.events.emit(Event.SESSION_TEARDOWN_DONE, teardown_duration)
+            self._teardown_duration = time.perf_counter() - teardown_start

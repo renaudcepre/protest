@@ -302,52 +302,6 @@ class TestAsciiReporterParallelMode:
         assert captured.out == ""
 
 
-class TestAsciiReporterSessionHooks:
-    @pytest.mark.parametrize(
-        "hook_method,hook_args,expected_text",
-        [
-            pytest.param(
-                "on_session_setup_start", (), "session setup", id="setup_start"
-            ),
-            pytest.param(
-                "on_session_teardown_start", (), "teardown", id="teardown_start"
-            ),
-        ],
-    )
-    def test_session_lifecycle_hooks(
-        self,
-        ascii_reporter: AsciiReporter,
-        capsys: pytest.CaptureFixture[str],
-        hook_method: str,
-        hook_args: tuple,
-        expected_text: str,
-    ) -> None:
-        """Given a lifecycle hook, when called, then expected text is printed."""
-        getattr(ascii_reporter, hook_method)(*hook_args)
-        captured = capsys.readouterr()
-        assert expected_text in captured.out.lower()
-
-    @pytest.mark.parametrize(
-        "hook_method,duration,expected_duration_str",
-        [
-            pytest.param("on_session_setup_done", 0.5, "500ms", id="setup_done"),
-            pytest.param("on_session_teardown_done", 0.25, "250ms", id="teardown_done"),
-        ],
-    )
-    def test_session_done_hooks(
-        self,
-        ascii_reporter: AsciiReporter,
-        capsys: pytest.CaptureFixture[str],
-        hook_method: str,
-        duration: float,
-        expected_duration_str: str,
-    ) -> None:
-        """Given a done hook with duration, when called, then duration is printed."""
-        getattr(ascii_reporter, hook_method)(duration)
-        captured = capsys.readouterr()
-        assert expected_duration_str in captured.out
-
-
 class TestAsciiReporterTestStatus:
     @pytest.mark.parametrize(
         "handler_method,result_kwargs,expected_marker,expected_texts",
@@ -482,30 +436,47 @@ class TestAsciiReporterSummaryParts:
             assert text in captured.out
 
 
-class TestAsciiReporterAutouse:
-    """Test on_fixture_setup with autouse."""
+class TestAsciiReporterFixtureSetup:
+    """Test on_fixture_setup_start hook."""
 
-    def test_on_fixture_setup_autouse(
+    def test_on_fixture_setup_start_autouse(
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Autouse fixture displays setup message."""
-        ascii_reporter.on_fixture_setup(
+        """Autouse fixture displays both scope setup and autouse messages."""
+        ascii_reporter.on_fixture_setup_start(
             FixtureInfo(name="my_autouse_fixture", scope="session", autouse=True)
         )
         captured = capsys.readouterr()
+        assert "session setup" in captured.out
         assert "autouse" in captured.out
         assert "my_autouse_fixture" in captured.out
         assert "session" in captured.out
 
-    def test_on_fixture_setup_not_autouse(
+    def test_on_fixture_setup_start_not_autouse(
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Non-autouse fixture does not display message."""
-        ascii_reporter.on_fixture_setup(
+        """Non-autouse fixture displays only scope setup message."""
+        ascii_reporter.on_fixture_setup_start(
             FixtureInfo(name="regular_fixture", scope="suite", autouse=False)
         )
         captured = capsys.readouterr()
-        assert captured.out == ""
+        assert "suite setup" in captured.out
+        assert "autouse" not in captured.out
+
+    def test_on_fixture_setup_start_same_scope_prints_once(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Multiple fixtures in same scope only print scope setup once."""
+        ascii_reporter.on_fixture_setup_start(
+            FixtureInfo(name="first_fixture", scope="session", autouse=False)
+        )
+        capsys.readouterr()  # Clear first output
+
+        ascii_reporter.on_fixture_setup_start(
+            FixtureInfo(name="second_fixture", scope="session", autouse=False)
+        )
+        captured = capsys.readouterr()
+        assert "session setup" not in captured.out
 
 
 class TestAsciiReporterRetry:

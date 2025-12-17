@@ -10,6 +10,7 @@ if TYPE_CHECKING:
         FixtureInfo,
         HandlerInfo,
         SessionResult,
+        SuiteResult,
         TestItem,
         TestResult,
         TestRetryInfo,
@@ -19,10 +20,21 @@ if TYPE_CHECKING:
 
 
 class PluginBase:
-    """Base class for ProTest plugins. Methods can be sync or async."""
+    """Base class for ProTest plugins. Methods can be sync or async.
+
+    Methods are ordered chronologically following the event timeline.
+    """
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Registration
+    # ─────────────────────────────────────────────────────────────────────
 
     def setup(self, session: ProTestSession) -> None:
         """Called when plugin is registered via session.use()."""
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Collection
+    # ─────────────────────────────────────────────────────────────────────
 
     def on_collection_finish(
         self, items: list[TestItem]
@@ -30,23 +42,15 @@ class PluginBase:
         """Called after collection. Can filter/sort items."""
         return items
 
+    # ─────────────────────────────────────────────────────────────────────
+    # Session lifecycle
+    # ─────────────────────────────────────────────────────────────────────
+
     def on_session_start(self) -> None | Awaitable[None]:
         """Called before any test runs."""
 
-    def on_session_setup_start(self) -> None | Awaitable[None]:
-        """Called before session fixtures are resolved."""
-
-    def on_session_setup_done(self, duration: float) -> None | Awaitable[None]:
-        """Called after session fixtures are resolved."""
-
-    def on_session_teardown_start(self) -> None | Awaitable[None]:
-        """Called before session fixture teardown begins."""
-
-    def on_session_teardown_done(self, duration: float) -> None | Awaitable[None]:
-        """Called after session fixture teardown completes."""
-
     def on_session_end(self, result: SessionResult) -> None | Awaitable[None]:
-        """Tests done. Async handlers (Slack, etc.) start here."""
+        """Tests done, teardown complete. result.setup_duration and teardown_duration available."""
 
     def on_waiting_handlers(self, pending_count: int) -> None | Awaitable[None]:
         """Called when waiting for async handlers to complete."""
@@ -54,17 +58,35 @@ class PluginBase:
     def on_session_complete(self, result: SessionResult) -> None | Awaitable[None]:
         """After wait_pending(). All async handlers finished."""
 
+    # ─────────────────────────────────────────────────────────────────────
+    # Suite lifecycle
+    # ─────────────────────────────────────────────────────────────────────
+
     def on_suite_start(self, name: str) -> None | Awaitable[None]:
         """Called before a suite's tests run."""
 
-    def on_suite_end(self, name: str) -> None | Awaitable[None]:
-        """Called after a suite's tests complete."""
+    def on_suite_end(self, result: SuiteResult) -> None | Awaitable[None]:
+        """Called after a suite's tests and teardown complete."""
 
-    def on_suite_teardown_start(self, name: str) -> None | Awaitable[None]:
-        """Called before suite fixture teardown begins."""
+    # ─────────────────────────────────────────────────────────────────────
+    # Fixture lifecycle
+    # ─────────────────────────────────────────────────────────────────────
 
-    def on_suite_teardown_done(self, name: str) -> None | Awaitable[None]:
-        """Called after suite fixture teardown completes."""
+    def on_fixture_setup_start(self, info: FixtureInfo) -> None | Awaitable[None]:
+        """Called before a fixture setup begins."""
+
+    def on_fixture_setup_done(self, info: FixtureInfo) -> None | Awaitable[None]:
+        """Called after a fixture setup completes. info.duration = setup duration."""
+
+    def on_fixture_teardown_start(self, info: FixtureInfo) -> None | Awaitable[None]:
+        """Called before a fixture teardown begins."""
+
+    def on_fixture_teardown_done(self, info: FixtureInfo) -> None | Awaitable[None]:
+        """Called after a fixture teardown completes. info.duration = fixture lifetime."""
+
+    # ─────────────────────────────────────────────────────────────────────
+    # Test lifecycle
+    # ─────────────────────────────────────────────────────────────────────
 
     def on_test_start(self, info: TestStartInfo) -> None | Awaitable[None]:
         """Called when a test begins (waiting for execution slot)."""
@@ -81,6 +103,10 @@ class PluginBase:
     def on_test_retry(self, info: TestRetryInfo) -> None | Awaitable[None]:
         """Called when a test fails and will be retried."""
 
+    # ─────────────────────────────────────────────────────────────────────
+    # Test outcomes
+    # ─────────────────────────────────────────────────────────────────────
+
     def on_test_pass(self, result: TestResult) -> None | Awaitable[None]:
         """Called when a test passes."""
 
@@ -96,17 +122,19 @@ class PluginBase:
     def on_test_xpass(self, result: TestResult) -> None | Awaitable[None]:
         """Called when a test marked xfail unexpectedly passes."""
 
+    # ─────────────────────────────────────────────────────────────────────
+    # Handler events (meta)
+    # ─────────────────────────────────────────────────────────────────────
+
     def on_handler_start(self, info: HandlerInfo) -> None | Awaitable[None]:
         """Called when an event handler starts executing."""
 
     def on_handler_end(self, info: HandlerInfo) -> None | Awaitable[None]:
         """Called when an event handler completes."""
 
-    def on_fixture_setup(self, info: FixtureInfo) -> None | Awaitable[None]:
-        """Called when a fixture starts setup."""
-
-    def on_fixture_teardown(self, info: FixtureInfo) -> None | Awaitable[None]:
-        """Called when a fixture is torn down."""
+    # ─────────────────────────────────────────────────────────────────────
+    # Interruption
+    # ─────────────────────────────────────────────────────────────────────
 
     def on_session_interrupted(self, force_teardown: bool) -> None | Awaitable[None]:
         """Called when Ctrl+C is pressed. force_teardown=True on 2nd Ctrl+C."""

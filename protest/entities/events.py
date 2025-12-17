@@ -53,7 +53,17 @@ class SessionResult:
     xfailed: int = 0
     xpassed: int = 0
     duration: float = 0
+    setup_duration: float = 0
+    teardown_duration: float = 0
     interrupted: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class SuiteResult:
+    name: str
+    duration: float = 0
+    setup_duration: float = 0
+    teardown_duration: float = 0
 
 
 @dataclass(frozen=True, slots=True)

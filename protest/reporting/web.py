@@ -16,7 +16,9 @@ from protest.plugin import PluginBase
 
 if TYPE_CHECKING:
     from protest.entities import (
+        FixtureInfo,
         SessionResult,
+        SuiteResult,
         TestItem,
         TestResult,
         TestStartInfo,
@@ -192,6 +194,39 @@ class WebReporter(PluginBase):
                 "message": result.xfail_reason,
             },
         )
+
+    def on_fixture_setup_start(self, info: FixtureInfo) -> None:
+        self._send(
+            "FIXTURE_SETUP_START",
+            {"name": info.name, "scope": info.scope},
+        )
+
+    def on_fixture_setup_done(self, info: FixtureInfo) -> None:
+        self._send(
+            "FIXTURE_SETUP_DONE",
+            {"name": info.name, "scope": info.scope, "duration": info.duration},
+        )
+
+    def on_fixture_teardown_start(self, info: FixtureInfo) -> None:
+        self._send(
+            "FIXTURE_TEARDOWN_START",
+            {"name": info.name, "scope": info.scope},
+        )
+
+    def on_fixture_teardown_done(self, info: FixtureInfo) -> None:
+        self._send(
+            "FIXTURE_TEARDOWN_DONE",
+            {"name": info.name, "scope": info.scope, "duration": info.duration},
+        )
+
+    def on_suite_end(self, result: SuiteResult) -> None:
+        self._send(
+            "SUITE_END",
+            {"name": result.name, "duration": result.duration},
+        )
+
+    def on_session_end(self, result: SessionResult) -> None:
+        self._send("SESSION_TEARDOWN_DONE", {})
 
     def on_session_complete(self, result: SessionResult) -> None:
         remove_log_callback(self._on_log)

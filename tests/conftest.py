@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from protest.core.suite import ProTestSuite
-from protest.entities import SessionResult, TestItem, TestResult
+from protest.entities import SessionResult, SuiteResult, TestItem, TestResult
 from protest.plugin import PluginBase
 from tests.factories.test_items import make_test_item
 
@@ -64,7 +64,7 @@ class CollectedEvents:
     session_results: list[SessionResult] = field(default_factory=list)
     collection_items: list[TestItem] = field(default_factory=list)
     events: list[str] = field(default_factory=list)
-    suite_events: list[tuple[str, str]] = field(default_factory=list)
+    suite_events: list[tuple[str, str | SuiteResult]] = field(default_factory=list)
 
 
 @pytest.fixture
@@ -95,8 +95,8 @@ def event_collector() -> tuple[PluginBase, CollectedEvents]:
         def on_suite_start(self, name: str) -> None:
             collected.suite_events.append(("start", name))
 
-        def on_suite_end(self, name: str) -> None:
-            collected.suite_events.append(("end", name))
+        def on_suite_end(self, result: SuiteResult) -> None:
+            collected.suite_events.append(("end", result))
 
         def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
             collected.collection_items.extend(items)
