@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from protest.entities import FixtureScope
     from protest.events.types import Event
 
 
@@ -90,7 +91,8 @@ class HandlerInfo:
 @dataclass(frozen=True, slots=True)
 class FixtureInfo:
     name: str
-    scope: str
+    scope: FixtureScope
+    scope_path: str | None = None
     duration: float = 0
     autouse: bool = False
 

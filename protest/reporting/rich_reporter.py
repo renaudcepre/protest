@@ -16,6 +16,7 @@ from protest.entities import (
     TestItem,
     TestResult,
     TestRetryInfo,
+    format_fixture_scope,
 )
 from protest.plugin import PluginBase, PluginContext
 
@@ -145,14 +146,16 @@ class RichReporter(PluginBase):
         return items
 
     def on_fixture_setup_start(self, info: FixtureInfo) -> None:
-        if info.scope not in self._setup_started:
-            self._print(f"[yellow]  {info.scope} setup...[/]")
-            self._setup_started.add(info.scope)
+        display = format_fixture_scope(info.scope, info.scope_path)
+        if display not in self._setup_started:
+            self._print(f"[yellow]  {display} setup...[/]")
+            self._setup_started.add(display)
 
     def on_fixture_teardown_start(self, info: FixtureInfo) -> None:
-        if info.scope not in self._teardown_started:
-            self._print(f"[yellow]  {info.scope} teardown...[/]")
-            self._teardown_started.add(info.scope)
+        display = format_fixture_scope(info.scope, info.scope_path)
+        if display not in self._teardown_started:
+            self._print(f"[yellow]  {display} teardown...[/]")
+            self._teardown_started.add(display)
 
     def on_suite_end(self, result: SuiteResult) -> None:
         if result.teardown_duration > 0:

@@ -47,10 +47,10 @@ def configure_kennel_logging() -> Generator[None, None, None]:
 @session.fixture(tags=["database", "slow-setup"])
 async def kennel() -> AsyncGenerator[Kennel, None]:
     kennel_instance = Kennel()
-    await asyncio.sleep(3)
+    await asyncio.sleep(1)
     yield kennel_instance
     print("  [kennel] starting LONG teardown (1 seconds)...")  # noqa
-    await asyncio.sleep(6)
+    await asyncio.sleep(3)
     print("  [kennel] teardown complete!")  # noqa
     await kennel_instance.clear()
 
@@ -65,10 +65,10 @@ async def yorkshire_factory(
 ) -> Yorkshire:
     dog = Yorkshire(name=name, size=size, job=job, age=age)
     await kennel_fixture.add(dog)
-    await asyncio.sleep(age / 50)
+    await asyncio.sleep(age / 100)
     print(f"Creating {dog.name}... ")  # noqa: T201
     yield dog
-    await asyncio.sleep(age / 20)
+    await asyncio.sleep(age / 100)
     await kennel_fixture.remove(dog.name)
 
 

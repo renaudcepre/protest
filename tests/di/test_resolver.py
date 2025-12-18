@@ -37,7 +37,7 @@ def resolver() -> Resolver:
     "target_scope",
     [
         pytest.param(None, id="session_target"),
-        pytest.param(Resolver.FUNCTION_SCOPE, id="function_target"),
+        pytest.param(Resolver.TEST_SCOPE, id="test_target"),
     ],
 )
 async def test_session_dependency_is_cached(
@@ -61,12 +61,12 @@ async def test_session_dependency_is_cached(
 @pytest.mark.asyncio
 async def test_function_scope_is_not_cached_across_runs(resolver: Resolver) -> None:
     """Given a function-scoped fixture, when resolved twice, then called each time."""
-    resolver.register(function_dependency, scope_path=Resolver.FUNCTION_SCOPE)
+    resolver.register(function_dependency, scope_path=Resolver.TEST_SCOPE)
 
     def target(function_data: Annotated[str, Use(function_dependency)]) -> str:
         return function_data
 
-    resolver.register(target, scope_path=Resolver.FUNCTION_SCOPE)
+    resolver.register(target, scope_path=Resolver.TEST_SCOPE)
 
     await resolver.resolve(target)
     expected_call_count_first = 1
@@ -81,7 +81,7 @@ async def test_function_scope_is_not_cached_across_runs(resolver: Resolver) -> N
 
 
 def test_session_scope_cannot_depend_on_function_scope(resolver: Resolver) -> None:
-    resolver.register(function_dependency, scope_path=Resolver.FUNCTION_SCOPE)
+    resolver.register(function_dependency, scope_path=Resolver.TEST_SCOPE)
 
     def invalid_session_fixture(
         function_data: Annotated[str, Use(function_dependency)],
@@ -99,7 +99,7 @@ def test_cannot_register_same_function_twice(resolver: Resolver) -> None:
     def my_fixture() -> str:
         return "test"
 
-    resolver.register(my_fixture, scope_path=Resolver.FUNCTION_SCOPE)
+    resolver.register(my_fixture, scope_path=Resolver.TEST_SCOPE)
 
     with pytest.raises(
         AlreadyRegisteredError, match=r"Function 'my_fixture' is already registered\."
@@ -267,7 +267,7 @@ async def test_generator_teardown_without_try_finally_on_exception(
 @pytest.mark.asyncio
 async def test_mixed_regular_and_generator_fixtures(resolver: Resolver) -> None:
     resolver.register(session_dependency, scope_path=None)
-    resolver.register(generator_function_fixture, scope_path=Resolver.FUNCTION_SCOPE)
+    resolver.register(generator_function_fixture, scope_path=Resolver.TEST_SCOPE)
 
     def mixed_target(
         regular: Annotated[str, Use(session_dependency)],
@@ -275,7 +275,7 @@ async def test_mixed_regular_and_generator_fixtures(resolver: Resolver) -> None:
     ) -> str:
         return f"{regular}_{generated}"
 
-    resolver.register(mixed_target, scope_path=Resolver.FUNCTION_SCOPE)
+    resolver.register(mixed_target, scope_path=Resolver.TEST_SCOPE)
 
     async with resolver:
         result = await resolver.resolve(mixed_target)

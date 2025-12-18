@@ -2,9 +2,11 @@ from protest.entities.core import (
     Fixture,
     FixtureCallable,
     FixtureRegistration,
+    FixtureScope,
     TestItem,
     TestOutcome,
     TestRegistration,
+    format_fixture_scope,
 )
 from protest.entities.events import (
     FixtureInfo,
@@ -28,6 +30,7 @@ __all__ = [
     "FixtureCallable",
     "FixtureInfo",
     "FixtureRegistration",
+    "FixtureScope",
     "HandlerInfo",
     "LogCapture",
     "Retry",
@@ -44,6 +47,7 @@ __all__ = [
     "TestStartInfo",
     "TestTeardownInfo",
     "Xfail",
+    "format_fixture_scope",
     "normalize_retry",
     "normalize_skip",
     "normalize_xfail",

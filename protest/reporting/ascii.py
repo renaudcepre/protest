@@ -11,6 +11,7 @@ from protest.entities import (
     TestItem,
     TestResult,
     TestRetryInfo,
+    format_fixture_scope,
 )
 from protest.plugin import PluginBase, PluginContext
 
@@ -80,16 +81,18 @@ class AsciiReporter(PluginBase):
         print()
 
     def on_fixture_setup_start(self, info: FixtureInfo) -> None:
-        if info.scope not in self._setup_started:
-            print(f"  {info.scope} setup...")
-            self._setup_started.add(info.scope)
+        display = format_fixture_scope(info.scope, info.scope_path)
+        if display not in self._setup_started:
+            print(f"  {display} setup...")
+            self._setup_started.add(display)
         if info.autouse:
-            print(f"  autouse: {info.name} ({info.scope})")
+            print(f"  autouse: {info.name} ({display})")
 
     def on_fixture_teardown_start(self, info: FixtureInfo) -> None:
-        if info.scope not in self._teardown_started:
-            print(f"  {info.scope} teardown...")
-            self._teardown_started.add(info.scope)
+        display = format_fixture_scope(info.scope, info.scope_path)
+        if display not in self._teardown_started:
+            print(f"  {display} teardown...")
+            self._teardown_started.add(display)
 
     def on_suite_end(self, result: SuiteResult) -> None:
         if result.teardown_duration > 0:
