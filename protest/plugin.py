@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from argparse import ArgumentParser, Namespace
-from typing import TYPE_CHECKING, Self
+from argparse import ArgumentParser
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Self
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
@@ -18,6 +19,25 @@ if TYPE_CHECKING:
         TestStartInfo,
         TestTeardownInfo,
     )
+
+
+@dataclass
+class PluginContext:
+    """Unified context for plugin activation.
+
+    Can be built from CLI args or programmatic kwargs.
+    Plugins use this to decide whether to activate and how to configure themselves.
+    """
+
+    args: dict[str, Any] = field(default_factory=dict)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a value from the context."""
+        return self.args.get(key, default)
+
+    def __contains__(self, key: str) -> bool:
+        """Check if a key exists in the context."""
+        return key in self.args
 
 
 class PluginBase:
@@ -47,11 +67,19 @@ class PluginBase:
         """
 
     @classmethod
-    def from_cli(cls, args: Namespace) -> Self | None:
-        """Create instance from CLI args. Return None to skip activation.
+    def activate(cls, ctx: PluginContext) -> Self | None:
+        """Create instance if plugin should be active. Return None to skip.
 
-        Default: always instantiate with no args.
-        Override to check CLI flags and potentially return None.
+        Override to check ctx for required options/config.
+        Default: always activate with no args.
+
+        Example:
+            @classmethod
+            def activate(cls, ctx: PluginContext) -> Self | None:
+                output = ctx.get("ctrf_output")
+                if not output:
+                    return None  # Skip if option not provided
+                return cls(output_path=output)
         """
         return cls()
 

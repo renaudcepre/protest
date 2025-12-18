@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
 from typing import TYPE_CHECKING
 
 from typing_extensions import Self
 
-from protest.plugin import PluginBase
+from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
     from protest.entities import TestItem
@@ -33,8 +33,8 @@ class KeywordFilterPlugin(PluginBase):
         )
 
     @classmethod
-    def from_cli(cls, args: Namespace) -> Self | None:
-        keywords = getattr(args, "keywords", []) or []
+    def activate(cls, ctx: PluginContext) -> Self | None:
+        keywords = ctx.get("keywords", []) or []
         if not keywords:
             return None
         return cls(patterns=keywords)

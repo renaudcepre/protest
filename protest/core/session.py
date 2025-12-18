@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from protest.compat import Self
     from protest.core.suite import ProTestSuite
     from protest.entities import FixtureCallable
-    from protest.plugin import PluginBase
+    from protest.plugin import PluginBase, PluginContext
 
 from protest.cache.plugin import CachePlugin
 from protest.cache.storage import CacheStorage
@@ -284,6 +284,18 @@ class ProTestSession:
             handler = getattr(plugin, method_name, None)
             if handler and callable(handler):
                 self._events.on(event, handler)
+
+    def activate_plugins(self, ctx: PluginContext) -> None:
+        """Activate all registered plugin classes with the given context.
+
+        Each plugin's activate() method is called with the context.
+        If it returns an instance, that instance is registered.
+        If it returns None, the plugin is skipped.
+        """
+        for plugin_class in self._plugin_classes:
+            instance = plugin_class.activate(ctx)
+            if instance is not None:
+                self.register_plugin(instance)
 
     async def __aenter__(self) -> Self:
         self._register_fixtures()

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
 from typing import TYPE_CHECKING
 
 from typing_extensions import Self
 
-from protest.plugin import PluginBase
+from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
     from protest.entities import TestItem
@@ -47,9 +47,9 @@ class TagFilterPlugin(PluginBase):
         )
 
     @classmethod
-    def from_cli(cls, args: Namespace) -> Self | None:
-        tags = getattr(args, "tags", []) or []
-        exclude_tags = getattr(args, "exclude_tags", []) or []
+    def activate(cls, ctx: PluginContext) -> Self | None:
+        tags = ctx.get("tags", []) or []
+        exclude_tags = ctx.get("exclude_tags", []) or []
         if not tags and not exclude_tags:
             return None
         return cls(

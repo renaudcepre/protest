@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from protest.core.session import ProTestSession
     from protest.entities import TestItem
+    from protest.plugin import PluginContext
 
 HELP_EPILOG = """
 Examples:
@@ -244,47 +245,31 @@ def _handle_run_command() -> None:
 
     # Phase 4: Full parse
     args = full_parser.parse_args(argv)
-    # Inject suite_filter for SuiteFilterPlugin
-    args._suite_filter = suite_filter
 
-    # Phase 5: Instantiate plugins via from_cli()
-    for plugin_class in session.plugin_classes:
-        plugin = plugin_class.from_cli(args)
-        if plugin is not None:
-            session.register_plugin(plugin)
+    # Phase 5: Build context
+    from protest.plugin import PluginContext
 
-    # Phase 6: Run tests
-    run_tests(
-        session,
-        concurrency=args.concurrency,
-        collect_only=args.collect_only,
-        exitfirst=args.exitfirst,
-        capture=not args.no_capture,
-    )
+    ctx = PluginContext(args={**vars(args), "target_suite": suite_filter})
+
+    # Phase 6: Run tests (api.run_session handles plugin activation)
+    run_tests(session, ctx, collect_only=args.collect_only)
 
 
 def run_tests(
     session: ProTestSession,
-    concurrency: int = 1,
+    ctx: PluginContext,
     collect_only: bool = False,
-    exitfirst: bool = False,
-    capture: bool = True,
 ) -> None:
     from protest.api import collect_tests, run_session
 
     if collect_only:
-        items = collect_tests(session)
+        items = collect_tests(session, ctx=ctx)
         print(f"Collected {len(items)} test(s):\n")
         for item in items:
             print(f"  {item.node_id}")
         sys.exit(0)
 
-    result = run_session(
-        session,
-        concurrency=concurrency,
-        exitfirst=exitfirst,
-        capture=capture,
-    )
+    result = run_session(session, ctx=ctx)
     exit_code_interrupted = 130
     if result.interrupted:
         sys.exit(exit_code_interrupted)

@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from protest.core.session import ProTestSession
     from protest.entities import RunResult, TestItem
+    from protest.plugin import PluginContext
 
 
 def run_session(  # noqa: PLR0913
@@ -38,6 +39,8 @@ def run_session(  # noqa: PLR0913
     keyword_patterns: list[str] | None = None,
     log_file: bool = True,
     force_no_color: bool = False,
+    *,
+    ctx: PluginContext | None = None,
 ) -> RunResult:
     """Run a test session and return result with success and interrupted status.
 
@@ -56,40 +59,47 @@ def run_session(  # noqa: PLR0913
         keyword_patterns: Only run tests matching these patterns (-k flag).
         log_file: Write output to .protest/last_run.log (default: True).
         force_no_color: Disable colors (--no-color flag).
+        ctx: Plugin context (if provided, overrides individual params above).
 
     Returns:
         RunResult with success status and interrupted flag.
     """
-    from protest.cache.plugin import CachePlugin  # noqa: PLC0415
     from protest.core.runner import TestRunner  # noqa: PLC0415
-    from protest.filters.keyword import KeywordFilterPlugin  # noqa: PLC0415
-    from protest.filters.suite import SuiteFilterPlugin  # noqa: PLC0415
-    from protest.reporting.factory import get_reporter  # noqa: PLC0415
-    from protest.reporting.log_file import LogFilePlugin  # noqa: PLC0415
-    from protest.tags.plugin import TagFilterPlugin  # noqa: PLC0415
 
-    if concurrency is not None:
-        session.concurrency = concurrency
-    session.exitfirst = exitfirst
-    session.capture = capture
+    # Apply session-level settings from ctx or params
+    if ctx is not None:
+        if ctx.get("concurrency") is not None:
+            session.concurrency = ctx.get("concurrency")
+        session.exitfirst = ctx.get("exitfirst", False)
+        session.capture = not ctx.get("no_capture", False)
+    else:
+        if concurrency is not None:
+            session.concurrency = concurrency
+        session.exitfirst = exitfirst
+        session.capture = capture
 
-    # Register plugins based on parameters
-    reporter = get_reporter(force_no_color=force_no_color)
-    session.register_plugin(reporter)
+    # Register default plugins if none registered
+    if not session.plugin_classes:
+        session.register_default_plugins()
 
-    session.register_plugin(CachePlugin(last_failed, cache_clear))
+    # Build context from parameters if not provided
+    if ctx is None:
+        from protest.plugin import PluginContext  # noqa: PLC0415
 
-    if log_file:
-        session.register_plugin(LogFilePlugin())
+        ctx = PluginContext(
+            args={
+                "last_failed": last_failed,
+                "cache_clear": cache_clear,
+                "tags": list(include_tags) if include_tags else [],
+                "exclude_tags": list(exclude_tags) if exclude_tags else [],
+                "target_suite": suite_filter,
+                "keywords": keyword_patterns or [],
+                "no_log_file": not log_file,
+                "no_color": force_no_color,
+            }
+        )
 
-    if include_tags or exclude_tags:
-        session.register_plugin(TagFilterPlugin(include_tags, exclude_tags))
-
-    if suite_filter:
-        session.register_plugin(SuiteFilterPlugin(suite_filter))
-
-    if keyword_patterns:
-        session.register_plugin(KeywordFilterPlugin(keyword_patterns))
+    session.activate_plugins(ctx)
 
     runner = TestRunner(session)
     return runner.run()
@@ -101,6 +111,8 @@ def collect_tests(
     exclude_tags: set[str] | None = None,
     suite_filter: str | None = None,
     keyword_patterns: list[str] | None = None,
+    *,
+    ctx: PluginContext | None = None,
 ) -> list[TestItem]:
     """Collect tests from a session without running them.
 
@@ -110,6 +122,7 @@ def collect_tests(
         exclude_tags: Exclude tests with these tags.
         suite_filter: Only include tests in this suite.
         keyword_patterns: Only include tests matching these patterns.
+        ctx: Plugin context (if provided, overrides individual params above).
 
     Returns:
         List of collected TestItem objects.
@@ -120,16 +133,25 @@ def collect_tests(
     from protest.events.types import Event  # noqa: PLC0415
     from protest.filters.keyword import KeywordFilterPlugin  # noqa: PLC0415
     from protest.filters.suite import SuiteFilterPlugin  # noqa: PLC0415
+    from protest.plugin import PluginContext  # noqa: PLC0415
     from protest.tags.plugin import TagFilterPlugin  # noqa: PLC0415
 
-    if include_tags or exclude_tags:
-        session.register_plugin(TagFilterPlugin(include_tags, exclude_tags))
+    # Build context from parameters if not provided
+    if ctx is None:
+        ctx = PluginContext(
+            args={
+                "tags": list(include_tags) if include_tags else [],
+                "exclude_tags": list(exclude_tags) if exclude_tags else [],
+                "target_suite": suite_filter,
+                "keywords": keyword_patterns or [],
+            }
+        )
 
-    if suite_filter:
-        session.register_plugin(SuiteFilterPlugin(suite_filter))
-
-    if keyword_patterns:
-        session.register_plugin(KeywordFilterPlugin(keyword_patterns))
+    # Activate filter plugins
+    for plugin_class in [TagFilterPlugin, SuiteFilterPlugin, KeywordFilterPlugin]:
+        instance = plugin_class.activate(ctx)
+        if instance is not None:
+            session.register_plugin(instance)
 
     collector = Collector()
     items = collector.collect(session)
