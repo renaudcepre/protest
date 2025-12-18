@@ -220,10 +220,9 @@ def _handle_run_command() -> None:
     base_args, remaining = base_parser.parse_known_args(argv)
 
     # If --help in remaining and no target, show help without loading session
-    if "--help" in remaining or "-h" in remaining:
-        if not base_args.target:
-            _create_run_parser().parse_args(["--help"])
-            return
+    if ("--help" in remaining or "-h" in remaining) and not base_args.target:
+        _create_run_parser().parse_args(["--help"])
+        return
 
     if not base_args.target:
         _create_run_parser().print_help()

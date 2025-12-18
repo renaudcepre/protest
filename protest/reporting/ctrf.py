@@ -8,7 +8,6 @@ import subprocess
 import time
 import traceback
 import uuid
-from argparse import ArgumentParser
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
@@ -18,6 +17,8 @@ from typing_extensions import NotRequired, Self
 from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
+    from argparse import ArgumentParser
+
     from protest.entities import SessionResult, TestResult
 
 

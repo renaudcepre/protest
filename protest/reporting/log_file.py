@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from argparse import ArgumentParser
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, TextIO
@@ -19,6 +18,7 @@ from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
     import logging
+    from argparse import ArgumentParser
 
     from protest.core.session import ProTestSession
     from protest.entities import SessionResult
