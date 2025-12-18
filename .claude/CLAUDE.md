@@ -79,12 +79,12 @@ def database():
 def api_client(db: Annotated[DB, Use(database)]):
     return Client(db)
 
-# Function scope - décorateur libre @fixture()
+# Test scope - décorateur libre @fixture()
 @fixture(tags=["database"])
 def db_session():
     yield Session()
 
-# Function scope - décorateur @fixture() sans tags
+# Test scope - décorateur @fixture() sans tags
 @fixture()
 def payload():
     return {"name": "test"}
@@ -113,7 +113,7 @@ def clean_environment():
     os.environ.update(old)
 ```
 
-**Pas de function-scope autouse** - ça n'a pas de sens sémantique.
+**Pas de test-scope autouse** - ça n'a pas de sens sémantique.
 
 Quand utiliser autouse :
 - Side effects nécessaires pour tous les tests (logging, env setup)
@@ -133,7 +133,7 @@ parent_suite.add_suite(child_suite)  # Child's full_path = "Parent::Child"
 Une fixture ne peut dépendre que de fixtures dans un scope égal ou parent:
 - Session peut dépendre de: session uniquement
 - Suite "Parent::Child" peut dépendre de: session, "Parent", "Parent::Child"
-- Function peut dépendre de: tout
+- Test peut dépendre de: tout
 
 ## Points d'Implémentation Critiques
 
@@ -142,7 +142,7 @@ Une fixture ne peut dépendre que de fixtures dans un scope égal ou parent:
 **Scope basé sur path:**
 ```python
 self._scope_paths: dict[FixtureCallable, str | None]
-# None = session, "SuiteName" = suite, "__function__" = function
+# None = session, "SuiteName" = suite, "<test_scope>" = test
 ```
 
 **Double-checked locking pour éviter les race conditions:**
@@ -174,8 +174,8 @@ L'`AsyncExitStack` garantit le teardown LIFO même en cas d'exception.
 
 ### 4. Isolation par Test (execution/context.py)
 
-`TestExecutionContext` isole les fixtures FUNCTION par test:
-- FUNCTION (`__function__`) → cache local + exit stack local
+`TestExecutionContext` isole les fixtures TEST par test:
+- TEST (`<test_scope>`) → cache local + exit stack local
 - Suite/Session → délégué au Resolver parent
 
 ### 5. Factory Fixtures
@@ -184,7 +184,7 @@ Deux patterns disponibles :
 
 **Managed (défaut)** - ProTest gère le cycle de vie via `FixtureFactory`:
 ```python
-@session.factory()  # ou @factory() pour function scope
+@session.factory()  # ou @factory() pour test scope
 def user(name: str, role: str = "guest") -> User:
     user = User.create(name=name, role=role)
     yield user

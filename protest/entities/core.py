@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import TYPE_CHECKING, Any, TypeAlias
 
 if TYPE_CHECKING:
@@ -16,6 +17,25 @@ if TYPE_CHECKING:
 from protest.utils import get_callable_name
 
 FixtureCallable: TypeAlias = "Callable[..., Any]"
+
+
+class FixtureScope(Enum):
+    """Scope level for fixtures."""
+
+    SESSION = "session"
+    SUITE = "suite"
+    TEST = "test"
+
+
+def format_fixture_scope(scope: FixtureScope, scope_path: str | None = None) -> str:
+    """Format fixture scope for display."""
+    match scope:
+        case FixtureScope.SESSION:
+            return "session"
+        case FixtureScope.SUITE:
+            return f"suite '{scope_path}'"
+        case FixtureScope.TEST:
+            return "test"
 
 
 @dataclass(slots=True)

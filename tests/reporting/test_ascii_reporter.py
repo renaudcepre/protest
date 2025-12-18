@@ -4,6 +4,7 @@ import pytest
 
 from protest.entities import (
     FixtureInfo,
+    FixtureScope,
     HandlerInfo,
     SessionResult,
     TestResult,
@@ -444,7 +445,9 @@ class TestAsciiReporterFixtureSetup:
     ) -> None:
         """Autouse fixture displays both scope setup and autouse messages."""
         ascii_reporter.on_fixture_setup_start(
-            FixtureInfo(name="my_autouse_fixture", scope="session", autouse=True)
+            FixtureInfo(
+                name="my_autouse_fixture", scope=FixtureScope.SESSION, autouse=True
+            )
         )
         captured = capsys.readouterr()
         assert "session setup" in captured.out
@@ -457,10 +460,15 @@ class TestAsciiReporterFixtureSetup:
     ) -> None:
         """Non-autouse fixture displays only scope setup message."""
         ascii_reporter.on_fixture_setup_start(
-            FixtureInfo(name="regular_fixture", scope="suite", autouse=False)
+            FixtureInfo(
+                name="regular_fixture",
+                scope=FixtureScope.SUITE,
+                scope_path="TestSuite",
+                autouse=False,
+            )
         )
         captured = capsys.readouterr()
-        assert "suite setup" in captured.out
+        assert "suite 'TestSuite' setup" in captured.out
         assert "autouse" not in captured.out
 
     def test_on_fixture_setup_start_same_scope_prints_once(
@@ -468,12 +476,14 @@ class TestAsciiReporterFixtureSetup:
     ) -> None:
         """Multiple fixtures in same scope only print scope setup once."""
         ascii_reporter.on_fixture_setup_start(
-            FixtureInfo(name="first_fixture", scope="session", autouse=False)
+            FixtureInfo(name="first_fixture", scope=FixtureScope.SESSION, autouse=False)
         )
         capsys.readouterr()  # Clear first output
 
         ascii_reporter.on_fixture_setup_start(
-            FixtureInfo(name="second_fixture", scope="session", autouse=False)
+            FixtureInfo(
+                name="second_fixture", scope=FixtureScope.SESSION, autouse=False
+            )
         )
         captured = capsys.readouterr()
         assert "session setup" not in captured.out

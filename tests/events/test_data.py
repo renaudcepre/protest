@@ -4,11 +4,13 @@ import pytest
 
 from protest.entities import (
     FixtureInfo,
+    FixtureScope,
     HandlerInfo,
     SessionResult,
     TestCounts,
     TestResult,
     TestStartInfo,
+    format_fixture_scope,
 )
 from protest.events.types import Event
 
@@ -148,7 +150,41 @@ class TestFrozenDataclasses:
             info.duration = 999.0  # type: ignore[misc]
 
     def test_fixture_info_is_immutable(self) -> None:
-        info = FixtureInfo(name="db", scope="session")
+        info = FixtureInfo(name="db", scope=FixtureScope.SESSION)
 
         with pytest.raises(FrozenInstanceError):
-            info.scope = "function"  # type: ignore[misc]
+            info.scope = FixtureScope.TEST  # type: ignore[misc]
+
+
+class TestFormatFixtureScope:
+    """Tests for format_fixture_scope helper function."""
+
+    def test_session_scope(self) -> None:
+        result = format_fixture_scope(FixtureScope.SESSION)
+
+        assert result == "session"
+
+    def test_session_scope_ignores_path(self) -> None:
+        result = format_fixture_scope(FixtureScope.SESSION, "ignored")
+
+        assert result == "session"
+
+    def test_suite_scope_with_path(self) -> None:
+        result = format_fixture_scope(FixtureScope.SUITE, "API::Users")
+
+        assert result == "suite 'API::Users'"
+
+    def test_suite_scope_with_simple_path(self) -> None:
+        result = format_fixture_scope(FixtureScope.SUITE, "API")
+
+        assert result == "suite 'API'"
+
+    def test_test_scope(self) -> None:
+        result = format_fixture_scope(FixtureScope.TEST)
+
+        assert result == "test"
+
+    def test_test_scope_ignores_path(self) -> None:
+        result = format_fixture_scope(FixtureScope.TEST, "ignored")
+
+        assert result == "test"

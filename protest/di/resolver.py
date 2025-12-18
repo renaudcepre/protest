@@ -21,7 +21,14 @@ from protest.di.decorators import FixtureWrapper
 from protest.di.factory import FixtureFactory
 from protest.di.markers import Use
 from protest.di.proxy import SafeProxy
-from protest.entities import Fixture, FixtureCallable, FixtureInfo, FixtureRegistration
+from protest.entities import (
+    Fixture,
+    FixtureCallable,
+    FixtureInfo,
+    FixtureRegistration,
+    FixtureScope,
+    format_fixture_scope,
+)
 from protest.events.types import Event
 from protest.exceptions import (
     AlreadyRegisteredError,
@@ -48,11 +55,11 @@ class Resolver:
     - "SuiteName": Suite scope (lives while suite runs)
     - "Parent::Child": Nested suite scope
 
-    Fixtures not explicitly registered are auto-registered with scope_path=FUNCTION_SCOPE
+    Fixtures not explicitly registered are auto-registered with scope_path=TEST_SCOPE
     (a special marker meaning fresh instance per test).
     """
 
-    FUNCTION_SCOPE: Final[str] = "<function_scope>"
+    TEST_SCOPE: Final[str] = "<test_scope>"
 
     @staticmethod
     def _unwrap(
@@ -97,7 +104,7 @@ class Resolver:
                 - None: Session scope (global)
                 - "SuiteName": Suite scope
                 - "Parent::Child": Nested suite scope
-                - FUNCTION_SCOPE: Function scope (fresh per test)
+                - TEST_SCOPE: Test scope (fresh per test)
             is_factory: Whether this fixture returns a FixtureFactory callable.
             cache: Whether to cache factory instances by kwargs (only for factories).
             managed: If True (default), factory fixtures are wrapped in FixtureFactory.
@@ -122,7 +129,7 @@ class Resolver:
 
         if autouse:
             self._autouse_fixtures.add(func)
-            if scope_path is not None and scope_path != self.FUNCTION_SCOPE:
+            if scope_path is not None and scope_path != self.TEST_SCOPE:
                 if scope_path not in self._suite_autouse:
                     self._suite_autouse[scope_path] = []
                 self._suite_autouse[scope_path].append(func)
@@ -138,7 +145,7 @@ class Resolver:
         return self._registry.get(actual_func)
 
     def get_scope_path(self, func: FixtureCallable) -> str | None:
-        """Return the scope path for a fixture (None=session, FUNCTION_SCOPE, or suite path)."""
+        """Return the scope path for a fixture (None=session, TEST_SCOPE, or suite path)."""
         actual_func, _ = self._unwrap(func)
         return self._scope_paths.get(actual_func)
 
@@ -192,7 +199,7 @@ class Resolver:
             if actual_func not in self._registry:
                 self.register(
                     actual_func,
-                    scope_path=self.FUNCTION_SCOPE,
+                    scope_path=self.TEST_SCOPE,
                     is_factory=reg.is_factory,
                     cache=reg.cache,
                     managed=reg.managed,
@@ -244,7 +251,7 @@ class Resolver:
                 context_cache,
                 context_exit_stack,
             )
-        if scope_path == self.FUNCTION_SCOPE:
+        if scope_path == self.TEST_SCOPE:
             return await self._resolve_function_scoped(
                 target_fixture,
                 current_path,
@@ -426,13 +433,15 @@ class Resolver:
     ) -> Any:
         """Execute fixture function, handling generators for setup/teardown."""
         fixture_name = get_callable_name(fixture.func)
-        scope_path = self._scope_paths.get(fixture.func)
-        scope = self._format_scope(scope_path)
+        raw_scope_path = self._scope_paths.get(fixture.func)
+        scope, scope_path = self._get_scope_enum(raw_scope_path)
         is_autouse = fixture.func in self._autouse_fixtures
 
         lifetime_start = time.perf_counter()
         setup_start = time.perf_counter()
-        await self._emit_fixture_setup_start_async(fixture_name, scope, is_autouse)
+        await self._emit_fixture_setup_start_async(
+            fixture_name, scope, scope_path, is_autouse
+        )
 
         if is_generator_like(fixture.func):
             # Push emit_done FIRST (runs LAST due to LIFO)
@@ -440,6 +449,7 @@ class Resolver:
                 self._emit_fixture_teardown_done_async,
                 fixture_name,
                 scope,
+                scope_path,
                 lifetime_start,
                 is_autouse,
             )
@@ -457,6 +467,7 @@ class Resolver:
                 self._emit_fixture_teardown_start_async,
                 fixture_name,
                 scope,
+                scope_path,
                 is_autouse,
             )
         else:
@@ -465,46 +476,72 @@ class Resolver:
         # Emit setup done after fixture setup completes
         setup_duration = time.perf_counter() - setup_start
         await self._emit_fixture_setup_done_async(
-            fixture_name, scope, setup_duration, is_autouse
+            fixture_name, scope, scope_path, setup_duration, is_autouse
         )
 
         return result
 
+    def _get_scope_enum(
+        self, scope_path: str | None
+    ) -> tuple[FixtureScope, str | None]:
+        """Convert internal scope_path to (FixtureScope, display_path) tuple."""
+        if scope_path is None:
+            return FixtureScope.SESSION, None
+        if scope_path == self.TEST_SCOPE:
+            return FixtureScope.TEST, None
+        return FixtureScope.SUITE, scope_path
+
     async def _emit_fixture_setup_start_async(
-        self, name: str, scope: str, autouse: bool
+        self, name: str, scope: FixtureScope, scope_path: str | None, autouse: bool
     ) -> None:
         if self._event_bus is None:
             return
 
         await self._event_bus.emit(
             Event.FIXTURE_SETUP_START,
-            FixtureInfo(name=name, scope=scope, autouse=autouse),
+            FixtureInfo(name=name, scope=scope, scope_path=scope_path, autouse=autouse),
         )
 
     async def _emit_fixture_setup_done_async(
-        self, name: str, scope: str, duration: float, autouse: bool
+        self,
+        name: str,
+        scope: FixtureScope,
+        scope_path: str | None,
+        duration: float,
+        autouse: bool,
     ) -> None:
         if self._event_bus is None:
             return
 
         await self._event_bus.emit(
             Event.FIXTURE_SETUP_DONE,
-            FixtureInfo(name=name, scope=scope, duration=duration, autouse=autouse),
+            FixtureInfo(
+                name=name,
+                scope=scope,
+                scope_path=scope_path,
+                duration=duration,
+                autouse=autouse,
+            ),
         )
 
     async def _emit_fixture_teardown_start_async(
-        self, name: str, scope: str, autouse: bool
+        self, name: str, scope: FixtureScope, scope_path: str | None, autouse: bool
     ) -> None:
         if self._event_bus is None:
             return
 
         await self._event_bus.emit(
             Event.FIXTURE_TEARDOWN_START,
-            FixtureInfo(name=name, scope=scope, autouse=autouse),
+            FixtureInfo(name=name, scope=scope, scope_path=scope_path, autouse=autouse),
         )
 
     async def _emit_fixture_teardown_done_async(
-        self, name: str, scope: str, start_time: float, autouse: bool
+        self,
+        name: str,
+        scope: FixtureScope,
+        scope_path: str | None,
+        start_time: float,
+        autouse: bool,
     ) -> None:
         if self._event_bus is None:
             return
@@ -512,7 +549,13 @@ class Resolver:
         duration = time.perf_counter() - start_time
         await self._event_bus.emit(
             Event.FIXTURE_TEARDOWN_DONE,
-            FixtureInfo(name=name, scope=scope, duration=duration, autouse=autouse),
+            FixtureInfo(
+                name=name,
+                scope=scope,
+                scope_path=scope_path,
+                duration=duration,
+                autouse=autouse,
+            ),
         )
 
     async def resolve_suite_autouse(self, suite_path: str) -> None:
@@ -658,17 +701,17 @@ class Resolver:
         Rules:
         - Session (None) can only depend on session fixtures
         - Suite can depend on session or parent/same suite fixtures
-        - Function can depend on anything
+        - Test can depend on anything
         """
         dep_path = self._scope_paths[dependency_func]
 
-        if dep_path == self.FUNCTION_SCOPE:
-            if requester_path != self.FUNCTION_SCOPE:
+        if dep_path == self.TEST_SCOPE:
+            if requester_path != self.TEST_SCOPE:
                 raise ScopeMismatchError(
                     get_callable_name(requester_func),
                     self._format_scope(requester_path),
                     get_callable_name(dependency_func),
-                    "function",
+                    "test",
                 )
             return
 
@@ -683,7 +726,7 @@ class Resolver:
                 self._format_scope(dep_path),
             )
 
-        if requester_path == self.FUNCTION_SCOPE:
+        if requester_path == self.TEST_SCOPE:
             return
 
         if not self._is_parent_or_same_path(dep_path, requester_path):
@@ -706,11 +749,8 @@ class Resolver:
         return child.startswith(potential_parent + "::")
 
     def _format_scope(self, scope_path: str | None) -> str:
-        if scope_path is None:
-            return "session"
-        if scope_path == self.FUNCTION_SCOPE:
-            return "function"
-        return f"suite '{scope_path}'"
+        scope, path = self._get_scope_enum(scope_path)
+        return format_fixture_scope(scope, path)
 
     @staticmethod
     def _extract_dependency_from_annotation(

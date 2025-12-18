@@ -66,14 +66,11 @@ class EventBus:
                     )
                     self._pending_tasks.add(task)
                     task.add_done_callback(self._pending_tasks.discard)
-                elif data is not None:
-                    await run_in_threadpool(handler, data)
-                    duration = time.perf_counter() - start_time
-                    await self._emit_handler_end(
-                        handler_name, event, False, duration, None
-                    )
                 else:
-                    await run_in_threadpool(handler)
+                    if data is not None:
+                        await run_in_threadpool(handler, data)
+                    else:
+                        await run_in_threadpool(handler)
                     duration = time.perf_counter() - start_time
                     await self._emit_handler_end(
                         handler_name, event, False, duration, None
@@ -164,7 +161,7 @@ class EventBus:
                 if asyncio.iscoroutinefunction(handler):
                     result = await handler(data)
                 else:
-                    result = handler(data)
+                    result = await run_in_threadpool(handler, data)
                 if result is not None:
                     data = result
             except Exception:
