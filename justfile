@@ -45,7 +45,7 @@ clean:
 
 # Serve docs with hot reload
 docs:
-    uv run mkdocs serve
+    uv run mkdocs serve --livereload --dirty
 
 # Web Reporter
 web-setup:

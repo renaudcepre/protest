@@ -62,5 +62,7 @@ nav:
       - Reporters: core-concepts/reporters.md
   - CLI Reference: cli.md
   - FAQ: faq.md
-  - Internals:
+  - Events: internals/events.md
+  - Plugins: internals/plugins.md
+  - Architecture:
       - Event Bus: internals/event-bus.md
