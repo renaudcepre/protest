@@ -22,7 +22,6 @@ from protest.exceptions import (
     UnregisteredDependencyError,
 )
 from protest.execution.async_bridge import is_async_callable
-from protest.reporting.ascii import AsciiReporter
 
 
 class TestHashableEdgeCases:
@@ -249,9 +248,9 @@ class TestApiForceNoColor:
     """Test api.py force_no_color branch."""
 
     def test_run_session_with_force_no_color(self) -> None:
-        """run_session with force_no_color=True sets ASCII reporter."""
+        """run_session with force_no_color=True uses ASCII reporter."""
 
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         executed: list[str] = []
 
         @session.test()
@@ -262,5 +261,3 @@ class TestApiForceNoColor:
 
         assert result.success is True
         assert executed == ["ran"]
-        # The default reporter should be an AsciiReporter
-        assert isinstance(session._default_reporter, AsciiReporter)

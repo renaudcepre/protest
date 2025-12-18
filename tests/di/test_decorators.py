@@ -17,7 +17,7 @@ class TestFixtureDecorator:
         """@fixture() creates a function-scoped fixture (fresh per test)."""
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         call_count = 0
 
@@ -48,7 +48,7 @@ class TestFixtureDecorator:
         """@fixture(tags=[...]) properly tags the fixture."""
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @fixture(tags=["database", "slow"])
         def db_connection() -> str:
@@ -73,7 +73,7 @@ class TestFixtureDecorator:
         """@fixture() with yield gets proper teardown."""
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         teardown_called = []
 
@@ -102,7 +102,7 @@ class TestFactoryDecorator:
         """@factory() creates a function-scoped factory."""
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @factory()
         def user(name: str) -> dict[str, str]:
@@ -126,7 +126,7 @@ class TestFactoryDecorator:
         """@factory(cache=True) caches by kwargs."""
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         call_count = 0
 
@@ -160,7 +160,7 @@ class TestFactoryDecorator:
         """@factory() without arguments defaults to cache=False."""
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         call_count = 0
 
@@ -192,7 +192,7 @@ class TestFactoryDecorator:
         """@factory(cache=False) creates new instance each time."""
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         call_count = 0
 
@@ -224,7 +224,7 @@ class TestFactoryDecorator:
         """@factory(managed=False) returns custom factory class with SafeProxy."""
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         class UserFactory:
             def create(self, name: str) -> dict[str, str]:
@@ -252,7 +252,7 @@ class TestFactoryDecorator:
         """@factory() can depend on @fixture() (both function-scoped)."""
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @fixture()
         def db_connection() -> str:
@@ -284,7 +284,7 @@ class TestFactoryDecorator:
         """@factory(tags=[...]) properly tags the factory."""
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @factory(tags=["slow", "integration"])
         def user(name: str) -> dict[str, str]:

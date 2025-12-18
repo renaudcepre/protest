@@ -7,10 +7,8 @@ import pytest
 
 from protest import ProTestSession, ProTestSuite, Use
 from protest.di.decorators import fixture
-from protest.events.types import Event
 from protest.exceptions import PlainFunctionError
 from protest.execution.context import TestExecutionContext
-from protest.plugin import PluginBase
 
 
 class TestSessionSuiteAPI:
@@ -441,62 +439,10 @@ class TestNestedSuites:
         assert result == "child_using_session_data"
 
 
-class TestSessionTagsInConstructor:
-    def test_include_tags_at_construction(self) -> None:
-        session = ProTestSession(
-            include_tags={"slow", "integration"}, default_reporter=False
-        )
-        assert session._tag_filter_plugin is not None
-        assert session._tag_filter_plugin._include_tags == {"slow", "integration"}
-
-    def test_exclude_tags_at_construction(self) -> None:
-        session = ProTestSession(exclude_tags={"flaky"}, default_reporter=False)
-        assert session._tag_filter_plugin is not None
-        assert session._tag_filter_plugin._exclude_tags == {"flaky"}
-
-    def test_both_include_and_exclude_tags(self) -> None:
-        session = ProTestSession(
-            include_tags={"unit"}, exclude_tags={"slow"}, default_reporter=False
-        )
-        assert session._tag_filter_plugin is not None
-        assert session._tag_filter_plugin._include_tags == {"unit"}
-        assert session._tag_filter_plugin._exclude_tags == {"slow"}
-
-
-class TestSessionFilterReconfiguration:
-    def test_reconfigure_tag_filter(self) -> None:
-        session = ProTestSession(default_reporter=False)
-        session.configure_tags(include_tags={"unit"})
-        assert session._tag_filter_plugin is not None
-        assert session._tag_filter_plugin._include_tags == {"unit"}
-
-        session.configure_tags(include_tags={"integration"}, exclude_tags={"slow"})
-        assert session._tag_filter_plugin._include_tags == {"integration"}
-        assert session._tag_filter_plugin._exclude_tags == {"slow"}
-
-    def test_reconfigure_suite_filter(self) -> None:
-        session = ProTestSession(default_reporter=False)
-        session.configure_suite_filter("MySuite")
-        assert session._suite_filter_plugin is not None
-        assert session._suite_filter_plugin._suite_filter == "MySuite"
-
-        session.configure_suite_filter("OtherSuite")
-        assert session._suite_filter_plugin._suite_filter == "OtherSuite"
-
-    def test_reconfigure_keyword_filter(self) -> None:
-        session = ProTestSession(default_reporter=False)
-        session.configure_keyword_filter(["login"])
-        assert session._keyword_filter_plugin is not None
-        assert session._keyword_filter_plugin._patterns == ["login"]
-
-        session.configure_keyword_filter(["auth", "user"])
-        assert session._keyword_filter_plugin._patterns == ["auth", "user"]
-
-
 class TestSuiteFactory:
     @pytest.mark.asyncio
     async def test_suite_factory_basic(self) -> None:
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         suite = ProTestSuite("MySuite")
         session.add_suite(suite)
 
@@ -515,7 +461,7 @@ class TestSuiteFactory:
     @pytest.mark.asyncio
     async def test_suite_factory_with_cache_false(self) -> None:
         call_count = 0
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         suite = ProTestSuite("MySuite")
         session.add_suite(suite)
 
@@ -538,7 +484,7 @@ class TestSuiteFactory:
 
     @pytest.mark.asyncio
     async def test_suite_factory_with_managed_false(self) -> None:
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         suite = ProTestSuite("MySuite")
         session.add_suite(suite)
 
@@ -561,7 +507,7 @@ class TestSuiteFactory:
 
 class TestSuiteAddAfterAttach:
     def test_add_suite_after_session_attach(self) -> None:
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         parent = ProTestSuite("Parent")
         session.add_suite(parent)
 
@@ -572,7 +518,7 @@ class TestSuiteAddAfterAttach:
         assert child._session is session
 
     def test_add_deeply_nested_after_attach(self) -> None:
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         parent = ProTestSuite("Parent")
         session.add_suite(parent)
 
@@ -584,77 +530,3 @@ class TestSuiteAddAfterAttach:
         assert child._session is session
         assert grandchild._session is session
         assert grandchild.full_path == "Parent::Child::GrandChild"
-
-
-class TestSetDefaultReporter:
-    """Tests for set_default_reporter and _unuse."""
-
-    def test_set_default_reporter_replaces_existing(self) -> None:
-        """set_default_reporter replaces the previous reporter."""
-
-        class FakeReporter(PluginBase):
-            def __init__(self, name: str) -> None:
-                self.name = name
-                self.events_received: list[str] = []
-
-            def on_session_start(self) -> None:
-                self.events_received.append("session_start")
-
-        session = ProTestSession(default_reporter=False)
-
-        reporter1 = FakeReporter("first")
-        session.set_default_reporter(reporter1)
-        assert session._default_reporter is reporter1
-
-        reporter2 = FakeReporter("second")
-        session.set_default_reporter(reporter2)
-        assert session._default_reporter is reporter2
-
-    @pytest.mark.asyncio
-    async def test_unuse_removes_handler_from_bus(self) -> None:
-        """_unuse removes a plugin's handlers from the event bus."""
-
-        class TrackingPlugin(PluginBase):
-            def __init__(self) -> None:
-                self.events: list[str] = []
-
-            def on_session_start(self) -> None:
-                self.events.append("session_start")
-
-        session = ProTestSession(default_reporter=False)
-        plugin = TrackingPlugin()
-        session.use(plugin)
-
-        await session.events.emit(Event.SESSION_START)
-        assert plugin.events == ["session_start"]
-
-        session._unuse(plugin)
-
-        await session.events.emit(Event.SESSION_START)
-        assert plugin.events == ["session_start"]  # No new event
-
-    @pytest.mark.asyncio
-    async def test_set_default_reporter_unregisters_old_handlers(self) -> None:
-        """set_default_reporter ensures old reporter stops receiving events."""
-
-        class CountingReporter(PluginBase):
-            def __init__(self) -> None:
-                self.count = 0
-
-            def on_session_start(self) -> None:
-                self.count += 1
-
-        session = ProTestSession(default_reporter=False)
-
-        reporter1 = CountingReporter()
-        session.set_default_reporter(reporter1)
-
-        await session.events.emit(Event.SESSION_START)
-        assert reporter1.count == 1
-
-        reporter2 = CountingReporter()
-        session.set_default_reporter(reporter2)
-
-        await session.events.emit(Event.SESSION_START)
-        assert reporter1.count == 1  # Old reporter not called
-        assert reporter2.count == 1  # New reporter called

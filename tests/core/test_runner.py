@@ -76,7 +76,7 @@ class TestRunnerEvents:
         """Runner emits SESSION_START, SESSION_END, SESSION_COMPLETE."""
         plugin, collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.test()
         def simple_test() -> None:
@@ -95,7 +95,7 @@ class TestRunnerEvents:
         """Runner emits TEST_PASS for passing tests."""
         plugin, collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.test()
         def my_passing_test() -> None:
@@ -115,7 +115,7 @@ class TestRunnerEvents:
         """Runner emits TEST_FAIL for failing tests."""
         plugin, collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.test()
         def my_failing_test() -> None:
@@ -200,7 +200,7 @@ class TestRunnerWithSuites:
         session = ProTestSession()
         suite = ProTestSuite("my_suite")
         session.add_suite(suite)
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @suite.test()
         def suite_test() -> None:
@@ -287,7 +287,7 @@ class TestRunnerCollectionEvent:
         """COLLECTION_FINISH event is emitted with collected items."""
         plugin, collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.test()
         def test_a() -> None:
@@ -316,7 +316,7 @@ class TestRunnerCollectionEvent:
                     if "run" in getattr(item.func, "__name__", "")
                 ]
 
-        session.use(FilterPlugin())
+        session.register_plugin(FilterPlugin())
 
         @session.test()
         def test_run_this() -> None:

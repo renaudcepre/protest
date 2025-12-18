@@ -1,10 +1,12 @@
 import time
 import traceback
+from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 from rich.console import Console  # type: ignore[import-not-found]
 from rich.live import Live  # type: ignore[import-not-found]
 from rich.text import Text  # type: ignore[import-not-found]
+from typing_extensions import Self
 
 from protest.entities import (
     FixtureInfo,
@@ -41,6 +43,9 @@ def _format_duration(seconds: float) -> str:
 class RichReporter(PluginBase):
     """Rich console reporter with colors and live status footer."""
 
+    name = "rich-reporter"
+    description = "Rich console reporter with colors"
+
     def __init__(self) -> None:
         self.console = Console(highlight=False)
         self._printed_suites: set[str | None] = set()
@@ -58,6 +63,22 @@ class RichReporter(PluginBase):
         self._skipped = 0
         self._xfailed = 0
         self._xpassed = 0
+
+    @classmethod
+    def add_cli_options(cls, parser: ArgumentParser) -> None:
+        group = parser.add_argument_group(f"{cls.name} - {cls.description}")
+        group.add_argument(
+            "--no-color",
+            dest="no_color",
+            action="store_true",
+            help="Disable colors (plain ASCII output)",
+        )
+
+    @classmethod
+    def from_cli(cls, args: Namespace) -> Self | None:
+        if getattr(args, "no_color", False):
+            return None
+        return cls()
 
     def _make_status_line(self) -> Text:
         elapsed = time.perf_counter() - self._start_time if self._start_time else 0

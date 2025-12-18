@@ -60,22 +60,36 @@ def run_session(  # noqa: PLR0913
     Returns:
         RunResult with success status and interrupted flag.
     """
+    from protest.cache.plugin import CachePlugin  # noqa: PLC0415
     from protest.core.runner import TestRunner  # noqa: PLC0415
+    from protest.filters.keyword import KeywordFilterPlugin  # noqa: PLC0415
+    from protest.filters.suite import SuiteFilterPlugin  # noqa: PLC0415
     from protest.reporting.factory import get_reporter  # noqa: PLC0415
-
-    if force_no_color:
-        reporter = get_reporter(force_no_color=force_no_color)
-        session.set_default_reporter(reporter)
+    from protest.reporting.log_file import LogFilePlugin  # noqa: PLC0415
+    from protest.tags.plugin import TagFilterPlugin  # noqa: PLC0415
 
     if concurrency is not None:
         session.concurrency = concurrency
     session.exitfirst = exitfirst
     session.capture = capture
-    session.configure_suite_filter(suite_filter)
-    session.configure_keyword_filter(keyword_patterns)
-    session.configure_tags(include_tags=include_tags, exclude_tags=exclude_tags)
-    session.configure_cache(last_failed=last_failed, cache_clear=cache_clear)
-    session.configure_log_file(enabled=log_file)
+
+    # Register plugins based on parameters
+    reporter = get_reporter(force_no_color=force_no_color)
+    session.register_plugin(reporter)
+
+    session.register_plugin(CachePlugin(last_failed, cache_clear))
+
+    if log_file:
+        session.register_plugin(LogFilePlugin())
+
+    if include_tags or exclude_tags:
+        session.register_plugin(TagFilterPlugin(include_tags, exclude_tags))
+
+    if suite_filter:
+        session.register_plugin(SuiteFilterPlugin(suite_filter))
+
+    if keyword_patterns:
+        session.register_plugin(KeywordFilterPlugin(keyword_patterns))
 
     runner = TestRunner(session)
     return runner.run()
@@ -104,10 +118,18 @@ def collect_tests(
 
     from protest.core.collector import Collector  # noqa: PLC0415
     from protest.events.types import Event  # noqa: PLC0415
+    from protest.filters.keyword import KeywordFilterPlugin  # noqa: PLC0415
+    from protest.filters.suite import SuiteFilterPlugin  # noqa: PLC0415
+    from protest.tags.plugin import TagFilterPlugin  # noqa: PLC0415
 
-    session.configure_suite_filter(suite_filter)
-    session.configure_keyword_filter(keyword_patterns)
-    session.configure_tags(include_tags=include_tags, exclude_tags=exclude_tags)
+    if include_tags or exclude_tags:
+        session.register_plugin(TagFilterPlugin(include_tags, exclude_tags))
+
+    if suite_filter:
+        session.register_plugin(SuiteFilterPlugin(suite_filter))
+
+    if keyword_patterns:
+        session.register_plugin(KeywordFilterPlugin(keyword_patterns))
 
     collector = Collector()
     items = collector.collect(session)

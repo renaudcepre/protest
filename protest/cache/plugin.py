@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from argparse import ArgumentParser, Namespace
 from typing import TYPE_CHECKING
+
+from typing_extensions import Self
 
 from protest.plugin import PluginBase
 
@@ -15,10 +18,37 @@ if TYPE_CHECKING:
 class CachePlugin(PluginBase):
     """Plugin that caches test results and provides --lf filtering."""
 
+    name = "cache"
+    description = "Test result caching with --lf support"
+
     def __init__(self, last_failed: bool = False, cache_clear: bool = False) -> None:
         self._last_failed = last_failed
         self._cache_clear = cache_clear
         self._cache: CacheStorage | None = None
+
+    @classmethod
+    def add_cli_options(cls, parser: ArgumentParser) -> None:
+        group = parser.add_argument_group(f"{cls.name} - {cls.description}")
+        group.add_argument(
+            "--lf",
+            "--last-failed",
+            dest="last_failed",
+            action="store_true",
+            help="Re-run only failed tests from last run",
+        )
+        group.add_argument(
+            "--cache-clear",
+            dest="cache_clear",
+            action="store_true",
+            help="Clear cache before run",
+        )
+
+    @classmethod
+    def from_cli(cls, args: Namespace) -> Self:
+        return cls(
+            last_failed=getattr(args, "last_failed", False),
+            cache_clear=getattr(args, "cache_clear", False),
+        )
 
     def setup(self, session: ProTestSession) -> None:
         self._cache = session.cache
