@@ -68,6 +68,21 @@ class SuiteResult:
 
 
 @dataclass(frozen=True, slots=True)
+class SessionSetupInfo:
+    """Emitted after session fixtures are resolved, before any suite starts."""
+
+    duration: float
+
+
+@dataclass(frozen=True, slots=True)
+class SuiteSetupInfo:
+    """Emitted after suite fixtures are resolved, before any test starts."""
+
+    name: str
+    duration: float
+
+
+@dataclass(frozen=True, slots=True)
 class RunResult:
     success: bool
     interrupted: bool = False
