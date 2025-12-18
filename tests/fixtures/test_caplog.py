@@ -16,7 +16,7 @@ class TestCaplogFixture:
     ) -> None:
         plugin, collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.test()
         def test_with_logs(logs: Annotated[LogCapture, Use(caplog)]) -> None:
@@ -146,7 +146,7 @@ class TestCaplogFixture:
     ) -> None:
         plugin, collected = event_collector
         session = ProTestSession(concurrency=3)
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.test()
         def test_a(logs: Annotated[LogCapture, Use(caplog)]) -> None:

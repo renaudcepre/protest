@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 def temp_session(tmp_path: Path) -> ProTestSession:
     """Create a session with a temporary cache directory."""
-    session = ProTestSession(default_reporter=False, default_cache=False)
+    session = ProTestSession()
     session._cache_storage = CacheStorage(
         cache_dir=tmp_path / ".protest", cache_file="cache.json"
     )

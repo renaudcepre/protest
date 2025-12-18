@@ -21,7 +21,7 @@ class TestTimeoutBasic:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_async_timeout_exceeded(self, session: ProTestSession) -> None:
         """Async test exceeding timeout fails with TimeoutError."""
@@ -94,7 +94,7 @@ class TestTimeoutWithXfail:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_xfail_timeout_is_xfail(self, session: ProTestSession) -> None:
         """xfail=True + timeout → XFAIL."""
@@ -133,7 +133,7 @@ class TestTimeoutWithSkip:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_skip_ignores_timeout(self, session: ProTestSession) -> None:
         """Skipped test does not run, timeout never applies."""
@@ -157,7 +157,7 @@ class TestTimeoutValidation:
 
     def test_negative_timeout_raises(self) -> None:
         """Negative timeout raises ValueError at decoration time."""
-        session = ProTestSession(default_reporter=False, default_cache=False)
+        session = ProTestSession()
 
         with pytest.raises(ValueError, match="timeout must be non-negative"):
 
@@ -167,7 +167,7 @@ class TestTimeoutValidation:
 
     def test_zero_timeout_allowed(self) -> None:
         """Zero timeout is valid (immediate timeout)."""
-        session = ProTestSession(default_reporter=False, default_cache=False)
+        session = ProTestSession()
 
         @session.test(timeout=0.0)
         async def test_zero() -> None:
@@ -181,7 +181,7 @@ class TestTimeoutWithSuite:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_suite_test_timeout(self, session: ProTestSession) -> None:
         """Suite test can have timeout."""
@@ -218,7 +218,7 @@ class TestTimeoutResult:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_result_contains_timeout_value(self, session: ProTestSession) -> None:
         """TestResult.timeout contains configured value."""

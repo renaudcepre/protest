@@ -1,6 +1,8 @@
 import traceback
 from pathlib import Path
 
+from typing_extensions import Self
+
 from protest.entities import (
     FixtureInfo,
     HandlerInfo,
@@ -10,7 +12,7 @@ from protest.entities import (
     TestResult,
     TestRetryInfo,
 )
-from protest.plugin import PluginBase
+from protest.plugin import PluginBase, PluginContext
 
 _MIN_NODE_ID_PARTS = 2
 
@@ -53,12 +55,21 @@ def _format_duration(seconds: float) -> str:
 class AsciiReporter(PluginBase):
     """Plain ASCII reporter. No colors, no emojis. Works everywhere."""
 
+    name = "ascii-reporter"
+    description = "Plain ASCII reporter"
+
     def __init__(self) -> None:
         self._is_parallel = False
         self._failed_results: list[TestResult] = []
         self._error_results: list[TestResult] = []
         self._setup_started: set[str] = set()
         self._teardown_started: set[str] = set()
+
+    @classmethod
+    def activate(cls, ctx: PluginContext) -> Self | None:
+        if ctx.get("no_color", False):
+            return cls()
+        return None
 
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
         self._is_parallel = len(items) > 1

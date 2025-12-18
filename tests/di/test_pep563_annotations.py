@@ -36,7 +36,7 @@ class TestPEP563Annotations:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_resolves_module_level_fixture_with_future_annotations(
         self, session: ProTestSession

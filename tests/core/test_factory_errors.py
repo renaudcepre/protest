@@ -16,7 +16,7 @@ class TestFactoryErrorDistinction:
     ) -> None:
         plugin, collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.factory()
         def user(username: str) -> dict[str, str]:
@@ -46,7 +46,7 @@ class TestFactoryErrorDistinction:
     ) -> None:
         plugin, collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.test()
         def test_that_fails() -> None:
@@ -67,7 +67,7 @@ class TestFactoryErrorDistinction:
     ) -> None:
         plugin, collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         def broken_fixture() -> str:
             raise RuntimeError("Setup failed")
@@ -95,7 +95,7 @@ class TestFactoryErrorDistinction:
     ) -> None:
         plugin, collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.factory()
         def user(username: str, fail: bool = False) -> dict[str, str]:
@@ -137,7 +137,7 @@ class TestFactoryErrorPreservesOriginal:
     ) -> None:
         plugin, collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.factory()
         def user(username: str) -> dict[str, str]:
@@ -166,7 +166,7 @@ class TestAsyncFactoryErrors:
     ) -> None:
         plugin, collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.factory()
         async def user(username: str) -> dict[str, str]:
@@ -196,7 +196,7 @@ class TestFactoryWithTeardown:
     ) -> None:
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         teardown_called = []
 
@@ -229,7 +229,7 @@ class TestFactoryCaching:
     ) -> None:
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         call_count = 0
 
@@ -262,7 +262,7 @@ class TestFactoryCaching:
     ) -> None:
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         call_count = 0
 

@@ -6,16 +6,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, TextIO
 
+from typing_extensions import Self
+
 from protest.execution.capture import (
     add_log_callback,
     add_stdout_callback,
     remove_log_callback,
     remove_stdout_callback,
 )
-from protest.plugin import PluginBase
+from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
     import logging
+    from argparse import ArgumentParser
 
     from protest.core.session import ProTestSession
     from protest.entities import SessionResult
@@ -26,12 +29,31 @@ _MIN_NODE_ID_PARTS = 2
 class LogFilePlugin(PluginBase):
     """Writes logging and stdout to .protest/ for post-mortem debugging."""
 
+    name = "log-file"
+    description = "Write logs to .protest/"
+
     def __init__(self, log_dir: Path | None = None) -> None:
         self._log_dir = log_dir or Path(".protest")
         self._log_file = self._log_dir / "last_run.log"
         self._stdout_file = self._log_dir / "last_run_stdout"
         self._log_handle: TextIO | None = None
         self._stdout_handle: TextIO | None = None
+
+    @classmethod
+    def add_cli_options(cls, parser: ArgumentParser) -> None:
+        group = parser.add_argument_group(f"{cls.name} - {cls.description}")
+        group.add_argument(
+            "--no-log-file",
+            dest="no_log_file",
+            action="store_true",
+            help="Disable writing to .protest/last_run.log",
+        )
+
+    @classmethod
+    def activate(cls, ctx: PluginContext) -> Self | None:
+        if ctx.get("no_log_file", False):
+            return None
+        return cls()
 
     def setup(self, session: ProTestSession) -> None:
         self._log_dir.mkdir(exist_ok=True)

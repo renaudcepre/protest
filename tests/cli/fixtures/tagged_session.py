@@ -1,6 +1,7 @@
 from protest import ProTestSession, ProTestSuite
 
 session = ProTestSession()
+session.register_default_plugins()
 api_suite = ProTestSuite("API", tags=["api"])
 session.add_suite(api_suite)
 

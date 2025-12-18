@@ -25,7 +25,7 @@ class TestRetriesBasic:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_retry_succeeds_after_failure(self, session: ProTestSession) -> None:
         """Test passes after initial failure with retry."""
@@ -127,7 +127,7 @@ class TestRetryOn:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_retry_on_matching_exception(self, session: ProTestSession) -> None:
         """Retry triggers when exception matches retry_on."""
@@ -242,7 +242,7 @@ class TestRetryDelay:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_retry_delay_applied(self, session: ProTestSession) -> None:
         """Delay is applied between retries."""
@@ -305,7 +305,7 @@ class TestRetriesWithSkip:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_skip_ignores_retries(self, session: ProTestSession) -> None:
         """Skipped test does not run, retries never apply."""
@@ -337,7 +337,7 @@ class TestRetriesWithXfail:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_xfail_with_retries_exhausted_is_xfail(
         self, session: ProTestSession
@@ -386,7 +386,7 @@ class TestRetriesWithTimeout:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_timeout_triggers_retry(self, session: ProTestSession) -> None:
         """Timeout on first attempt triggers retry."""
@@ -500,7 +500,7 @@ class TestRetriesWithFixtureErrors:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_fixture_error_no_retry(self, session: ProTestSession) -> None:
         """Fixture error does not trigger retry."""
@@ -544,7 +544,7 @@ class TestRetriesValidation:
 
     def test_zero_retries_allowed(self) -> None:
         """Zero retries is valid (default behavior)."""
-        session = ProTestSession(default_reporter=False, default_cache=False)
+        session = ProTestSession()
 
         @session.test(retry=0)
         def test_zero() -> None:
@@ -555,7 +555,7 @@ class TestRetriesValidation:
 
     def test_zero_retry_delay_allowed(self) -> None:
         """Zero retry_delay is valid (no delay)."""
-        session = ProTestSession(default_reporter=False, default_cache=False)
+        session = ProTestSession()
 
         @session.test(retry=Retry(times=1, delay=0.0))
         def test_zero_delay() -> None:
@@ -585,7 +585,7 @@ class TestRetriesWithSuite:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_suite_test_retries(self, session: ProTestSession) -> None:
         """Suite test can have retries."""
@@ -622,7 +622,7 @@ class TestRetryEvent:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_retry_event_emitted(self, session: ProTestSession) -> None:
         """TEST_RETRY event is emitted on each retry."""
@@ -687,7 +687,7 @@ class TestRetriesAsync:
 
     @pytest.fixture
     def session(self) -> ProTestSession:
-        return ProTestSession(default_reporter=False, default_cache=False)
+        return ProTestSession()
 
     def test_async_retry_succeeds(self, session: ProTestSession) -> None:
         """Async test retries work correctly."""

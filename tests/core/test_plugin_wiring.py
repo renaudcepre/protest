@@ -1,14 +1,15 @@
 import pytest
+from typing_extensions import Self
 
 from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
 from protest.entities import SessionResult, TestResult
 from protest.events.types import Event
-from protest.plugin import PluginBase
+from protest.plugin import PluginBase, PluginContext
 
 
 class TestPluginWiring:
-    """session.use() should auto-wire handlers based on method names."""
+    """session.register_plugin() should auto-wire handlers based on method names."""
 
     @pytest.mark.asyncio
     async def test_use_wires_on_test_pass_handler(self) -> None:
@@ -20,7 +21,7 @@ class TestPluginWiring:
             def on_test_pass(self, result: TestResult) -> None:
                 received.append(result)
 
-        session.use(TestPlugin())
+        session.register_plugin(TestPlugin())
 
         test_result = TestResult(name="my_test", duration=0.1)
         await session.events.emit(Event.TEST_PASS, test_result)
@@ -44,7 +45,7 @@ class TestPluginWiring:
             def on_session_complete(self, result: SessionResult) -> None:
                 events_received.append("session_complete")
 
-        session.use(MultiPlugin())
+        session.register_plugin(MultiPlugin())
 
         await session.events.emit(Event.SESSION_START)
         await session.events.emit(Event.TEST_PASS, TestResult(name="t"))
@@ -70,7 +71,7 @@ class TestPluginWiring:
                 pass
 
         plugin = PluginWithOtherMethods()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         assert not plugin.helper_called
 
@@ -89,7 +90,7 @@ class TestPluginWiring:
                 self.received_session = session
 
         plugin = PluginWithSetup()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         assert plugin.setup_called
         assert plugin.received_session is session
@@ -104,7 +105,7 @@ class TestPluginWiring:
             def on_session_start(self) -> None:
                 received.append("started")
 
-        session.use(PluginWithoutSetup())
+        session.register_plugin(PluginWithoutSetup())
         await session.events.emit(Event.SESSION_START)
 
         assert received == ["started"]
@@ -119,7 +120,7 @@ class TestPluginWiring:
             async def on_test_pass(self, result: TestResult) -> None:
                 received.append(result.name)
 
-        session.use(AsyncPlugin())  # type: ignore[arg-type]
+        session.register_plugin(AsyncPlugin())  # type: ignore[arg-type]
         await session.events.emit(Event.TEST_PASS, TestResult(name="async_test"))
         await session.events.wait_pending()
 
@@ -180,3 +181,85 @@ class TestSuiteMaxConcurrency:
         assert fast_suite.max_concurrency == 10
         assert slow_suite.max_concurrency == 1
         assert default_suite.max_concurrency is None
+
+
+class TestPluginContext:
+    """PluginContext API."""
+
+    def test_get_returns_value(self) -> None:
+        ctx = PluginContext(args={"key": "value"})
+        assert ctx.get("key") == "value"
+
+    def test_get_returns_default_for_missing(self) -> None:
+        ctx = PluginContext(args={})
+        assert ctx.get("missing", "default") == "default"
+
+    def test_contains_true_for_existing_key(self) -> None:
+        ctx = PluginContext(args={"key": "value"})
+        assert "key" in ctx
+
+    def test_contains_false_for_missing_key(self) -> None:
+        ctx = PluginContext(args={})
+        assert "missing" not in ctx
+
+
+class TestPluginBaseDefaults:
+    """PluginBase default implementations."""
+
+    def test_default_activate_returns_instance(self) -> None:
+        ctx = PluginContext(args={})
+        instance = PluginBase.activate(ctx)
+        assert isinstance(instance, PluginBase)
+
+
+class TestActivatePluginsIdempotence:
+    """activate_plugins() should be idempotent."""
+
+    @pytest.mark.asyncio
+    async def test_activate_plugins_only_registers_once(self) -> None:
+        """Calling activate_plugins twice doesn't register plugins twice."""
+        session = ProTestSession()
+        activation_count = 0
+
+        class CountingPlugin(PluginBase):
+            @classmethod
+            def activate(cls, ctx: PluginContext) -> Self:
+                nonlocal activation_count
+                activation_count += 1
+                return cls()
+
+            def on_session_start(self) -> None:
+                pass
+
+        session.use(CountingPlugin)
+        ctx = PluginContext(args={})
+
+        session.activate_plugins(ctx)
+        session.activate_plugins(ctx)  # Second call should be no-op
+
+        assert activation_count == 1
+
+    @pytest.mark.asyncio
+    async def test_handlers_fire_once_after_double_activation(self) -> None:
+        """Handlers only fire once even if activate_plugins called twice."""
+        session = ProTestSession()
+        handler_calls = 0
+
+        class HandlerPlugin(PluginBase):
+            @classmethod
+            def activate(cls, ctx: PluginContext) -> Self:
+                return cls()
+
+            def on_session_start(self) -> None:
+                nonlocal handler_calls
+                handler_calls += 1
+
+        session.use(HandlerPlugin)
+        ctx = PluginContext(args={})
+
+        session.activate_plugins(ctx)
+        session.activate_plugins(ctx)
+
+        await session.events.emit(Event.SESSION_START)
+
+        assert handler_calls == 1

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Self
 
 if TYPE_CHECKING:
+    from argparse import ArgumentParser
     from collections.abc import Awaitable
 
     from protest.core.session import ProTestSession
@@ -19,6 +21,25 @@ if TYPE_CHECKING:
     )
 
 
+@dataclass
+class PluginContext:
+    """Unified context for plugin activation.
+
+    Can be built from CLI args or programmatic kwargs.
+    Plugins use this to decide whether to activate and how to configure themselves.
+    """
+
+    args: dict[str, Any] = field(default_factory=dict)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a value from the context."""
+        return self.args.get(key, default)
+
+    def __contains__(self, key: str) -> bool:
+        """Check if a key exists in the context."""
+        return key in self.args
+
+
 class PluginBase:
     """Base class for ProTest plugins. Methods can be sync or async.
 
@@ -26,11 +47,48 @@ class PluginBase:
     """
 
     # ─────────────────────────────────────────────────────────────────────
+    # Metadata (for CLI --help organization)
+    # ─────────────────────────────────────────────────────────────────────
+
+    name: str = ""  # e.g. "ctrf", "cache", "tag-filter"
+    description: str = ""  # e.g. "CTRF JSON reporter for CI/CD"
+
+    # ─────────────────────────────────────────────────────────────────────
+    # CLI Integration
+    # ─────────────────────────────────────────────────────────────────────
+
+    @classmethod
+    def add_cli_options(cls, parser: ArgumentParser) -> None:
+        """Override to add CLI options for this plugin.
+
+        Example:
+            group = parser.add_argument_group("My Plugin")
+            group.add_argument("--my-option", help="...")
+        """
+
+    @classmethod
+    def activate(cls, ctx: PluginContext) -> Self | None:
+        """Create instance if plugin should be active. Return None to skip.
+
+        Override to check ctx for required options/config.
+        Default: always activate with no args.
+
+        Example:
+            @classmethod
+            def activate(cls, ctx: PluginContext) -> Self | None:
+                output = ctx.get("ctrf_output")
+                if not output:
+                    return None  # Skip if option not provided
+                return cls(output_path=output)
+        """
+        return cls()
+
+    # ─────────────────────────────────────────────────────────────────────
     # Registration
     # ─────────────────────────────────────────────────────────────────────
 
     def setup(self, session: ProTestSession) -> None:
-        """Called when plugin is registered via session.use()."""
+        """Called when plugin instance is wired to event bus."""
 
     # ─────────────────────────────────────────────────────────────────────
     # Collection

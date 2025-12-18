@@ -9,14 +9,15 @@ import time
 import traceback
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
-from typing_extensions import NotRequired
+from typing_extensions import NotRequired, Self
 
-from protest.plugin import PluginBase
+from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from argparse import ArgumentParser
 
     from protest.entities import SessionResult, TestResult
 
@@ -78,12 +79,33 @@ class CTRFReport(TypedDict):
 class CTRFReporter(PluginBase):
     """CTRF JSON reporter for CI/CD integration."""
 
+    name = "ctrf"
+    description = "CTRF JSON reporter for CI/CD"
+
     def __init__(self, output_path: Path) -> None:
         self._output_path = output_path
         self._tests: list[CTRFTest] = []
         self._start_time: int = 0
         self._suites: set[str] = set()
         self._counts = {"passed": 0, "failed": 0, "skipped": 0}
+
+    @classmethod
+    def add_cli_options(cls, parser: ArgumentParser) -> None:
+        group = parser.add_argument_group(f"{cls.name} - {cls.description}")
+        group.add_argument(
+            "--ctrf-output",
+            dest="ctrf_output",
+            type=Path,
+            metavar="PATH",
+            help="Output CTRF JSON report to PATH",
+        )
+
+    @classmethod
+    def activate(cls, ctx: PluginContext) -> Self | None:
+        ctrf_output = ctx.get("ctrf_output")
+        if not ctrf_output:
+            return None
+        return cls(output_path=Path(ctrf_output))
 
     def on_session_start(self) -> None:
         self._start_time = int(time.time() * 1000)

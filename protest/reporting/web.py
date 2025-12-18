@@ -11,10 +11,14 @@ from logging import LogRecord
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from typing_extensions import Self
+
 from protest.execution.capture import add_log_callback, remove_log_callback
-from protest.plugin import PluginBase
+from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
+    from argparse import ArgumentParser
+
     from protest.entities import (
         FixtureInfo,
         SessionResult,
@@ -103,12 +107,34 @@ def run_live_server(port: int = DEFAULT_PORT) -> None:  # pragma: no cover
 
 
 class WebReporter(PluginBase):
-    def __init__(self, port: int = DEFAULT_PORT) -> None:
+    """Live web reporter with real-time test updates."""
+
+    name = "web"
+    description = "Live web reporter"
+
+    def __init__(self, port: int = DEFAULT_PORT, target: str = "") -> None:
         self._port = port
         self._ws: Any = None
         self._total_tests = 0
-        self._session_target: str = ""
+        self._session_target: str = target
         self._test_logs: dict[str, list[str]] = {}
+
+    @classmethod
+    def add_cli_options(cls, parser: ArgumentParser) -> None:
+        group = parser.add_argument_group(f"{cls.name} - {cls.description}")
+        group.add_argument(
+            "--live",
+            dest="live",
+            action="store_true",
+            help="Open live web reporter in browser",
+        )
+
+    @classmethod
+    def activate(cls, ctx: PluginContext) -> Self | None:
+        if not ctx.get("live", False):
+            return None
+        target = ctx.get("target", "")
+        return cls(target=target)
 
     def _send(self, msg_type: str, payload: dict[str, Any]) -> None:
         if not self._ws:

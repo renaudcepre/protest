@@ -41,7 +41,7 @@ class TestUnmanagedFactoryBasic:
     ) -> None:
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.factory(managed=False)
         def user_factory() -> UserFactory:
@@ -73,7 +73,7 @@ class TestUnmanagedFactoryErrorHandling:
     ) -> None:
         plugin, collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.factory(managed=False)
         def user_factory() -> FailingUserFactory:
@@ -102,7 +102,7 @@ class TestUnmanagedFactoryErrorHandling:
     ) -> None:
         plugin, collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.factory(managed=False)
         def user_factory() -> UserFactory:
@@ -133,7 +133,7 @@ class TestUnmanagedFactoryWithDependencies:
     ) -> None:
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.fixture()
         def database() -> str:
@@ -167,7 +167,7 @@ class TestUnmanagedFactoryWithTeardown:
     ) -> None:
         plugin, _collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         teardown_called = []
 
