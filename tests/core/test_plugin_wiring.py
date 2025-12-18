@@ -1,10 +1,11 @@
 import pytest
+from typing_extensions import Self
 
 from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
 from protest.entities import SessionResult, TestResult
 from protest.events.types import Event
-from protest.plugin import PluginBase
+from protest.plugin import PluginBase, PluginContext
 
 
 class TestPluginWiring:
@@ -180,3 +181,85 @@ class TestSuiteMaxConcurrency:
         assert fast_suite.max_concurrency == 10
         assert slow_suite.max_concurrency == 1
         assert default_suite.max_concurrency is None
+
+
+class TestPluginContext:
+    """PluginContext API."""
+
+    def test_get_returns_value(self) -> None:
+        ctx = PluginContext(args={"key": "value"})
+        assert ctx.get("key") == "value"
+
+    def test_get_returns_default_for_missing(self) -> None:
+        ctx = PluginContext(args={})
+        assert ctx.get("missing", "default") == "default"
+
+    def test_contains_true_for_existing_key(self) -> None:
+        ctx = PluginContext(args={"key": "value"})
+        assert "key" in ctx
+
+    def test_contains_false_for_missing_key(self) -> None:
+        ctx = PluginContext(args={})
+        assert "missing" not in ctx
+
+
+class TestPluginBaseDefaults:
+    """PluginBase default implementations."""
+
+    def test_default_activate_returns_instance(self) -> None:
+        ctx = PluginContext(args={})
+        instance = PluginBase.activate(ctx)
+        assert isinstance(instance, PluginBase)
+
+
+class TestActivatePluginsIdempotence:
+    """activate_plugins() should be idempotent."""
+
+    @pytest.mark.asyncio
+    async def test_activate_plugins_only_registers_once(self) -> None:
+        """Calling activate_plugins twice doesn't register plugins twice."""
+        session = ProTestSession()
+        activation_count = 0
+
+        class CountingPlugin(PluginBase):
+            @classmethod
+            def activate(cls, ctx: PluginContext) -> Self:
+                nonlocal activation_count
+                activation_count += 1
+                return cls()
+
+            def on_session_start(self) -> None:
+                pass
+
+        session.use(CountingPlugin)
+        ctx = PluginContext(args={})
+
+        session.activate_plugins(ctx)
+        session.activate_plugins(ctx)  # Second call should be no-op
+
+        assert activation_count == 1
+
+    @pytest.mark.asyncio
+    async def test_handlers_fire_once_after_double_activation(self) -> None:
+        """Handlers only fire once even if activate_plugins called twice."""
+        session = ProTestSession()
+        handler_calls = 0
+
+        class HandlerPlugin(PluginBase):
+            @classmethod
+            def activate(cls, ctx: PluginContext) -> Self:
+                return cls()
+
+            def on_session_start(self) -> None:
+                nonlocal handler_calls
+                handler_calls += 1
+
+        session.use(HandlerPlugin)
+        ctx = PluginContext(args={})
+
+        session.activate_plugins(ctx)
+        session.activate_plugins(ctx)
+
+        await session.events.emit(Event.SESSION_START)
+
+        assert handler_calls == 1

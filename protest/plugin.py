@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from argparse import ArgumentParser
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Self
 
 if TYPE_CHECKING:
+    from argparse import ArgumentParser
     from collections.abc import Awaitable
 
     from protest.core.session import ProTestSession

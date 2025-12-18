@@ -105,7 +105,7 @@ def run_session(  # noqa: PLR0913
     return runner.run()
 
 
-def collect_tests(
+def collect_tests(  # noqa: PLR0913
     session: ProTestSession,
     include_tags: set[str] | None = None,
     exclude_tags: set[str] | None = None,
@@ -133,7 +133,7 @@ def collect_tests(
     from protest.events.types import Event  # noqa: PLC0415
     from protest.filters.keyword import KeywordFilterPlugin  # noqa: PLC0415
     from protest.filters.suite import SuiteFilterPlugin  # noqa: PLC0415
-    from protest.plugin import PluginContext  # noqa: PLC0415
+    from protest.plugin import PluginBase, PluginContext  # noqa: PLC0415
     from protest.tags.plugin import TagFilterPlugin  # noqa: PLC0415
 
     # Build context from parameters if not provided
@@ -148,7 +148,12 @@ def collect_tests(
         )
 
     # Activate filter plugins
-    for plugin_class in [TagFilterPlugin, SuiteFilterPlugin, KeywordFilterPlugin]:
+    filter_plugins: list[type[PluginBase]] = [
+        TagFilterPlugin,
+        SuiteFilterPlugin,
+        KeywordFilterPlugin,
+    ]
+    for plugin_class in filter_plugins:
         instance = plugin_class.activate(ctx)
         if instance is not None:
             session.register_plugin(instance)

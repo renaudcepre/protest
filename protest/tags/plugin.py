@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from argparse import ArgumentParser
 from typing import TYPE_CHECKING
 
 from typing_extensions import Self
@@ -10,6 +9,8 @@ from typing_extensions import Self
 from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
+    from argparse import ArgumentParser
+
     from protest.entities import TestItem
 
 

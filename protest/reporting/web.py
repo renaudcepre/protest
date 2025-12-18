@@ -6,7 +6,6 @@ import logging
 import time
 import traceback
 import warnings
-from argparse import ArgumentParser
 from http import HTTPStatus
 from logging import LogRecord
 from pathlib import Path
@@ -18,6 +17,8 @@ from protest.execution.capture import add_log_callback, remove_log_callback
 from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
+    from argparse import ArgumentParser
+
     from protest.entities import (
         FixtureInfo,
         SessionResult,

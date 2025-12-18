@@ -57,6 +57,7 @@ class ProTestSession:
         self._autouse_fixtures: list[FixtureCallable] = []
         self._cache_storage = CacheStorage()
         self._plugin_classes: list[type[PluginBase]] = []
+        self._plugins_activated: bool = False
         self._exitfirst: bool = False
         self._capture: bool = True
         self._setup_duration: float = 0
@@ -252,8 +253,8 @@ class ProTestSession:
         This includes: RichReporter, AsciiReporter, CachePlugin, LogFilePlugin,
         TagFilterPlugin, SuiteFilterPlugin, KeywordFilterPlugin.
         """
-        from protest.filters.keyword import KeywordFilterPlugin as KFP
-        from protest.filters.suite import SuiteFilterPlugin as SFP
+        from protest.filters.keyword import KeywordFilterPlugin
+        from protest.filters.suite import SuiteFilterPlugin
         from protest.reporting.ascii import AsciiReporter
         from protest.reporting.rich_reporter import RichReporter
 
@@ -262,8 +263,8 @@ class ProTestSession:
         self.use(CachePlugin)
         self.use(LogFilePlugin)
         self.use(TagFilterPlugin)
-        self.use(SFP)
-        self.use(KFP)
+        self.use(SuiteFilterPlugin)
+        self.use(KeywordFilterPlugin)
 
     @property
     def plugin_classes(self) -> list[type[PluginBase]]:
@@ -291,7 +292,13 @@ class ProTestSession:
         Each plugin's activate() method is called with the context.
         If it returns an instance, that instance is registered.
         If it returns None, the plugin is skipped.
+
+        This method is idempotent: calling it multiple times has no effect.
         """
+        if self._plugins_activated:
+            return
+        self._plugins_activated = True
+
         for plugin_class in self._plugin_classes:
             instance = plugin_class.activate(ctx)
             if instance is not None:
