@@ -12,7 +12,9 @@ if TYPE_CHECKING:
         FixtureInfo,
         HandlerInfo,
         SessionResult,
+        SessionSetupInfo,
         SuiteResult,
+        SuiteSetupInfo,
         TestItem,
         TestResult,
         TestRetryInfo,
@@ -107,6 +109,12 @@ class PluginBase:
     def on_session_start(self) -> None | Awaitable[None]:
         """Called before any test runs."""
 
+    def on_session_setup_done(self, info: SessionSetupInfo) -> None | Awaitable[None]:
+        """Called after session fixtures resolved, before any suite starts."""
+
+    def on_session_teardown_start(self) -> None | Awaitable[None]:
+        """Called after all suites complete, before session fixture teardown."""
+
     def on_session_end(self, result: SessionResult) -> None | Awaitable[None]:
         """Tests done, teardown complete. result.setup_duration and teardown_duration available."""
 
@@ -122,6 +130,12 @@ class PluginBase:
 
     def on_suite_start(self, name: str) -> None | Awaitable[None]:
         """Called before a suite's tests run."""
+
+    def on_suite_setup_done(self, info: SuiteSetupInfo) -> None | Awaitable[None]:
+        """Called after suite fixtures resolved, before any test starts."""
+
+    def on_suite_teardown_start(self, name: str) -> None | Awaitable[None]:
+        """Called after all suite tests complete, before suite fixture teardown."""
 
     def on_suite_end(self, result: SuiteResult) -> None | Awaitable[None]:
         """Called after a suite's tests and teardown complete."""

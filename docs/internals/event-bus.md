@@ -95,20 +95,24 @@ Events are defined in `protest/events/types.py`:
 
 ### Session Lifecycle
 
-| Event                 | Data                    | When                                    |
-|-----------------------|-------------------------|-----------------------------------------|
-| `COLLECTION_FINISH`   | `list[TestItem]`        | After test collection, before execution |
-| `SESSION_START`       | None                    | Before any test runs                    |
-| `SESSION_END`         | `SessionResult`         | After all tests, teardown complete      |
-| `SESSION_COMPLETE`    | `SessionResult`         | After `wait_pending()`                  |
-| `SESSION_INTERRUPTED` | `bool` (force_teardown) | On Ctrl+C                               |
+| Event                    | Data                    | When                                        |
+|--------------------------|-------------------------|---------------------------------------------|
+| `COLLECTION_FINISH`      | `list[TestItem]`        | After test collection, before execution     |
+| `SESSION_START`          | None                    | Before any test runs                        |
+| `SESSION_SETUP_DONE`     | `SessionSetupInfo`      | After session fixtures resolved             |
+| `SESSION_TEARDOWN_START` | None                    | After all suites, before session teardown   |
+| `SESSION_END`            | `SessionResult`         | After all tests, teardown complete          |
+| `SESSION_COMPLETE`       | `SessionResult`         | After `wait_pending()`                      |
+| `SESSION_INTERRUPTED`    | `bool` (force_teardown) | On Ctrl+C                                   |
 
 ### Suite Lifecycle
 
-| Event         | Data               | When                               |
-|---------------|--------------------|------------------------------------|
-| `SUITE_START` | `str` (suite_path) | Before suite's first test          |
-| `SUITE_END`   | `SuiteResult`      | After suite's last test + teardown |
+| Event                  | Data               | When                                       |
+|------------------------|--------------------|--------------------------------------------|
+| `SUITE_START`          | `str` (suite_path) | Before suite's first test                  |
+| `SUITE_SETUP_DONE`     | `SuiteSetupInfo`   | After suite fixtures resolved              |
+| `SUITE_TEARDOWN_START` | `str` (suite_path) | After all suite tests, before teardown     |
+| `SUITE_END`            | `SuiteResult`      | After suite's last test + teardown         |
 
 ### Test Lifecycle
 
@@ -160,12 +164,16 @@ SESSION_START
 │  │ FIXTURE_SETUP_DONE (scope=session)
 │  └───────────────────────────────────────
 │
+SESSION_SETUP_DONE
+│
 ├─ SUITE_START ("API") ◄─────────────────── for each suite
 │  │
 │  │  ┌──────────────────────────────────── for each suite-scoped fixture
 │  │  │ FIXTURE_SETUP_START (scope=suite)
 │  │  │ FIXTURE_SETUP_DONE (scope=suite)
 │  │  └────────────────────────────────────
+│  │
+│  │ SUITE_SETUP_DONE
 │  │
 │  ├─ TEST_START ◄───────────────────────── for each test in suite
 │  │  │ TEST_ACQUIRED
@@ -182,12 +190,14 @@ SESSION_START
 │  │  │  └─────────────────────────────────
 │  │  └─ TEST_PASS / TEST_FAIL / TEST_SKIP
 │  │
+│  │ SUITE_TEARDOWN_START
 │  │  ┌──────────────────────────────────── for each suite-scoped fixture (LIFO)
 │  │  │ FIXTURE_TEARDOWN_START (scope=suite)
 │  │  │ FIXTURE_TEARDOWN_DONE (scope=suite)
 │  │  └────────────────────────────────────
 │  └─ SUITE_END
 │
+SESSION_TEARDOWN_START
 │  ┌─────────────────────────────────────── for each session-scoped fixture (LIFO)
 │  │ FIXTURE_TEARDOWN_START (scope=session)
 │  │ FIXTURE_TEARDOWN_DONE (scope=session)
@@ -395,6 +405,34 @@ class SessionResult:
     setup_duration: float = 0
     teardown_duration: float = 0
     interrupted: bool = False
+```
+
+### SessionSetupInfo
+
+```python
+@dataclass(frozen=True, slots=True)
+class SessionSetupInfo:
+    duration: float
+```
+
+### SuiteSetupInfo
+
+```python
+@dataclass(frozen=True, slots=True)
+class SuiteSetupInfo:
+    name: str
+    duration: float
+```
+
+### SuiteResult
+
+```python
+@dataclass(frozen=True, slots=True)
+class SuiteResult:
+    name: str
+    duration: float = 0
+    setup_duration: float = 0
+    teardown_duration: float = 0
 ```
 
 ### HandlerInfo

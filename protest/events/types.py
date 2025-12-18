@@ -8,9 +8,13 @@ class Event(Enum):
 
     COLLECTION_FINISH = "collection_finish"
     SESSION_START = "session_start"
+    SESSION_SETUP_DONE = "session_setup_done"
+    SESSION_TEARDOWN_START = "session_teardown_start"
     SESSION_END = "session_end"
     SESSION_COMPLETE = "session_complete"
     SUITE_START = "suite_start"
+    SUITE_SETUP_DONE = "suite_setup_done"
+    SUITE_TEARDOWN_START = "suite_teardown_start"
     SUITE_END = "suite_end"
     TEST_START = "test_start"
     TEST_ACQUIRED = "test_acquired"
