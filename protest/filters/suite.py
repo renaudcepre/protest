@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from argparse import Namespace
 from typing import TYPE_CHECKING
 
 from typing_extensions import Self
 
-from protest.plugin import PluginBase
+from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
     from protest.entities import TestItem
@@ -21,10 +20,9 @@ class SuiteFilterPlugin(PluginBase):
         self._suite_filter = suite_filter
 
     @classmethod
-    def from_cli(cls, args: Namespace) -> Self | None:
+    def activate(cls, ctx: PluginContext) -> Self | None:
         # Suite filter is extracted from target via parse_target() in CLI
-        # We get it from args._suite_filter which is set by the CLI
-        suite_filter = getattr(args, "_suite_filter", None)
+        suite_filter = ctx.get("target_suite")
         if not suite_filter:
             return None
         return cls(suite_filter=suite_filter)

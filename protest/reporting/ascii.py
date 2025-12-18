@@ -1,5 +1,4 @@
 import traceback
-from argparse import Namespace
 from pathlib import Path
 
 from typing_extensions import Self
@@ -13,7 +12,7 @@ from protest.entities import (
     TestResult,
     TestRetryInfo,
 )
-from protest.plugin import PluginBase
+from protest.plugin import PluginBase, PluginContext
 
 _MIN_NODE_ID_PARTS = 2
 
@@ -67,8 +66,8 @@ class AsciiReporter(PluginBase):
         self._teardown_started: set[str] = set()
 
     @classmethod
-    def from_cli(cls, args: Namespace) -> Self | None:
-        if getattr(args, "no_color", False):
+    def activate(cls, ctx: PluginContext) -> Self | None:
+        if ctx.get("no_color", False):
             return cls()
         return None
 

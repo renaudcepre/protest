@@ -6,7 +6,7 @@ import logging
 import time
 import traceback
 import warnings
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
 from http import HTTPStatus
 from logging import LogRecord
 from pathlib import Path
@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any
 from typing_extensions import Self
 
 from protest.execution.capture import add_log_callback, remove_log_callback
-from protest.plugin import PluginBase
+from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
     from protest.entities import (
@@ -129,10 +129,10 @@ class WebReporter(PluginBase):
         )
 
     @classmethod
-    def from_cli(cls, args: Namespace) -> Self | None:
-        if not getattr(args, "live", False):
+    def activate(cls, ctx: PluginContext) -> Self | None:
+        if not ctx.get("live", False):
             return None
-        target = getattr(args, "target", "")
+        target = ctx.get("target", "")
         return cls(target=target)
 
     def _send(self, msg_type: str, payload: dict[str, Any]) -> None:

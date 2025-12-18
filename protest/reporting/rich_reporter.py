@@ -1,6 +1,6 @@
 import time
 import traceback
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
 from pathlib import Path
 
 from rich.console import Console  # type: ignore[import-not-found]
@@ -17,7 +17,7 @@ from protest.entities import (
     TestResult,
     TestRetryInfo,
 )
-from protest.plugin import PluginBase
+from protest.plugin import PluginBase, PluginContext
 
 
 def _format_test_name(result: TestResult) -> str:
@@ -75,8 +75,8 @@ class RichReporter(PluginBase):
         )
 
     @classmethod
-    def from_cli(cls, args: Namespace) -> Self | None:
-        if getattr(args, "no_color", False):
+    def activate(cls, ctx: PluginContext) -> Self | None:
+        if ctx.get("no_color", False):
             return None
         return cls()
 

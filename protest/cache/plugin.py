@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
 from typing import TYPE_CHECKING
 
 from typing_extensions import Self
 
-from protest.plugin import PluginBase
+from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
     from protest.cache.storage import CacheStorage
@@ -44,10 +44,10 @@ class CachePlugin(PluginBase):
         )
 
     @classmethod
-    def from_cli(cls, args: Namespace) -> Self:
+    def activate(cls, ctx: PluginContext) -> Self:
         return cls(
-            last_failed=getattr(args, "last_failed", False),
-            cache_clear=getattr(args, "cache_clear", False),
+            last_failed=ctx.get("last_failed", False),
+            cache_clear=ctx.get("cache_clear", False),
         )
 
     def setup(self, session: ProTestSession) -> None:

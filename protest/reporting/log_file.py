@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, TextIO
@@ -15,7 +15,7 @@ from protest.execution.capture import (
     remove_log_callback,
     remove_stdout_callback,
 )
-from protest.plugin import PluginBase
+from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
     import logging
@@ -50,8 +50,8 @@ class LogFilePlugin(PluginBase):
         )
 
     @classmethod
-    def from_cli(cls, args: Namespace) -> Self | None:
-        if getattr(args, "no_log_file", False):
+    def activate(cls, ctx: PluginContext) -> Self | None:
+        if ctx.get("no_log_file", False):
             return None
         return cls()
 

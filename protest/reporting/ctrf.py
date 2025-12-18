@@ -8,14 +8,14 @@ import subprocess
 import time
 import traceback
 import uuid
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
 from typing_extensions import NotRequired, Self
 
-from protest.plugin import PluginBase
+from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
     from protest.entities import SessionResult, TestResult
@@ -100,10 +100,11 @@ class CTRFReporter(PluginBase):
         )
 
     @classmethod
-    def from_cli(cls, args: Namespace) -> Self | None:
-        if not getattr(args, "ctrf_output", None):
+    def activate(cls, ctx: PluginContext) -> Self | None:
+        ctrf_output = ctx.get("ctrf_output")
+        if not ctrf_output:
             return None
-        return cls(output_path=args.ctrf_output)
+        return cls(output_path=Path(ctrf_output))
 
     def on_session_start(self) -> None:
         self._start_time = int(time.time() * 1000)
