@@ -8,7 +8,7 @@ from protest.plugin import PluginBase
 
 
 class TestPluginWiring:
-    """session.use() should auto-wire handlers based on method names."""
+    """session.register_plugin() should auto-wire handlers based on method names."""
 
     @pytest.mark.asyncio
     async def test_use_wires_on_test_pass_handler(self) -> None:
@@ -20,7 +20,7 @@ class TestPluginWiring:
             def on_test_pass(self, result: TestResult) -> None:
                 received.append(result)
 
-        session.use(TestPlugin())
+        session.register_plugin(TestPlugin())
 
         test_result = TestResult(name="my_test", duration=0.1)
         await session.events.emit(Event.TEST_PASS, test_result)
@@ -44,7 +44,7 @@ class TestPluginWiring:
             def on_session_complete(self, result: SessionResult) -> None:
                 events_received.append("session_complete")
 
-        session.use(MultiPlugin())
+        session.register_plugin(MultiPlugin())
 
         await session.events.emit(Event.SESSION_START)
         await session.events.emit(Event.TEST_PASS, TestResult(name="t"))
@@ -70,7 +70,7 @@ class TestPluginWiring:
                 pass
 
         plugin = PluginWithOtherMethods()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         assert not plugin.helper_called
 
@@ -89,7 +89,7 @@ class TestPluginWiring:
                 self.received_session = session
 
         plugin = PluginWithSetup()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         assert plugin.setup_called
         assert plugin.received_session is session
@@ -104,7 +104,7 @@ class TestPluginWiring:
             def on_session_start(self) -> None:
                 received.append("started")
 
-        session.use(PluginWithoutSetup())
+        session.register_plugin(PluginWithoutSetup())
         await session.events.emit(Event.SESSION_START)
 
         assert received == ["started"]
@@ -119,7 +119,7 @@ class TestPluginWiring:
             async def on_test_pass(self, result: TestResult) -> None:
                 received.append(result.name)
 
-        session.use(AsyncPlugin())  # type: ignore[arg-type]
+        session.register_plugin(AsyncPlugin())  # type: ignore[arg-type]
         await session.events.emit(Event.TEST_PASS, TestResult(name="async_test"))
         await session.events.wait_pending()
 

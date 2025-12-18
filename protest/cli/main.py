@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from protest.core.session import ProTestSession
     from protest.entities import TestItem
 
 HELP_EPILOG = """
@@ -144,8 +144,28 @@ def _print_help() -> None:
     print(HELP_EPILOG)
 
 
-def _handle_run_command() -> None:
-    """Handle 'protest run' subcommand."""
+def _create_base_parser() -> argparse.ArgumentParser:
+    """Parser with just target and app-dir for initial loading."""
+    parser = argparse.ArgumentParser(
+        prog="protest run",
+        description="Run tests",
+        add_help=False,  # We'll add help to the full parser
+    )
+    parser.add_argument(
+        "target",
+        nargs="?",
+        help="Module and session: 'module:session' (e.g., 'demo:session')",
+    )
+    parser.add_argument(
+        "--app-dir",
+        default=".",
+        help="Look for module in this directory (default: .)",
+    )
+    return parser
+
+
+def _create_run_parser() -> argparse.ArgumentParser:
+    """Base parser with core run options. Plugin options added dynamically."""
     parser = argparse.ArgumentParser(
         prog="protest run",
         description="Run tests",
@@ -167,38 +187,10 @@ def _handle_run_command() -> None:
         help="Number of concurrent tests (default: 1)",
     )
     parser.add_argument(
-        "--lf",
-        "--last-failed",
-        dest="last_failed",
-        action="store_true",
-        help="Re-run only failed tests from last run",
-    )
-    parser.add_argument(
-        "--cache-clear",
-        dest="cache_clear",
-        action="store_true",
-        help="Clear cache before run",
-    )
-    parser.add_argument(
         "--collect-only",
         dest="collect_only",
         action="store_true",
         help="Only collect and list tests, don't run them",
-    )
-    parser.add_argument(
-        "-t",
-        "--tag",
-        dest="tags",
-        action="append",
-        default=[],
-        help="Run only tests with this tag (can be used multiple times, OR logic)",
-    )
-    parser.add_argument(
-        "--no-tag",
-        dest="exclude_tags",
-        action="append",
-        default=[],
-        help="Exclude tests with this tag (can be used multiple times)",
     )
     parser.add_argument(
         "-x",
@@ -213,109 +205,75 @@ def _handle_run_command() -> None:
         action="store_true",
         help="Disable stdout/stderr capture (show print output)",
     )
-    parser.add_argument(
-        "-k",
-        "--keyword",
-        dest="keywords",
-        action="append",
-        default=[],
-        help="Run only tests matching pattern (substring, can be used multiple times, OR logic)",
-    )
-    parser.add_argument(
-        "--no-log-file",
-        dest="no_log_file",
-        action="store_true",
-        help="Disable writing to .protest/last_run.log",
-    )
-    parser.add_argument(
-        "--no-color",
-        dest="no_color",
-        action="store_true",
-        help="Disable colors (plain ASCII output)",
-    )
-    parser.add_argument(
-        "--ctrf-output",
-        dest="ctrf_output",
-        type=Path,
-        metavar="PATH",
-        help="Output CTRF JSON report to PATH",
-    )
-    parser.add_argument(
-        "--live",
-        dest="live",
-        action="store_true",
-        help="Open live web reporter in browser",
-    )
-
-    args = parser.parse_args(sys.argv[2:])
-
-    run_tests(
-        args.target,
-        app_dir=args.app_dir,
-        concurrency=args.concurrency,
-        last_failed=args.last_failed,
-        cache_clear=args.cache_clear,
-        collect_only=args.collect_only,
-        include_tags=set(args.tags) if args.tags else None,
-        exclude_tags=set(args.exclude_tags) if args.exclude_tags else None,
-        exitfirst=args.exitfirst,
-        capture=not args.no_capture,
-        keywords=args.keywords if args.keywords else None,
-        log_file=not args.no_log_file,
-        force_no_color=args.no_color,
-        ctrf_output=args.ctrf_output,
-        live=args.live,
-    )
+    return parser
 
 
-def run_tests(  # noqa: PLR0913
-    target: str,
-    app_dir: str = ".",
-    concurrency: int = 1,
-    last_failed: bool = False,
-    cache_clear: bool = False,
-    collect_only: bool = False,
-    include_tags: set[str] | None = None,
-    exclude_tags: set[str] | None = None,
-    exitfirst: bool = False,
-    capture: bool = True,
-    keywords: list[str] | None = None,
-    log_file: bool = True,
-    force_no_color: bool = False,
-    ctrf_output: Path | None = None,
-    live: bool = False,
-) -> None:
-    from protest.api import collect_tests, run_session
+def _handle_run_command() -> None:
+    """Handle 'protest run' subcommand with two-phase parsing."""
     from protest.loader import LoadError, load_session, parse_target
 
-    session_target, suite_filter = parse_target(target)
+    argv = sys.argv[2:]
 
+    # Phase 1: Parse base args to get target
+    base_parser = _create_base_parser()
+    base_args, remaining = base_parser.parse_known_args(argv)
+
+    # If --help in remaining and no target, show help without loading session
+    if "--help" in remaining or "-h" in remaining:
+        if not base_args.target:
+            _create_run_parser().parse_args(["--help"])
+            return
+
+    if not base_args.target:
+        _create_run_parser().print_help()
+        sys.exit(1)
+
+    # Phase 2: Load session to discover plugin classes
+    session_target, suite_filter = parse_target(base_args.target)
     try:
-        session = load_session(session_target, app_dir)
+        session = load_session(session_target, base_args.app_dir)
     except LoadError as exc:
         print(f"Error: {exc}")
         sys.exit(1)
 
-    if ctrf_output:
-        from protest.reporting.ctrf import CTRFReporter
+    # Phase 3: Build full parser with plugin options
+    full_parser = _create_run_parser()
+    for plugin_class in session.plugin_classes:
+        if hasattr(plugin_class, "add_cli_options"):
+            plugin_class.add_cli_options(full_parser)
 
-        session.use(CTRFReporter(output_path=ctrf_output))
+    # Phase 4: Full parse
+    args = full_parser.parse_args(argv)
+    # Inject suite_filter for SuiteFilterPlugin
+    args._suite_filter = suite_filter
 
-    if live:
-        from protest.reporting.web import WebReporter
+    # Phase 5: Instantiate plugins via from_cli()
+    for plugin_class in session.plugin_classes:
+        plugin = plugin_class.from_cli(args)
+        if plugin is not None:
+            session.register_plugin(plugin)
 
-        web_reporter = WebReporter()
-        web_reporter.set_target(target)
-        session.use(web_reporter)
+    # Phase 6: Run tests
+    run_tests(
+        session,
+        concurrency=args.concurrency,
+        collect_only=args.collect_only,
+        exitfirst=args.exitfirst,
+        capture=not args.no_capture,
+    )
+
+
+def run_tests(
+    session: ProTestSession,
+    concurrency: int = 1,
+    collect_only: bool = False,
+    exitfirst: bool = False,
+    capture: bool = True,
+) -> None:
+    from protest.api import collect_tests, run_session
 
     if collect_only:
-        items = collect_tests(
-            session,
-            include_tags=include_tags,
-            exclude_tags=exclude_tags,
-            suite_filter=suite_filter,
-            keyword_patterns=keywords,
-        )
+        items = collect_tests(session)
         print(f"Collected {len(items)} test(s):\n")
         for item in items:
             print(f"  {item.node_id}")
@@ -325,15 +283,7 @@ def run_tests(  # noqa: PLR0913
         session,
         concurrency=concurrency,
         exitfirst=exitfirst,
-        last_failed=last_failed,
-        cache_clear=cache_clear,
-        include_tags=include_tags,
-        exclude_tags=exclude_tags,
         capture=capture,
-        suite_filter=suite_filter,
-        keyword_patterns=keywords,
-        log_file=log_file,
-        force_no_color=force_no_color,
     )
     exit_code_interrupted = 130
     if result.interrupted:

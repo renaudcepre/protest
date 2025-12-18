@@ -28,8 +28,6 @@ from protest.entities import (
 )
 from protest.events.bus import EventBus
 from protest.events.types import Event
-from protest.filters import KeywordFilterPlugin, SuiteFilterPlugin
-from protest.reporting.factory import get_reporter
 from protest.reporting.log_file import LogFilePlugin
 from protest.tags.plugin import TagFilterPlugin
 
@@ -47,19 +45,9 @@ class ProTestSession:
 
     Args:
         concurrency: Number of parallel test workers (default: 1).
-        default_reporter: If True (default), adds RichReporter (or AsciiReporter fallback).
-        default_cache: If True (default), adds CachePlugin for --lf support.
     """
 
-    def __init__(
-        self,
-        concurrency: int = 1,
-        default_reporter: bool = True,
-        default_cache: bool = True,
-        default_log_file: bool = True,
-        include_tags: set[str] | None = None,
-        exclude_tags: set[str] | None = None,
-    ) -> None:
+    def __init__(self, concurrency: int = 1) -> None:
         self._events = EventBus()
         self._resolver = Resolver(event_bus=self._events)
         self._suites: list[ProTestSuite] = []
@@ -68,27 +56,11 @@ class ProTestSession:
         self._concurrency = max(1, concurrency)
         self._autouse_fixtures: list[FixtureCallable] = []
         self._cache_storage = CacheStorage()
-        self._cache_plugin: CachePlugin | None = None
-        self._cache_plugin_registered: bool = False
-        self._log_file_plugin: LogFilePlugin | None = None
-        self._log_file_enabled: bool = default_log_file
-        self._tag_filter_plugin: TagFilterPlugin | None = None
-        self._suite_filter_plugin: SuiteFilterPlugin | None = None
-        self._keyword_filter_plugin: KeywordFilterPlugin | None = None
+        self._plugin_classes: list[type[PluginBase]] = []
         self._exitfirst: bool = False
         self._capture: bool = True
-        self._default_reporter: PluginBase | None = None
         self._setup_duration: float = 0
         self._teardown_duration: float = 0
-
-        if default_reporter:
-            self._default_reporter = get_reporter()
-            self.use(self._default_reporter)
-        if default_cache:
-            self._cache_plugin = CachePlugin()
-        if include_tags or exclude_tags:
-            self._tag_filter_plugin = TagFilterPlugin(include_tags, exclude_tags)
-            self.use(self._tag_filter_plugin)
 
     async def resolve_autouse(self) -> None:
         """Resolve all session autouse fixtures at session start."""
@@ -132,59 +104,6 @@ class ProTestSession:
     def teardown_duration(self) -> float:
         """Duration of session teardown (available after __aexit__)."""
         return self._teardown_duration
-
-    def configure_cache(
-        self, last_failed: bool = False, cache_clear: bool = False
-    ) -> None:
-        """Configure the cache plugin (--lf, --cache-clear)."""
-        if self._cache_plugin is not None:
-            self._cache_plugin._last_failed = last_failed
-            self._cache_plugin._cache_clear = cache_clear
-            if not self._cache_plugin_registered:
-                self.use(self._cache_plugin)
-                self._cache_plugin_registered = True
-
-    def configure_tags(
-        self,
-        include_tags: set[str] | None = None,
-        exclude_tags: set[str] | None = None,
-    ) -> None:
-        """Configure tag filtering (-t/--tag, --no-tag)."""
-        if not include_tags and not exclude_tags:
-            return
-        if self._tag_filter_plugin is None:
-            self._tag_filter_plugin = TagFilterPlugin(include_tags, exclude_tags)
-            self.use(self._tag_filter_plugin)
-        else:
-            self._tag_filter_plugin._include_tags = include_tags or set()
-            self._tag_filter_plugin._exclude_tags = exclude_tags or set()
-
-    def configure_suite_filter(self, suite_filter: str | None = None) -> None:
-        """Configure suite filtering (::SuiteName target syntax)."""
-        if not suite_filter:
-            return
-        if self._suite_filter_plugin is None:
-            self._suite_filter_plugin = SuiteFilterPlugin(suite_filter)
-            self.use(self._suite_filter_plugin)
-        else:
-            self._suite_filter_plugin._suite_filter = suite_filter
-
-    def configure_keyword_filter(self, patterns: list[str] | None = None) -> None:
-        """Configure keyword filtering (-k patterns)."""
-        if not patterns:
-            return
-        if self._keyword_filter_plugin is None:
-            self._keyword_filter_plugin = KeywordFilterPlugin(patterns)
-            self.use(self._keyword_filter_plugin)
-        else:
-            self._keyword_filter_plugin._patterns = patterns
-
-    def configure_log_file(self, enabled: bool = True) -> None:
-        """Configure log file output (.protest/last_run.log)."""
-        self._log_file_enabled = enabled
-        if enabled and self._log_file_plugin is None:
-            self._log_file_plugin = LogFilePlugin()
-            self.use(self._log_file_plugin)
 
     @property
     def resolver(self) -> Resolver:
@@ -320,8 +239,43 @@ class ProTestSession:
         """Alias for add_suite (backward compatibility)."""
         self.add_suite(suite)
 
-    def use(self, plugin: PluginBase) -> None:
-        """Enregistre un plugin avec wiring automatique des hooks."""
+    def use(self, plugin_class: type[PluginBase]) -> None:
+        """Register a plugin class for CLI discovery.
+
+        The plugin will be instantiated via from_cli() after CLI parsing.
+        """
+        self._plugin_classes.append(plugin_class)
+
+    def register_default_plugins(self) -> None:
+        """Register all standard ProTest plugins for CLI discovery.
+
+        This includes: RichReporter, AsciiReporter, CachePlugin, LogFilePlugin,
+        TagFilterPlugin, SuiteFilterPlugin, KeywordFilterPlugin.
+        """
+        from protest.filters.keyword import KeywordFilterPlugin as KFP
+        from protest.filters.suite import SuiteFilterPlugin as SFP
+        from protest.reporting.ascii import AsciiReporter
+        from protest.reporting.rich_reporter import RichReporter
+
+        self.use(RichReporter)
+        self.use(AsciiReporter)
+        self.use(CachePlugin)
+        self.use(LogFilePlugin)
+        self.use(TagFilterPlugin)
+        self.use(SFP)
+        self.use(KFP)
+
+    @property
+    def plugin_classes(self) -> list[type[PluginBase]]:
+        """Get registered plugin classes."""
+        return self._plugin_classes.copy()
+
+    def register_plugin(self, plugin: PluginBase) -> None:
+        """Register a plugin instance and wire it to the event bus.
+
+        Use this to register a pre-configured plugin instance. For CLI usage,
+        prefer `use(PluginClass)` which enables CLI option discovery.
+        """
         if hasattr(plugin, "setup") and callable(plugin.setup):
             plugin.setup(self)
 
@@ -330,26 +284,6 @@ class ProTestSession:
             handler = getattr(plugin, method_name, None)
             if handler and callable(handler):
                 self._events.on(event, handler)
-
-    def _unuse(self, plugin: PluginBase) -> None:
-        """Retire un plugin du bus d'événements."""
-        for event in Event:
-            method_name = f"on_{event.value}"
-            handler = getattr(plugin, method_name, None)
-            if handler and callable(handler):
-                self._events.off(event, handler)
-
-    def set_default_reporter(self, reporter: PluginBase) -> None:
-        """Replace the default reporter (RichReporter/AsciiReporter).
-
-        This only replaces the default console reporter, not any custom
-        reporters added via use(). Use this to switch between Rich and ASCII
-        output modes at runtime.
-        """
-        if self._default_reporter is not None:
-            self._unuse(self._default_reporter)
-        self._default_reporter = reporter
-        self.use(reporter)
 
     async def __aenter__(self) -> Self:
         self._register_fixtures()

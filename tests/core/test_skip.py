@@ -95,7 +95,7 @@ class TestSkipExecution:
                 results["skipped"] = result.skipped
                 results["failed"] = result.failed
 
-        session.use(CountingPlugin())
+        session.register_plugin(CountingPlugin())
 
         @session.test(skip=True)
         def test_skipped() -> None:
@@ -120,7 +120,7 @@ class TestSkipExecution:
             def on_test_skip(self, result: TestResult) -> None:
                 skip_results.append(result)
 
-        session.use(SkipPlugin())
+        session.register_plugin(SkipPlugin())
 
         @session.test(skip="My reason")
         def test_skipped() -> None:
@@ -158,7 +158,7 @@ class TestSkipWithParameterizedTests:
             def on_session_complete(self, result: SessionResult) -> None:
                 results["skipped"] = result.skipped
 
-        session.use(CountingPlugin())
+        session.register_plugin(CountingPlugin())
 
         VALUES = ForEach([1, 2, 3])  # noqa: N806
 

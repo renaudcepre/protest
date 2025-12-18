@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from argparse import ArgumentParser, Namespace
+from typing import TYPE_CHECKING, Self
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable
@@ -26,11 +27,40 @@ class PluginBase:
     """
 
     # ─────────────────────────────────────────────────────────────────────
+    # Metadata (for CLI --help organization)
+    # ─────────────────────────────────────────────────────────────────────
+
+    name: str = ""  # e.g. "ctrf", "cache", "tag-filter"
+    description: str = ""  # e.g. "CTRF JSON reporter for CI/CD"
+
+    # ─────────────────────────────────────────────────────────────────────
+    # CLI Integration
+    # ─────────────────────────────────────────────────────────────────────
+
+    @classmethod
+    def add_cli_options(cls, parser: ArgumentParser) -> None:
+        """Override to add CLI options for this plugin.
+
+        Example:
+            group = parser.add_argument_group("My Plugin")
+            group.add_argument("--my-option", help="...")
+        """
+
+    @classmethod
+    def from_cli(cls, args: Namespace) -> Self | None:
+        """Create instance from CLI args. Return None to skip activation.
+
+        Default: always instantiate with no args.
+        Override to check CLI flags and potentially return None.
+        """
+        return cls()
+
+    # ─────────────────────────────────────────────────────────────────────
     # Registration
     # ─────────────────────────────────────────────────────────────────────
 
     def setup(self, session: ProTestSession) -> None:
-        """Called when plugin is registered via session.use()."""
+        """Called when plugin instance is wired to event bus."""
 
     # ─────────────────────────────────────────────────────────────────────
     # Collection

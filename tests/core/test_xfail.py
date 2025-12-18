@@ -83,7 +83,7 @@ class TestXfailExecution:
                 results["xpassed"] = result.xpassed
                 results["failed"] = result.failed
 
-        session.use(CountingPlugin())
+        session.register_plugin(CountingPlugin())
 
         @session.test(xfail="Known bug")
         def test_xfailed() -> None:
@@ -109,7 +109,7 @@ class TestXfailExecution:
                 results["xpassed"] = result.xpassed
                 results["passed"] = result.passed
 
-        session.use(CountingPlugin())
+        session.register_plugin(CountingPlugin())
 
         @session.test(xfail="Should fail but doesn't")
         def test_xpassed() -> None:
@@ -132,7 +132,7 @@ class TestXfailExecution:
             def on_test_xfail(self, result: TestResult) -> None:
                 xfail_results.append(result)
 
-        session.use(XfailPlugin())
+        session.register_plugin(XfailPlugin())
 
         @session.test(xfail="My xfail reason")
         def test_xfailed() -> None:
@@ -153,7 +153,7 @@ class TestXfailExecution:
             def on_test_xpass(self, result: TestResult) -> None:
                 xpass_results.append(result)
 
-        session.use(XpassPlugin())
+        session.register_plugin(XpassPlugin())
 
         @session.test(xfail="Should fail")
         def test_xpassed() -> None:
@@ -209,7 +209,7 @@ class TestXfailWithParameterizedTests:
             def on_session_complete(self, result: SessionResult) -> None:
                 results["xfailed"] = result.xfailed
 
-        session.use(CountingPlugin())
+        session.register_plugin(CountingPlugin())
 
         VALUES = ForEach([1, 2, 3])  # noqa
 
@@ -238,7 +238,7 @@ class TestXfailWithSkip:
                 results["skipped"] = result.skipped
                 results["xfailed"] = result.xfailed
 
-        session.use(CountingPlugin())
+        session.register_plugin(CountingPlugin())
 
         @session.test(skip="Skipped", xfail="Would xfail")
         def test_skip_and_xfail() -> None:

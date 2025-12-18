@@ -35,7 +35,8 @@
       "Bash(for f in tests/core/test_factory_errors.py tests/core/test_parametrize.py tests/core/test_runner.py tests/core/test_session_suite_api.py tests/core/test_unmanaged_factory.py)",
       "Bash(do echo \"=== $f ===\" head -5 \"$f\")",
       "Bash(uv add:*)",
-      "Bash(comm -23:*)"
+      "Bash(comm -23:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

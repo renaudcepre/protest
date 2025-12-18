@@ -27,7 +27,7 @@ class TestMockerFixture:
     ) -> None:
         plugin, collected = event_collector
         session = ProTestSession()
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.test()
         def test_patch(mock_manager: Annotated[Mocker, Use(mocker)]) -> None:
@@ -308,7 +308,7 @@ class TestMockerFixture:
     ) -> None:
         plugin, collected = event_collector
         session = ProTestSession(concurrency=3)
-        session.use(plugin)
+        session.register_plugin(plugin)
 
         @session.test()
         def test_a(mock_manager: Annotated[Mocker, Use(mocker)]) -> None:

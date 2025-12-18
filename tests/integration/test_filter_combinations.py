@@ -28,7 +28,7 @@ class SessionFactory:
 
     def create_session(self) -> ProTestSession:
         """Create a fresh session with the given cache directory."""
-        session = ProTestSession(default_reporter=False, default_cache=True)
+        session = ProTestSession()
         session._cache_storage = CacheStorage(
             cache_dir=self._cache_dir, cache_file="cache.json"
         )
@@ -339,7 +339,7 @@ class TestTagsWithExitFirst:
 
     def test_tag_filter_with_exitfirst(self) -> None:
         """Given tests with different tags, when --tag X -x, then stop after first tagged failure."""
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         executed: list[str] = []
 
         @session.test(tags=["unit"])
@@ -364,7 +364,7 @@ class TestTagsWithExitFirst:
 
     def test_exclude_tag_with_exitfirst(self) -> None:
         """Given tests with different tags, when --exclude-tag X -x, then stop after first non-excluded failure."""
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         executed: list[str] = []
 
         @session.test(tags=["slow"])
@@ -491,7 +491,7 @@ class TestSuiteFilter:
 
     def test_suite_filter_basic(self) -> None:
         """Given tests in different suites, when suite filter applied, then only suite tests run."""
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         api_suite = ProTestSuite("API")
         session.add_suite(api_suite)
         executed: list[str] = []
@@ -511,7 +511,7 @@ class TestSuiteFilter:
 
     def test_suite_filter_with_nested_suites(self) -> None:
         """Given nested suites, when parent suite filter applied, then child suite tests also run."""
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         api_suite = ProTestSuite("API")
         users_suite = ProTestSuite("Users")
         api_suite.add_suite(users_suite)
@@ -533,7 +533,7 @@ class TestSuiteFilter:
 
     def test_suite_filter_specific_child(self) -> None:
         """Given nested suites, when child suite filter applied, then parent suite tests excluded."""
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         api_suite = ProTestSuite("API")
         users_suite = ProTestSuite("Users")
         api_suite.add_suite(users_suite)
@@ -555,7 +555,7 @@ class TestSuiteFilter:
 
     def test_suite_filter_nonexistent(self) -> None:
         """Given nonexistent suite filter, when session runs, then 0 tests run."""
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         api_suite = ProTestSuite("API")
         session.add_suite(api_suite)
         executed: list[str] = []
@@ -584,7 +584,7 @@ class TestKeywordFilter:
         self, keyword_patterns: list[str], expected_executed: list[str]
     ) -> None:
         """Given tests with different names, when keyword filter applied, then matching tests run."""
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         executed: list[str] = []
 
         @session.test()
@@ -606,7 +606,7 @@ class TestKeywordFilter:
 
     def test_keyword_filter_substring(self) -> None:
         """Given tests with similar names, when keyword filter applied, then all matching substrings run."""
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         executed: list[str] = []
 
         @session.test()
@@ -628,7 +628,7 @@ class TestKeywordFilter:
 
     def test_keyword_filter_multiple_or_logic(self) -> None:
         """Given multiple keyword patterns, when applied, then OR logic is used."""
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         executed: list[str] = []
 
         @session.test()
@@ -654,7 +654,7 @@ class TestSuiteFilterWithTags:
 
     def test_suite_and_include_tag(self) -> None:
         """Given suite tests with different tags, when suite + tag filter applied, then intersection runs."""
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         api_suite = ProTestSuite("API")
         session.add_suite(api_suite)
         executed: list[str] = []
@@ -678,7 +678,7 @@ class TestSuiteFilterWithTags:
 
     def test_suite_and_exclude_tag(self) -> None:
         """Given suite tests with different tags, when suite + exclude tag filter, then intersection runs."""
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         api_suite = ProTestSuite("API")
         session.add_suite(api_suite)
         executed: list[str] = []
@@ -702,7 +702,7 @@ class TestKeywordFilterWithTags:
 
     def test_keyword_and_tag(self) -> None:
         """Given tests with different names and tags, when keyword + tag filter, then intersection runs."""
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         executed: list[str] = []
 
         @session.test(tags=["api"])
@@ -728,7 +728,7 @@ class TestSuiteAndKeywordCombined:
 
     def test_suite_and_keyword(self) -> None:
         """Given suite tests with different names, when suite + keyword filter, then intersection runs."""
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         api_suite = ProTestSuite("API")
         session.add_suite(api_suite)
         executed: list[str] = []
@@ -756,7 +756,7 @@ class TestAllFiltersCombined:
 
     def test_suite_keyword_tag_combined(self) -> None:
         """Given tests in suite with different names and tags, when all filters applied, then intersection runs."""
-        session = ProTestSession(default_reporter=False)
+        session = ProTestSession()
         api_suite = ProTestSuite("API")
         session.add_suite(api_suite)
         executed: list[str] = []

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from argparse import Namespace
 from typing import TYPE_CHECKING
+
+from typing_extensions import Self
 
 from protest.plugin import PluginBase
 
@@ -9,8 +12,22 @@ if TYPE_CHECKING:
 
 
 class SuiteFilterPlugin(PluginBase):
+    """Filters tests based on suite name from target (::SuiteName syntax)."""
+
+    name = "suite-filter"
+    description = "Filter tests by suite name"
+
     def __init__(self, suite_filter: str | None = None) -> None:
         self._suite_filter = suite_filter
+
+    @classmethod
+    def from_cli(cls, args: Namespace) -> Self | None:
+        # Suite filter is extracted from target via parse_target() in CLI
+        # We get it from args._suite_filter which is set by the CLI
+        suite_filter = getattr(args, "_suite_filter", None)
+        if not suite_filter:
+            return None
+        return cls(suite_filter=suite_filter)
 
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
         if not self._suite_filter:

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from argparse import ArgumentParser, Namespace
 from typing import TYPE_CHECKING
+
+from typing_extensions import Self
 
 from protest.plugin import PluginBase
 
@@ -13,6 +16,9 @@ if TYPE_CHECKING:
 class TagFilterPlugin(PluginBase):
     """Filters tests based on include/exclude tags."""
 
+    name = "tag-filter"
+    description = "Filter tests by tags"
+
     def __init__(
         self,
         include_tags: set[str] | None = None,
@@ -20,6 +26,36 @@ class TagFilterPlugin(PluginBase):
     ) -> None:
         self._include_tags = include_tags or set()
         self._exclude_tags = exclude_tags or set()
+
+    @classmethod
+    def add_cli_options(cls, parser: ArgumentParser) -> None:
+        group = parser.add_argument_group(f"{cls.name} - {cls.description}")
+        group.add_argument(
+            "-t",
+            "--tag",
+            dest="tags",
+            action="append",
+            default=[],
+            help="Run only tests with this tag (can be used multiple times, OR logic)",
+        )
+        group.add_argument(
+            "--no-tag",
+            dest="exclude_tags",
+            action="append",
+            default=[],
+            help="Exclude tests with this tag (can be used multiple times)",
+        )
+
+    @classmethod
+    def from_cli(cls, args: Namespace) -> Self | None:
+        tags = getattr(args, "tags", []) or []
+        exclude_tags = getattr(args, "exclude_tags", []) or []
+        if not tags and not exclude_tags:
+            return None
+        return cls(
+            include_tags=set(tags) if tags else None,
+            exclude_tags=set(exclude_tags) if exclude_tags else None,
+        )
 
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
         """Filter items based on tags (OR for include, exclude always applies)."""
