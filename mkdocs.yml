@@ -39,7 +39,11 @@ markdown_extensions:
       anchor_linenums: true
       line_spans: __span
   - pymdownx.inlinehilite
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - admonition
@@ -62,7 +66,8 @@ nav:
       - Reporters: core-concepts/reporters.md
   - CLI Reference: cli.md
   - FAQ: faq.md
-  - Events: internals/events.md
-  - Plugins: internals/plugins.md
-  - Architecture:
+  - Internals:
+      - Events: internals/events.md
       - Event Bus: internals/event-bus.md
+      - Dependency Injection: internals/dependency-injection.md
+      - Plugins: internals/plugins.md

@@ -104,7 +104,8 @@ class TestRunner:
                     setup_duration = time.perf_counter() - setup_start
                     self._session.set_setup_duration(setup_duration)
                     await self._session.events.emit(
-                        Event.SESSION_SETUP_DONE, SessionSetupInfo(duration=setup_duration)
+                        Event.SESSION_SETUP_DONE,
+                        SessionSetupInfo(duration=setup_duration),
                     )
 
                     self._started_suites = set()
