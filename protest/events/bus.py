@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import asyncio
 import logging
+import threading
 import time
+import weakref
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -35,6 +39,48 @@ class EventBus:
     def __init__(self) -> None:
         self._handlers: dict[Event, list[_RegisteredHandler]] = defaultdict(list)
         self._pending_tasks: set[asyncio.Task[None]] = set()
+        # Per-owner locks for sync handler serialization (prevents race conditions).
+        # WeakKeyDictionary ensures locks are garbage collected with their owners.
+        self._owner_locks: weakref.WeakKeyDictionary[
+            object, threading.Lock
+        ] = weakref.WeakKeyDictionary()
+        self._owner_locks_lock = threading.Lock()  # Protects _owner_locks dict
+
+    def _get_owner_lock(self, handler: Callable[..., Any]) -> threading.Lock | None:
+        """Get or create a lock for the handler's owner (plugin instance).
+
+        For bound methods, we serialize calls to the same instance.
+        For plain functions, we return None (no serialization needed).
+        """
+        owner = getattr(handler, "__self__", None)
+        if owner is None:
+            return None  # Plain function, no instance state to protect
+
+        with self._owner_locks_lock:
+            if owner not in self._owner_locks:
+                self._owner_locks[owner] = threading.Lock()
+            return self._owner_locks[owner]
+
+    @staticmethod
+    def _run_sync_with_lock(
+        lock: threading.Lock | None,
+        handler: Callable[..., Any],
+        data: Any,
+    ) -> None:
+        """Execute sync handler with optional lock for serialization."""
+        if lock is None:
+            # Plain function, no serialization needed
+            if data is not None:
+                handler(data)
+            else:
+                handler()
+        else:
+            # Bound method, serialize calls to same instance
+            with lock:
+                if data is not None:
+                    handler(data)
+                else:
+                    handler()
 
     def on(self, event: Event, handler: Callable[..., Any]) -> None:
         """Register a handler for an event."""
@@ -67,10 +113,15 @@ class EventBus:
                     self._pending_tasks.add(task)
                     task.add_done_callback(self._pending_tasks.discard)
                 else:
+                    lock = self._get_owner_lock(handler)
                     if data is not None:
-                        await run_in_threadpool(handler, data)
+                        await run_in_threadpool(
+                            self._run_sync_with_lock, lock, handler, data
+                        )
                     else:
-                        await run_in_threadpool(handler)
+                        await run_in_threadpool(
+                            self._run_sync_with_lock, lock, handler, None
+                        )
                     duration = time.perf_counter() - start_time
                     await self._emit_handler_end(
                         handler_name, event, False, duration, None
