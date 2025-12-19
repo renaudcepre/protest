@@ -6,14 +6,16 @@ import threading
 import time
 import weakref
 from collections import defaultdict
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from protest.entities import HandlerInfo
 from protest.events.types import Event
 from protest.execution.async_bridge import run_in_threadpool
 from protest.utils import get_callable_name
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +43,9 @@ class EventBus:
         self._pending_tasks: set[asyncio.Task[None]] = set()
         # Per-owner locks for sync handler serialization (prevents race conditions).
         # WeakKeyDictionary ensures locks are garbage collected with their owners.
-        self._owner_locks: weakref.WeakKeyDictionary[
-            object, threading.Lock
-        ] = weakref.WeakKeyDictionary()
+        self._owner_locks: weakref.WeakKeyDictionary[object, threading.Lock] = (
+            weakref.WeakKeyDictionary()
+        )
         self._owner_locks_lock = threading.Lock()  # Protects _owner_locks dict
 
     def _get_owner_lock(self, handler: Callable[..., Any]) -> threading.Lock | None:
