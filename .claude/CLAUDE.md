@@ -63,57 +63,68 @@ entities/
 
 Import canonique: `from protest.entities import Fixture, TestResult, ...`
 
-## Tree-based Scoping Architecture
+## Scope at Binding Architecture
 
-Le scope des fixtures est déterminé par **où** elles sont décorées, pas par un enum.
+Le scope des fixtures est déterminé par **où elles sont liées**, pas par le décorateur.
+Les décorateurs définissent uniquement les **propriétés intrinsèques** (tags, cache, managed).
+
 **IMPORTANT** : Toutes les fixtures doivent être décorées (pas de plain functions).
 
 ```python
-# Session scope - vit pendant toute la session
-@session.fixture()
+from protest import fixture, factory
+
+# Session scope - lié via session.fixture()
+@fixture(tags=["database"])
 def database():
     yield connect()
 
-# Suite scope - vit pendant l'exécution de la suite
-@api_suite.fixture()
+session.fixture(database)  # → SESSION scope
+
+# Suite scope - lié via suite.fixture()
+@fixture()
 def api_client(db: Annotated[DB, Use(database)]):
     return Client(db)
 
-# Test scope - décorateur libre @fixture()
-@fixture(tags=["database"])
+api_suite.fixture(api_client)  # → SUITE scope
+
+# Test scope (défaut) - pas de binding
+@fixture()
 def db_session():
     yield Session()
+# Non lié → TEST scope automatique
 
-# Test scope - décorateur @fixture() sans tags
 @fixture()
 def payload():
     return {"name": "test"}
+# Non lié → TEST scope automatique
 ```
 
 Les plain functions (sans décorateur) lèvent `PlainFunctionError` quand utilisées avec `Use()`.
 
 ### Autouse Fixtures
 
-Fixtures auto-résolues au démarrage de leur scope, sans être explicitement demandées :
+Fixtures auto-résolues au démarrage de leur scope, via `autouse=True` au binding :
 
 ```python
 # Session autouse - résolu à SESSION_SETUP_START
-@session.autouse()
+@fixture()
 def configure_logging():
     logging.basicConfig(level=logging.DEBUG)
     yield
     logging.shutdown()
 
+session.fixture(configure_logging, autouse=True)  # autouse au binding
+
 # Suite autouse - résolu quand la suite démarre (avant son premier test)
-@api_suite.autouse()
+@fixture()
 def clean_environment():
     old = os.environ.copy()
     os.environ.clear()
     yield
     os.environ.update(old)
-```
 
-**Pas de test-scope autouse** - ça n'a pas de sens sémantique.
+api_suite.fixture(clean_environment, autouse=True)  # autouse au binding
+```
 
 Quand utiliser autouse :
 - Side effects nécessaires pour tous les tests (logging, env setup)
@@ -184,11 +195,13 @@ Deux patterns disponibles :
 
 **Managed (défaut)** - ProTest gère le cycle de vie via `FixtureFactory`:
 ```python
-@session.factory()  # ou @factory() pour test scope
+@factory()  # cache=False, managed=True par défaut
 def user(name: str, role: str = "guest") -> User:
     user = User.create(name=name, role=role)
     yield user
     user.delete()  # Teardown automatique par instance
+
+session.fixture(user)  # → SESSION scope
 
 # Usage - async obligatoire
 alice = await user_factory(name="alice")
@@ -197,9 +210,11 @@ bob = await user_factory(name="bob")
 
 **Non-managed** - Tu retournes ta propre classe factory:
 ```python
-@factory(managed=False)  # ou @session.factory(managed=False)
+@factory(managed=False)
 def user_factory(db: Annotated[Session, Use(db_session)]) -> UserFactory:
     return UserFactory(db=db)
+
+session.fixture(user_factory)  # → SESSION scope
 
 # Usage - sync, méthodes custom
 alice = factory.create(name="alice")
@@ -233,11 +248,12 @@ ProTestError (base)
 
 ## Design Decisions
 
-### Pourquoi tree-based au lieu de Scope enum?
+### Pourquoi Scope at Binding ?
 
-- Plus intuitif: le scope est visible par où on décore
-- Supporte naturellement les suites imbriquées
-- API plus élégante: `@session.fixture()` vs `@fixture(scope=Scope.SESSION)`
+- **Évite les scope mismatches** : le scope est déterminé au binding, pas à la définition
+- **Séparation des préoccupations** : décorateur = propriétés intrinsèques, binding = contexte
+- **Explicite** : `session.fixture(fn)` rend visible où chaque fixture est liée
+- **Flexible** : même fixture peut être liée avec différents scopes (pas recommandé mais possible)
 
 ### Pourquoi Use(ref) au lieu de Use("name")?
 
@@ -272,8 +288,10 @@ Le système de tags permet de filtrer les tests. Les tags sont **propagés trans
 api_suite = ProTestSuite("API", tags=["api", "integration"])
 
 # Tags sur une fixture (propagés aux tests qui l'utilisent)
-@session.fixture(tags=["database"])
+@fixture(tags=["database"])
 def db(): ...
+
+session.fixture(db)  # SESSION scope
 
 # Tags sur un test
 @api_suite.test(tags=["slow"])
@@ -308,7 +326,8 @@ protest tags list -r demo:session                # Tags effectifs par test
 
 ### Points d'attention
 
-- Toutes les fixtures doivent être décorées (`@fixture()`, `@session.fixture()`, `@suite.fixture()`)
+- Toutes les fixtures doivent être décorées avec `@fixture()` ou `@factory()`
+- Session/Suite fixtures doivent être liées via `session.fixture()` ou `suite.fixture()`
 - Les tags de suites sont hérités par les suites enfants
 - La propagation via fixtures est **transitive** : si A dépend de B qui dépend de C tagué "x", A hérite "x"
 

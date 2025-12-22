@@ -7,13 +7,15 @@ Factories create configurable fixture instances with automatic caching and teard
 A factory is a fixture that accepts arguments and can be called multiple times:
 
 ```python
-from protest import FixtureFactory, Use
+from protest import factory, FixtureFactory, FixtureScope, Use
 
-@session.factory()
+@factory(scope=FixtureScope.SESSION)
 def user(name: str, role: str = "guest"):
     print(f"Creating user {name}")
     yield {"name": name, "role": role}
     print(f"Deleting user {name}")
+
+session.use_fixtures([user])
 
 @session.test()
 async def test_users(
@@ -28,8 +30,9 @@ async def test_users(
 
 Key points:
 
-- Use `@session.factory()` or `@suite.factory()` for scoped factories
-- Use `@factory()` for function-scoped factories
+- Use `@factory(scope=FixtureScope.SESSION)` or `@factory(scope=FixtureScope.SUITE)` for scoped factories
+- Use `@factory()` for test-scoped factories
+- Bind to session/suite with `use_fixtures([...])`
 - The test receives a `FixtureFactory[T]`, not the value directly
 - Call the factory with `await` - it's always async
 - Each call can pass different arguments
@@ -54,11 +57,13 @@ async def test_caching(user_factory: Annotated[FixtureFactory[dict], Use(user)])
 Factories with `yield` get automatic cleanup in LIFO order:
 
 ```python
-@session.factory()
+@factory(scope=FixtureScope.SESSION)
 def user(name: str, role: str = "guest"):
     user = db.create_user(name, role)
     yield user
     db.delete_user(user.id)  # Cleanup runs for each created instance
+
+session.use_fixtures([user])
 ```
 
 If a test creates `alice` then `bob`, teardown runs `bob` first, then `alice`.
@@ -68,11 +73,13 @@ If a test creates `alice` then `bob`, teardown runs `bob` first, then `alice`.
 Factories can depend on other fixtures:
 
 ```python
-@session.fixture()
+@fixture(scope=FixtureScope.SESSION)
 def database():
     return Database()
 
-@session.factory()
+session.use_fixtures([database])
+
+@factory(scope=FixtureScope.SESSION)
 def user(
     db: Annotated[Database, Use(database)],
     name: str,
@@ -81,6 +88,8 @@ def user(
     user = db.insert_user(name, role)
     yield user
     db.delete_user(user.id)
+
+session.use_fixtures([user])
 ```
 
 ## Error Handling

@@ -50,9 +50,28 @@ class TestRegistration:
     retry: Retry | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class FixtureMarker:
+    """Marker attached to decorated fixture functions (_protest_fixture attribute).
+
+    This enables the "Scope at Binding" pattern: decorators mark functions with
+    intrinsic properties (is_factory, cache, managed, tags). Scope and autouse
+    are determined at binding time via session.fixture() or suite.fixture().
+    """
+
+    is_factory: bool = False
+    cache: bool = True
+    managed: bool = True
+    tags: frozenset[str] = field(default_factory=frozenset)
+
+
 @dataclass(slots=True)
 class FixtureRegistration:
-    """Registration info for a fixture before it's added to the resolver."""
+    """Registration info for a fixture before it's added to the resolver.
+
+    Note: This is the legacy registration mechanism used by @session.fixture()
+    and @suite.fixture(). New code should use FixtureMarker instead.
+    """
 
     func: FixtureCallable
     is_factory: bool = False

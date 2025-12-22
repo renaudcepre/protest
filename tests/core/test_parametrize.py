@@ -8,6 +8,7 @@ import pytest
 from protest import ForEach, From, ProTestSession, ProTestSuite, Use
 from protest.core.collector import Collector
 from protest.core.runner import TestRunner
+from protest.di.decorators import fixture
 
 
 @dataclass
@@ -125,9 +126,11 @@ class TestParameterizedCollection:
     def test_foreach_with_fixtures(self) -> None:
         session = ProTestSession()
 
-        @session.fixture()
+        @fixture()
         def multiplier() -> int:
             return 10
+
+        session.fixture(multiplier)
 
         numbers = ForEach([1, 2, 3])
 
@@ -254,9 +257,11 @@ class TestParameterizedExecution:
         session = ProTestSession()
         results: list[int] = []
 
-        @session.fixture()
+        @fixture()
         def multiplier() -> int:
             return 10
+
+        session.fixture(multiplier)
 
         numbers = ForEach([1, 2, 3])
 

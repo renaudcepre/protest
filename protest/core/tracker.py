@@ -18,12 +18,29 @@ class SuiteTracker:
 
     @classmethod
     def from_items(cls, items: list[TestItem]) -> SuiteTracker:
-        """Build tracker from collected test items."""
+        """Build tracker from collected test items.
+
+        Counts include descendant tests: a parent suite's count includes
+        all tests from child suites, ensuring proper teardown ordering.
+        Parent suites only complete when ALL descendant tests are done.
+        """
         tracker = cls()
         for item in items:
-            suite_path = item.suite.full_path if item.suite else None
-            tracker._counts[suite_path] = tracker._counts.get(suite_path, 0) + 1
-            tracker._completed[suite_path] = 0
+            # Walk up the suite hierarchy, counting for each ancestor
+            suite = item.suite
+            while suite:
+                suite_path = suite.full_path
+                tracker._counts[suite_path] = tracker._counts.get(suite_path, 0) + 1
+                if suite_path not in tracker._completed:
+                    tracker._completed[suite_path] = 0
+                suite = suite._parent_suite
+
+            # Also track standalone tests (no suite)
+            if item.suite is None:
+                tracker._counts[None] = tracker._counts.get(None, 0) + 1
+                if None not in tracker._completed:
+                    tracker._completed[None] = 0
+
         return tracker
 
     async def mark_completed(self, suite_path: str | None) -> bool:

@@ -9,14 +9,16 @@ from rich.text import Text  # type: ignore[import-not-found]
 from typing_extensions import Self
 
 from protest.entities import (
-    FixtureInfo,
     HandlerInfo,
     SessionResult,
+    SessionSetupInfo,
     SuiteResult,
+    SuiteSetupInfo,
     TestItem,
     TestResult,
     TestRetryInfo,
-    format_fixture_scope,
+    TestStartInfo,
+    TestTeardownInfo,
 )
 from protest.plugin import PluginBase, PluginContext
 
@@ -53,8 +55,6 @@ class RichReporter(PluginBase):
         self._total_tests = 0
         self._failed_results: list[TestResult] = []
         self._error_results: list[TestResult] = []
-        self._setup_started: set[str] = set()
-        self._teardown_started: set[str] = set()
 
         self._live: Live | None = None
         self._start_time: float = 0
@@ -145,17 +145,23 @@ class RichReporter(PluginBase):
 
         return items
 
-    def on_fixture_setup_start(self, info: FixtureInfo) -> None:
-        display = format_fixture_scope(info.scope, info.scope_path)
-        if display not in self._setup_started:
-            self._print(f"[yellow]  {display} setup...[/]")
-            self._setup_started.add(display)
+    def on_session_setup_done(self, info: SessionSetupInfo) -> None:
+        self._print("[dim]  session setup...[/]")
 
-    def on_fixture_teardown_start(self, info: FixtureInfo) -> None:
-        display = format_fixture_scope(info.scope, info.scope_path)
-        if display not in self._teardown_started:
-            self._print(f"[yellow]  {display} teardown...[/]")
-            self._teardown_started.add(display)
+    def on_suite_setup_done(self, info: SuiteSetupInfo) -> None:
+        self._print(f"[dim]  suite '{info.name}' setup...[/]")
+
+    def on_test_setup_done(self, info: TestStartInfo) -> None:
+        self._print("[dim]  test setup...[/]")
+
+    def on_session_teardown_start(self) -> None:
+        self._print("[dim]  session teardown...[/]")
+
+    def on_suite_teardown_start(self, name: str) -> None:
+        self._print(f"[dim]  suite '{name}' teardown...[/]")
+
+    def on_test_teardown_start(self, info: TestTeardownInfo) -> None:
+        self._print("[dim]  test teardown...[/]")
 
     def on_suite_end(self, result: SuiteResult) -> None:
         if result.teardown_duration > 0:
