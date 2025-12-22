@@ -13,6 +13,7 @@ import pytest
 
 from protest import ProTestSession, ProTestSuite, Retry
 from protest.core.runner import TestRunner
+from protest.di.decorators import fixture
 from protest.di.markers import Use
 from protest.events.types import Event
 
@@ -509,9 +510,11 @@ class TestRetriesWithFixtureErrors:
         session.events.on(Event.TEST_FAIL, lambda result: results.append(result))
         session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
-        @session.fixture()
+        @fixture()
         def broken_fixture() -> str:
             raise RuntimeError("Fixture broken")
+
+        session.fixture(broken_fixture)
 
         @session.test(retry=3)
         def test_with_broken_fixture(

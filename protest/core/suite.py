@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypeVar
 
+from protest.di.decorators import unwrap_fixture
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from protest.core.session import ProTestSession
 
-from protest.di.decorators import FixtureWrapper
-from protest.di.validation import validate_no_from_params
+from protest.di.decorators import get_fixture_marker
 from protest.entities import (
     FixtureRegistration,
     Retry,
@@ -139,76 +140,6 @@ class ProTestSuite:
 
         return decorator
 
-    def fixture(
-        self,
-        tags: list[str] | None = None,
-    ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
-        """Register a fixture scoped to this suite."""
-
-        def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
-            validate_no_from_params(func)
-            fixture_tags = set(tags) if tags else set()
-            registration = FixtureRegistration(
-                func=func,
-                is_factory=False,
-                cache=True,
-                managed=True,
-                tags=fixture_tags,
-            )
-            self._fixtures.append(registration)
-            return FixtureWrapper(func, registration)
-
-        return decorator
-
-    def autouse(
-        self,
-        tags: list[str] | None = None,
-    ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
-        """Register an autouse fixture scoped to this suite.
-
-        Autouse fixtures are resolved when the suite starts (before its first test).
-        They can depend on session fixtures or parent suite fixtures.
-        """
-
-        def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
-            validate_no_from_params(func)
-            fixture_tags = set(tags) if tags else set()
-            registration = FixtureRegistration(
-                func=func,
-                is_factory=False,
-                cache=True,
-                managed=True,
-                tags=fixture_tags,
-                autouse=True,
-            )
-            self._fixtures.append(registration)
-            return FixtureWrapper(func, registration)
-
-        return decorator
-
-    def factory(
-        self,
-        cache: bool = False,
-        managed: bool = True,
-        tags: list[str] | None = None,
-    ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
-        """Register a factory fixture scoped to this suite."""
-
-        def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
-            validate_no_from_params(func)
-            fixture_tags = set(tags) if tags else set()
-            registration = FixtureRegistration(
-                func=func,
-                is_factory=True,
-                cache=cache,
-                managed=managed,
-                tags=fixture_tags,
-            )
-            self._fixtures.append(registration)
-            return FixtureWrapper(func, registration)
-
-        return decorator
-
     def add_suite(self, suite: ProTestSuite) -> None:
         """Add a child suite. Child can access parent's fixtures."""
         parent_effective = self.effective_max_concurrency
@@ -226,6 +157,57 @@ class ProTestSuite:
         if self._session:
             suite._attach_to_session(self._session)
         self._suites.append(suite)
+
+    def fixture(
+        self,
+        fn: Callable[..., object],
+        autouse: bool = False,
+    ) -> None:
+        """Bind a fixture to this suite (SUITE scope).
+
+        The fixture must be decorated with @fixture() or @factory().
+        Scope is determined by this binding - no scope declaration needed
+        on the decorator.
+
+        Fixtures bound here will be:
+        - Cached once per this suite (not per child suite)
+        - Accessible to all tests in this suite AND child suites
+        - Torn down when this suite completes
+
+        Args:
+            fn: Function decorated with @fixture() or @factory().
+            autouse: If True, resolve automatically when suite starts.
+
+        Raises:
+            ValueError: If the function is not decorated with @fixture/@factory.
+
+        Example:
+            @fixture()
+            def api_client():
+                yield Client()
+
+            api_suite = ProTestSuite("API")
+            api_suite.fixture(api_client)  # SUITE scope
+            api_suite.fixture(setup_env, autouse=True)  # SUITE + auto-resolve
+        """
+
+        actual_func = unwrap_fixture(fn)
+        marker = get_fixture_marker(fn)
+        if marker is None:
+            raise ValueError(
+                f"Function '{actual_func.__name__}' is not decorated with "
+                "@fixture() or @factory(). Use the decorator first."
+            )
+
+        registration = FixtureRegistration(
+            func=actual_func,
+            is_factory=marker.is_factory,
+            cache=marker.cache,
+            managed=marker.managed,
+            tags=set(marker.tags),
+            autouse=autouse,
+        )
+        self._fixtures.append(registration)
 
     def _attach_to_session(self, session: ProTestSession) -> None:
         self._session = session

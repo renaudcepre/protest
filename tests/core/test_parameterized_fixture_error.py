@@ -4,7 +4,8 @@ from typing import Annotated
 
 import pytest
 
-from protest import ForEach, From, ProTestSession, ProTestSuite, factory, fixture
+from protest import ForEach, From, ProTestSession, ProTestSuite
+from protest.di.decorators import factory, fixture
 from protest.exceptions import ParameterizedFixtureError
 
 ROLES = ForEach(["admin", "guest"])
@@ -12,11 +13,11 @@ ROLES = ForEach(["admin", "guest"])
 
 class TestSessionFixture:
     def test_fixture_with_from_raises_error(self) -> None:
-        session = ProTestSession()
+        ProTestSession()
 
         with pytest.raises(ParameterizedFixtureError) as exc_info:
 
-            @session.fixture()
+            @fixture()
             def bad_fixture(role: Annotated[str, From(ROLES)]) -> dict[str, str]:
                 return {"role": role}
 
@@ -25,11 +26,11 @@ class TestSessionFixture:
         assert "From() is only allowed in tests" in str(exc_info.value)
 
     def test_factory_with_from_raises_error(self) -> None:
-        session = ProTestSession()
+        ProTestSession()
 
         with pytest.raises(ParameterizedFixtureError) as exc_info:
 
-            @session.factory()
+            @factory()
             def bad_factory(role: Annotated[str, From(ROLES)]) -> dict[str, str]:
                 return {"role": role}
 
@@ -38,22 +39,22 @@ class TestSessionFixture:
 
 class TestSuiteFixture:
     def test_fixture_with_from_raises_error(self) -> None:
-        suite = ProTestSuite("test")
+        ProTestSuite("test")
 
         with pytest.raises(ParameterizedFixtureError) as exc_info:
 
-            @suite.fixture()
+            @fixture()
             def bad_fixture(role: Annotated[str, From(ROLES)]) -> dict[str, str]:
                 return {"role": role}
 
         assert "bad_fixture" in str(exc_info.value)
 
     def test_factory_with_from_raises_error(self) -> None:
-        suite = ProTestSuite("test")
+        ProTestSuite("test")
 
         with pytest.raises(ParameterizedFixtureError) as exc_info:
 
-            @suite.factory()
+            @factory()
             def bad_factory(role: Annotated[str, From(ROLES)]) -> dict[str, str]:
                 return {"role": role}
 
@@ -82,12 +83,12 @@ class TestStandaloneDecorators:
 
 class TestMultipleFromParams:
     def test_error_lists_all_params(self) -> None:
-        session = ProTestSession()
+        ProTestSession()
         methods = ForEach(["GET", "POST"])
 
         with pytest.raises(ParameterizedFixtureError) as exc_info:
 
-            @session.fixture()
+            @fixture()
             def bad_fixture(
                 role: Annotated[str, From(ROLES)],
                 method: Annotated[str, From(methods)],
@@ -103,17 +104,21 @@ class TestValidFixtures:
     def test_fixture_without_from_works(self) -> None:
         session = ProTestSession()
 
-        @session.fixture()
+        @fixture()
         def good_fixture() -> str:
             return "ok"
+
+        session.fixture(good_fixture)
 
         assert len(session.fixtures) == 1
 
     def test_factory_without_from_works(self) -> None:
         session = ProTestSession()
 
-        @session.factory()
+        @factory()
         def good_factory(name: str) -> dict[str, str]:
             return {"name": name}
+
+        session.fixture(good_factory)
 
         assert len(session.fixtures) == 1

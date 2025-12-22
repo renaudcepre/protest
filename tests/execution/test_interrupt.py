@@ -6,7 +6,7 @@ from typing import Annotated
 
 import pytest
 
-from protest import ProTestSession, Use
+from protest import ProTestSession, Use, fixture
 from protest.core.runner import TestRunner
 from protest.execution.interrupt import InterruptHandler, InterruptState
 
@@ -242,10 +242,12 @@ class TestRunnerInterruptIntegration:
         session = ProTestSession()
         teardown_called: list[str] = []
 
-        @session.fixture()
+        @fixture()
         def resource() -> str:
             yield "value"
             teardown_called.append("cleaned")
+
+        session.fixture(resource)
 
         @session.test()
         def test_with_fixture(res: Annotated[str, Use(resource)]) -> None:

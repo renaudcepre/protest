@@ -4,6 +4,7 @@ from typing import Annotated
 
 from protest import FixtureFactory, ProTestSession, Use
 from protest.core.runner import TestRunner
+from protest.di.decorators import factory
 from protest.plugin import PluginBase
 from tests.conftest import CollectedEvents
 
@@ -18,9 +19,11 @@ class TestFactoryErrorDistinction:
         session = ProTestSession()
         session.register_plugin(plugin)
 
-        @session.factory()
+        @factory()
         def user(username: str) -> dict[str, str]:
             raise RuntimeError("DB unavailable")
+
+        session.fixture(user)
 
         @session.test()
         async def test_using_factory(
@@ -97,11 +100,13 @@ class TestFactoryErrorDistinction:
         session = ProTestSession()
         session.register_plugin(plugin)
 
-        @session.factory()
+        @factory()
         def user(username: str, fail: bool = False) -> dict[str, str]:
             if fail:
                 raise RuntimeError("Factory failed")
             return {"name": username}
+
+        session.fixture(user)
 
         @session.test()
         def test_passing() -> None:
@@ -139,9 +144,11 @@ class TestFactoryErrorPreservesOriginal:
         session = ProTestSession()
         session.register_plugin(plugin)
 
-        @session.factory()
+        @factory()
         def user(username: str) -> dict[str, str]:
             raise ValueError("Custom message with details")
+
+        session.fixture(user)
 
         @session.test()
         async def test_it(
@@ -168,9 +175,11 @@ class TestAsyncFactoryErrors:
         session = ProTestSession()
         session.register_plugin(plugin)
 
-        @session.factory()
+        @factory()
         async def user(username: str) -> dict[str, str]:
             raise ConnectionError("API timeout")
+
+        session.fixture(user)
 
         @session.test()
         async def test_async_factory(
@@ -200,10 +209,12 @@ class TestFactoryWithTeardown:
 
         teardown_called = []
 
-        @session.factory()
+        @factory()
         def user(username: str) -> dict[str, str]:
             yield {"name": username}
             teardown_called.append(username)
+
+        session.fixture(user)
 
         @session.test()
         async def test_create_users(
@@ -233,11 +244,13 @@ class TestFactoryCaching:
 
         call_count = 0
 
-        @session.factory(cache=True)
+        @factory(cache=True)
         def user(username: str) -> dict[str, str]:
             nonlocal call_count
             call_count += 1
             return {"name": username, "call": call_count}
+
+        session.fixture(user)
 
         @session.test()
         async def test_caching(
@@ -266,11 +279,13 @@ class TestFactoryCaching:
 
         call_count = 0
 
-        @session.factory(cache=False)
+        @factory(cache=False)
         def user(username: str) -> dict[str, str]:
             nonlocal call_count
             call_count += 1
             return {"name": username, "call": call_count}
+
+        session.fixture(user)
 
         @session.test()
         async def test_no_caching(

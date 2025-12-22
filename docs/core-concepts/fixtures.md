@@ -7,41 +7,50 @@ Fixtures provide reusable setup and teardown logic for tests.
 A fixture is a function that provides a value to tests. It can be a simple function or include cleanup logic.
 
 ```python
+@fixture()
 def config():
     return {"debug": True}
 ```
 
 ## Scopes
 
-Fixture scope is determined by **where** you define it, not by a parameter.
+Fixture scope is determined by the `scope` parameter in the decorator.
 
 ### Session Scope
 
-Defined with `@session.fixture()`. Lives for the entire test session.
+Defined with `@fixture(scope=FixtureScope.SESSION)`. Lives for the entire test session.
 
 ```python
-@session.fixture()
+from protest import fixture, FixtureScope
+
+@fixture(scope=FixtureScope.SESSION)
 async def database():
     db = await connect()
     yield db
     await db.close()
+
+# Bind to session
+session.use_fixtures([database])
 ```
 
 Use case: Expensive resources shared across all tests (database connections, HTTP clients).
 
 ### Suite Scope
 
-Defined with `@suite.fixture()`. Lives for the duration of the suite.
+Defined with `@fixture(scope=FixtureScope.SUITE)`. Lives for the duration of the suite.
 
 ```python
-@api_suite.fixture()
+@fixture(scope=FixtureScope.SUITE)
 def api_client(db: Annotated[Database, Use(database)]):
     return Client(db)
+
+# Bind to suite
+api_suite.use_fixtures([api_client])
 ```
 
 Use case: Resources shared within a group of related tests.
 
-### Function Scope
+### Test Scope (Default)
 
 Use `@fixture()` decorator. Fresh instance for each test.
 
@@ -68,7 +77,7 @@ Use case: Isolated state per test, unique IDs, temporary files.
 Use `yield` to separate setup from teardown:
 
 ```python
-@session.fixture()
+@fixture(scope=FixtureScope.SESSION)
 async def database():
     # Setup
     db = await connect()
@@ -77,6 +86,8 @@ async def database():
 
     # Teardown (runs even if test fails)
     await db.close()
+
+session.use_fixtures([database])
 ```
 
 Teardown runs in reverse order (LIFO). If multiple fixtures are used, the last one set up is the first one torn down.
@@ -89,7 +100,7 @@ A fixture can only depend on fixtures with equal or wider scope:
 |---------------|---------------|
 | Session | Session only |
 | Suite | Session, parent suites, same suite |
-| Function | Anything |
+| Test | Anything |
 
 Violating this raises `ScopeMismatchError`:
 
@@ -98,7 +109,7 @@ Violating this raises `ScopeMismatchError`:
 def function_scoped():
     return "per-test"
 
-@session.fixture()
+@fixture(scope=FixtureScope.SESSION)
 def session_scoped(x: Annotated[str, Use(function_scoped)]):
     # ERROR: session fixture can't depend on function-scoped
     return x
@@ -127,32 +138,50 @@ Autouse fixtures are automatically resolved at their scope start, without being 
 
 ### Session Autouse
 
-Use `@session.autouse()` for fixtures that must run before any test:
+Use `@fixture(scope=FixtureScope.SESSION, autouse=True)` for fixtures that must run before any test:
 
 ```python
-@session.autouse()
+@fixture(scope=FixtureScope.SESSION, autouse=True)
 def configure_logging():
     logging.basicConfig(level=logging.DEBUG)
     yield
     logging.shutdown()
+
+session.use_fixtures([configure_logging])
 ```
 
 Session autouse fixtures are resolved at `SESSION_SETUP_START`, before any test runs.
 
 ### Suite Autouse
 
-Use `@suite.autouse()` for fixtures that must run when a suite starts:
+Use `@fixture(scope=FixtureScope.SUITE, autouse=True)` for fixtures that must run when a suite starts:
 
 ```python
-@api_suite.autouse()
+@fixture(scope=FixtureScope.SUITE, autouse=True)
 def clear_environment():
     old = os.environ.copy()
     os.environ.clear()
     yield
     os.environ.update(old)
+
+api_suite.use_fixtures([clear_environment])
 ```
 
 Suite autouse fixtures are resolved when the suite starts (before its first test). For nested suites, parent autouse fixtures run before child autouse fixtures.
+
+### Test Autouse
+
+Use `@fixture(autouse=True)` for fixtures that must run at the start of every test:
+
+```python
+@fixture(autouse=True)
+def reset_state():
+    global_cache.clear()
+    yield
+    global_cache.clear()
+```
+
+Test autouse fixtures are resolved before each test runs.
 
 ### When to Use Autouse
 
@@ -163,10 +192,3 @@ Use autouse when:
 - You want to ensure setup/teardown runs **regardless** of which tests are selected
 
 Don't use autouse when tests need the fixture's value - use explicit `Use()` instead.
-
-### Function-scope Autouse
-
-There is no `@fixture(autouse=True)` for function scope. It doesn't make semantic sense - if you need something for every test, either:
-
-- Make it a suite/session autouse fixture
-- Add it explicitly to each test with `Use()`

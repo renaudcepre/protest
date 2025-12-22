@@ -4,6 +4,7 @@ from typing import Annotated
 
 from protest import ProTestSession, Use
 from protest.core.runner import TestRunner
+from protest.di.decorators import factory, fixture
 from protest.plugin import PluginBase
 from tests.conftest import CollectedEvents
 
@@ -43,9 +44,11 @@ class TestUnmanagedFactoryBasic:
         session = ProTestSession()
         session.register_plugin(plugin)
 
-        @session.factory(managed=False)
+        @factory(managed=False)
         def user_factory() -> UserFactory:
             return UserFactory(db="test_db")
+
+        session.fixture(user_factory)
 
         @session.test()
         def test_use_factory(
@@ -75,9 +78,11 @@ class TestUnmanagedFactoryErrorHandling:
         session = ProTestSession()
         session.register_plugin(plugin)
 
-        @session.factory(managed=False)
+        @factory(managed=False)
         def user_factory() -> FailingUserFactory:
             return FailingUserFactory()
+
+        session.fixture(user_factory)
 
         @session.test()
         def test_trigger_factory_error(
@@ -104,9 +109,11 @@ class TestUnmanagedFactoryErrorHandling:
         session = ProTestSession()
         session.register_plugin(plugin)
 
-        @session.factory(managed=False)
+        @factory(managed=False)
         def user_factory() -> UserFactory:
             return UserFactory(db="test_db")
+
+        session.fixture(user_factory)
 
         @session.test()
         def test_assertion_failure(
@@ -135,15 +142,18 @@ class TestUnmanagedFactoryWithDependencies:
         session = ProTestSession()
         session.register_plugin(plugin)
 
-        @session.fixture()
+        @fixture()
         def database() -> str:
             return "postgres://localhost"
 
-        @session.factory(managed=False)
+        @factory(managed=False)
         def user_factory(
             db: Annotated[str, Use(database)],
         ) -> UserFactory:
             return UserFactory(db=db)
+
+        session.fixture(database)
+        session.fixture(user_factory)
 
         @session.test()
         def test_factory_has_db(
@@ -171,11 +181,13 @@ class TestUnmanagedFactoryWithTeardown:
 
         teardown_called = []
 
-        @session.factory(managed=False)
+        @factory(managed=False)
         def user_factory() -> UserFactory:
             factory = UserFactory(db="test_db")
             yield factory
             teardown_called.append(factory.created.copy())
+
+        session.fixture(user_factory)
 
         @session.test()
         def test_create_users(

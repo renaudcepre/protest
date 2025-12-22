@@ -13,11 +13,11 @@ if TYPE_CHECKING:
 
 from protest.cache.plugin import CachePlugin
 from protest.cache.storage import CacheStorage
-from protest.di.decorators import FixtureWrapper
+from protest.di.decorators import get_fixture_marker
 from protest.di.resolver import Resolver
-from protest.di.validation import validate_no_from_params
 from protest.entities import (
     FixtureRegistration,
+    FixtureScope,
     Retry,
     Skip,
     TestRegistration,
@@ -161,76 +161,6 @@ class ProTestSession:
 
         return decorator
 
-    def fixture(
-        self,
-        tags: list[str] | None = None,
-    ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
-        """Register a fixture scoped to the session (lives entire session)."""
-
-        def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
-            validate_no_from_params(func)
-            fixture_tags = set(tags) if tags else set()
-            registration = FixtureRegistration(
-                func=func,
-                is_factory=False,
-                cache=True,
-                managed=True,
-                tags=fixture_tags,
-            )
-            self._fixtures.append(registration)
-            return FixtureWrapper(func, registration)
-
-        return decorator
-
-    def autouse(
-        self,
-        tags: list[str] | None = None,
-    ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
-        """Register an autouse fixture scoped to the session.
-
-        Autouse fixtures are resolved at session start before any test runs.
-        They can have dependencies on other session fixtures.
-        """
-
-        def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
-            validate_no_from_params(func)
-            fixture_tags = set(tags) if tags else set()
-            registration = FixtureRegistration(
-                func=func,
-                is_factory=False,
-                cache=True,
-                managed=True,
-                tags=fixture_tags,
-                autouse=True,
-            )
-            self._fixtures.append(registration)
-            return FixtureWrapper(func, registration)
-
-        return decorator
-
-    def factory(
-        self,
-        cache: bool = False,
-        managed: bool = True,
-        tags: list[str] | None = None,
-    ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
-        """Register a factory fixture scoped to the session."""
-
-        def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
-            validate_no_from_params(func)
-            fixture_tags = set(tags) if tags else set()
-            registration = FixtureRegistration(
-                func=func,
-                is_factory=True,
-                cache=cache,
-                managed=managed,
-                tags=fixture_tags,
-            )
-            self._fixtures.append(registration)
-            return FixtureWrapper(func, registration)
-
-        return decorator
-
     def add_suite(self, suite: ProTestSuite) -> None:
         """Add a suite to this session."""
         suite._attach_to_session(self)
@@ -239,6 +169,53 @@ class ProTestSession:
     def include_suite(self, suite: ProTestSuite) -> None:
         """Alias for add_suite (backward compatibility)."""
         self.add_suite(suite)
+
+    def fixture(
+        self,
+        fn: FixtureCallable,
+        autouse: bool = False,
+    ) -> None:
+        """Bind a fixture to this session (SESSION scope).
+
+        The fixture must be decorated with @fixture() or @factory().
+        Scope is determined by this binding - no scope declaration needed
+        on the decorator.
+
+        Args:
+            fn: Function decorated with @fixture() or @factory().
+            autouse: If True, resolve automatically at session start.
+
+        Raises:
+            ValueError: If the function is not decorated with @fixture/@factory.
+
+        Example:
+            @fixture()
+            def database():
+                yield connect()
+
+            session = ProTestSession()
+            session.fixture(database)  # SESSION scope
+            session.fixture(config, autouse=True)  # SESSION + auto-resolve
+        """
+        from protest.di.decorators import unwrap_fixture
+
+        actual_func = unwrap_fixture(fn)
+        marker = get_fixture_marker(fn)
+        if marker is None:
+            raise ValueError(
+                f"Function '{actual_func.__name__}' is not decorated with "
+                "@fixture() or @factory(). Use the decorator first."
+            )
+
+        registration = FixtureRegistration(
+            func=actual_func,
+            is_factory=marker.is_factory,
+            cache=marker.cache,
+            managed=marker.managed,
+            tags=set(marker.tags),
+            autouse=autouse,
+        )
+        self._fixtures.append(registration)
 
     def use(self, plugin_class: type[PluginBase]) -> None:
         """Register a plugin class for CLI discovery.
@@ -315,7 +292,7 @@ class ProTestSession:
         for reg in self._fixtures:
             self._resolver.register(
                 reg.func,
-                scope_path=None,
+                scope=FixtureScope.SESSION,
                 is_factory=reg.is_factory,
                 cache=reg.cache,
                 managed=reg.managed,
@@ -327,17 +304,23 @@ class ProTestSession:
         self._register_suite_fixtures(self._suites)
 
     def _register_suite_fixtures(self, suites: list[ProTestSuite]) -> None:
-        """Recursively register fixtures from suites."""
+        """Recursively register fixtures from suites.
+
+        Each fixture is registered with its owner suite's full_path. This determines:
+        - The cache key (fixtures cached per owner suite, not per test suite)
+        - Access control (only tests in this suite or child suites can access)
+        """
         for suite in suites:
             for reg in suite.fixtures:
                 self._resolver.register(
                     reg.func,
-                    scope_path=suite.full_path,
+                    scope=FixtureScope.SUITE,
                     is_factory=reg.is_factory,
                     cache=reg.cache,
                     managed=reg.managed,
                     tags=reg.tags,
                     autouse=reg.autouse,
+                    suite_path=suite.full_path,  # Owner suite's path
                 )
             self._register_suite_fixtures(suite.suites)
 

@@ -32,9 +32,16 @@ class TestExecutionContext:
         self._suite_path = suite_path
         self._cache: dict[FixtureCallable, Any] = {}
         self._exit_stack = AsyncExitStack()
+        self._closed = False
 
     async def __aenter__(self) -> Self:
         await self._exit_stack.__aenter__()
+        # Resolve TEST-scoped autouse fixtures at test start
+        await self._parent.resolve_test_autouse(
+            current_path=self._suite_path,
+            context_cache=self._cache,
+            context_exit_stack=self._exit_stack,
+        )
         return self
 
     async def __aexit__(
@@ -43,8 +50,16 @@ class TestExecutionContext:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:
+        if self._closed:
+            return False
         result = await self._exit_stack.__aexit__(exc_type, exc_val, exc_tb)
         return result or False
+
+    async def close(self) -> None:
+        """Explicitly close the context and teardown fixtures."""
+        if not self._closed:
+            self._closed = True
+            await self._exit_stack.aclose()
 
     async def resolve(self, target_func: FixtureCallable) -> Any:
         """Resolve a fixture by delegating to the parent Resolver with injected context."""

@@ -34,6 +34,22 @@ async def test_something():
 
 These tests don't belong to any suite.
 
+### Session Fixtures
+
+Bind fixtures to the session with `use_fixtures()`:
+
+```python
+from protest import fixture, FixtureScope
+
+@fixture(scope=FixtureScope.SESSION)
+def database():
+    db = connect()
+    yield db
+    db.close()
+
+session.use_fixtures([database])
+```
+
 ## ProTestSuite
 
 Suites group related tests together. They also define a scope boundary for fixtures.
@@ -58,6 +74,18 @@ api_suite = ProTestSuite(
     max_concurrency=2,          # Cap parallelism for this suite
     tags=["integration"],       # Tags inherited by all tests in suite
 )
+```
+
+### Suite Fixtures
+
+Bind fixtures to a suite with `use_fixtures()`:
+
+```python
+@fixture(scope=FixtureScope.SUITE)
+def api_client():
+    return Client()
+
+api_suite.use_fixtures([api_client])
 ```
 
 ## Nested Suites
@@ -98,9 +126,11 @@ orders_suite.full_path # "API::Orders"
 Child suites can access fixtures from parent suites:
 
 ```python
-@api_suite.fixture()
+@fixture(scope=FixtureScope.SUITE)
 def api_client():
     return Client()
+
+api_suite.use_fixtures([api_client])
 
 @users_suite.test()
 async def test_get_user(client: Annotated[Client, Use(api_client)]):

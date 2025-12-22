@@ -6,6 +6,7 @@ import pytest
 
 from protest.di.markers import Use
 from protest.di.resolver import Resolver
+from protest.entities import FixtureScope
 from protest.execution.context import TestExecutionContext
 
 
@@ -29,7 +30,7 @@ class TestFunctionScopeIsolation:
             call_count += 1
             return call_count
 
-        resolver.register(counter_fixture, scope_path=Resolver.TEST_SCOPE)
+        resolver.register(counter_fixture, scope=FixtureScope.TEST)
 
         async with TestExecutionContext(resolver) as ctx1:
             value1 = await ctx1.resolve(counter_fixture)
@@ -53,7 +54,7 @@ class TestFunctionScopeIsolation:
             call_count += 1
             return call_count
 
-        resolver.register(counter_fixture, scope_path=Resolver.TEST_SCOPE)
+        resolver.register(counter_fixture, scope=FixtureScope.TEST)
 
         async with TestExecutionContext(resolver) as ctx:
             value1 = await ctx.resolve(counter_fixture)
@@ -79,7 +80,7 @@ class TestSessionScopeDelegation:
             call_count += 1
             return call_count
 
-        resolver.register(session_fixture, scope_path=None)
+        resolver.register(session_fixture, scope=FixtureScope.SESSION)
 
         async with resolver:
             async with TestExecutionContext(resolver) as ctx1:
@@ -108,7 +109,7 @@ class TestTeardown:
             nonlocal teardown_called
             teardown_called = True
 
-        resolver.register(generator_fixture, scope_path=Resolver.TEST_SCOPE)
+        resolver.register(generator_fixture, scope=FixtureScope.TEST)
 
         async with TestExecutionContext(resolver) as ctx:
             value = await ctx.resolve(generator_fixture)
@@ -127,7 +128,7 @@ class TestTeardown:
             nonlocal teardown_called
             teardown_called = True
 
-        resolver.register(async_generator_fixture, scope_path=Resolver.TEST_SCOPE)
+        resolver.register(async_generator_fixture, scope=FixtureScope.TEST)
 
         async with TestExecutionContext(resolver) as ctx:
             value = await ctx.resolve(async_generator_fixture)
@@ -151,8 +152,8 @@ class TestTeardown:
             yield "b"
             teardown_order.append("b")
 
-        resolver.register(fixture_a, scope_path=Resolver.TEST_SCOPE)
-        resolver.register(fixture_b, scope_path=Resolver.TEST_SCOPE)
+        resolver.register(fixture_a, scope=FixtureScope.TEST)
+        resolver.register(fixture_b, scope=FixtureScope.TEST)
 
         async with TestExecutionContext(resolver) as ctx:
             await ctx.resolve(fixture_a)
@@ -176,14 +177,14 @@ class TestDependencyResolution:
         def dependent_fixture(base: str) -> str:
             return f"dependent_{base}"
 
-        resolver.register(base_fixture, scope_path=Resolver.TEST_SCOPE)
+        resolver.register(base_fixture, scope=FixtureScope.TEST)
 
         def dependent_with_annotation(
             base: Annotated[str, Use(base_fixture)],
         ) -> str:
             return f"dependent_{base}"
 
-        resolver.register(dependent_with_annotation, scope_path=Resolver.TEST_SCOPE)
+        resolver.register(dependent_with_annotation, scope=FixtureScope.TEST)
 
         async with TestExecutionContext(resolver) as ctx:
             value = await ctx.resolve(dependent_with_annotation)
@@ -199,14 +200,14 @@ class TestDependencyResolution:
         def session_fixture() -> str:
             return "session_value"
 
-        resolver.register(session_fixture, scope_path=None)
+        resolver.register(session_fixture, scope=FixtureScope.SESSION)
 
         def function_fixture(
             session: Annotated[str, Use(session_fixture)],
         ) -> str:
             return f"function_{session}"
 
-        resolver.register(function_fixture, scope_path=Resolver.TEST_SCOPE)
+        resolver.register(function_fixture, scope=FixtureScope.TEST)
 
         async with resolver, TestExecutionContext(resolver) as ctx:
             value = await ctx.resolve(function_fixture)
@@ -227,7 +228,7 @@ class TestSuiteScopeDelegation:
             call_count += 1
             return call_count
 
-        resolver.register(suite_fixture, scope_path="MySuite")
+        resolver.register(suite_fixture, scope=FixtureScope.SUITE)
 
         async with resolver:
             async with TestExecutionContext(resolver, suite_path="MySuite") as ctx1:
