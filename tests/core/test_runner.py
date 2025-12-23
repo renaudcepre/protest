@@ -143,7 +143,7 @@ class TestRunnerWithFixtures:
         def my_fixture() -> str:
             return "fixture_value"
 
-        session.fixture(my_fixture)
+        session.bind(my_fixture)
 
         @session.test()
         def test_with_fixture(val: Annotated[str, Use(my_fixture)]) -> None:
@@ -165,7 +165,7 @@ class TestRunnerWithFixtures:
             nonlocal teardown_called
             teardown_called = True
 
-        session.fixture(generator_fixture)
+        session.bind(generator_fixture)
 
         @session.test()
         def test_with_gen(val: Annotated[str, Use(generator_fixture)]) -> None:
@@ -350,7 +350,7 @@ class TestRunnerSmartTeardown:
         def suite_resource() -> str:
             return "resource_value"
 
-        suite.fixture(suite_resource)
+        suite.bind(suite_resource)
 
         results: list[str] = []
 
@@ -384,7 +384,7 @@ class TestRunnerSmartTeardown:
             nonlocal teardown_at_test_count, test_execution_count
             teardown_at_test_count = test_execution_count
 
-        suite.fixture(tracked_fixture)
+        suite.bind(tracked_fixture)
 
         @suite.test()
         def test_one(val: Annotated[str, Use(tracked_fixture)]) -> None:
@@ -443,7 +443,7 @@ class TestRunnerNestedSuites:
         def parent_resource() -> str:
             return "parent_data"
 
-        parent.fixture(parent_resource)
+        parent.bind(parent_resource)
 
         results: list[str] = []
 
@@ -541,7 +541,7 @@ class TestRunnerExitFirst:
         def broken_fixture() -> str:
             raise RuntimeError("fixture error")
 
-        session.fixture(broken_fixture)
+        session.bind(broken_fixture)
 
         @session.test()
         async def test_fast_error(val: Annotated[str, Use(broken_fixture)]) -> None:

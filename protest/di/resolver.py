@@ -198,7 +198,7 @@ class Resolver:
         """Ensure a fixture is registered and return it.
 
         In the "Scope at Binding" pattern:
-        - Fixtures bound via session.fixture()/suite.fixture() are pre-registered
+        - Fixtures bound via session.bind()/suite.bind() are pre-registered
         - Unbound fixtures with @fixture()/@factory() decorator → TEST scope (default)
         - Plain functions without decorator → PlainFunctionError
 

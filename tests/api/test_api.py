@@ -196,7 +196,7 @@ class TestListTags:
         def db_fixture() -> str:
             return "db"
 
-        session.fixture(db_fixture)
+        session.bind(db_fixture)
 
         @session.test()
         def test_one() -> None:
@@ -228,7 +228,7 @@ class TestListTags:
         def child_fixture() -> str:
             return "fixture"
 
-        child.fixture(child_fixture)
+        child.bind(child_fixture)
 
         @child.test(tags=["test_tag"])
         def test_child() -> None:

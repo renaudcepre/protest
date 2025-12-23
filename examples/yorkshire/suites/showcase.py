@@ -3,11 +3,11 @@
 This module demonstrates advanced ProTest features in one place.
 """
 
+import asyncio
 from typing import Annotated
 
 from examples.yorkshire.domain import Coat, Job, Size, Yorkshire
-from examples.yorkshire.fixtures import grooming_quote, kennel, yorkshire
-from examples.yorkshire.kennel import Kennel
+from examples.yorkshire.fixtures import grooming_quote, yorkshire
 from examples.yorkshire.services import GroomingService, VetService
 from protest import (
     FixtureFactory,
@@ -22,7 +22,6 @@ from protest import (
     raises,
 )
 from protest.entities import LogCapture
-
 
 showcase_suite = ProTestSuite(
     "Showcase",
@@ -57,7 +56,7 @@ def test_grooming_price_matrix(
     coat: Annotated[Coat, From(COATS)],
     quote: Annotated[dict[str, float], Use(grooming_quote)],
 ) -> None:
-    """Cartesian product: Size × Coat = 6 test variations."""
+    """Cartesian product: Size x Coat = 6 test variations."""
     dog = Yorkshire(name="Matrix", size=size, job=Job.UNEMPLOYED, age=24, coat=coat)
     price = quote["base"]
     if coat == Coat.LONG:
@@ -168,7 +167,7 @@ def test_raises_with_match_pattern() -> None:
     """Raises with regex match."""
 
     def feed_treats(dog: Yorkshire, count: int) -> None:
-        if dog.size == Size.TEACUP and count > 3:
+        if dog.size == Size.TEACUP and count > 3:  # noqa: PLR2004
             raise ValueError(f"Too many treats! {dog.name} now spherical")
 
     tiny = Yorkshire(name="Gizmo", size=Size.TEACUP, job=Job.THERAPIST, age=36)
@@ -206,7 +205,6 @@ def test_raises_with_match_groups() -> None:
 @showcase_suite.test()
 async def test_raises_async() -> None:
     """Raises works with async code."""
-    import asyncio
 
     async def post_selfie() -> None:
         await asyncio.sleep(0.01)
@@ -226,9 +224,9 @@ recall_attempts = 0
 @showcase_suite.test(retry=3)
 def test_recall_command_with_retry() -> None:
     """Simple retry: retries up to 3 times on any exception."""
-    global recall_attempts
+    global recall_attempts  # noqa: PLW0603
     recall_attempts += 1
-    if recall_attempts < 3:
+    if recall_attempts < 3:  # noqa: PLR2004
         raise TimeoutError("Yorkshire pretending to be deaf, investigating squirrel")
 
 
@@ -240,10 +238,10 @@ async def test_retry_with_specific_exception(
     factory: Annotated[FixtureFactory[Yorkshire], Use(yorkshire)],
 ) -> None:
     """Retry only on ConnectionError, with delay between attempts."""
-    global wifi_attempts
+    global wifi_attempts  # noqa: PLW0603
     wifi_attempts += 1
     fifi = await factory(name="Fifi", job=Job.INFLUENCER)
-    if wifi_attempts < 2:
+    if wifi_attempts < 2:  # noqa: PLR2004
         raise ConnectionError(f"{fifi.name} lost WiFi mid-selfie upload!")
 
 

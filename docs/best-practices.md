@@ -46,7 +46,8 @@ from tests.integration.suite import integration_suite
 from tests.fixtures import database, cache  # Session fixtures
 
 session = ProTestSession(concurrency=4)
-session.use_fixtures([database, cache])
+session.bind(database)
+session.bind(cache)
 session.add_suite(entities_suite)
 session.add_suite(services_suite)
 session.add_suite(integration_suite)
@@ -58,13 +59,14 @@ session.add_suite(integration_suite)
 # DON'T DO THIS - 500 lines of mixed fixtures/suites/tests
 session = ProTestSession()
 
-@fixture(scope=FixtureScope.SESSION)
+@fixture()
 def db(): ...
 
-@fixture(scope=FixtureScope.SESSION)
+@fixture()
 def cache(): ...
 
-session.use_fixtures([db, cache])
+session.bind(db)
+session.bind(cache)
 
 suite1 = ProTestSuite("Suite1")
 session.add_suite(suite1)
@@ -81,16 +83,16 @@ def test_something(): ...
 
 ```python
 # tests/unit/notes.py
-from protest import ProTestSuite, factory, FixtureScope
+from protest import ProTestSuite, factory
 
 notes_suite = ProTestSuite("Notes", tags=["domain", "notes"])
 
 # Factories for this domain
-@factory(scope=FixtureScope.SUITE, cache=False)
+@factory(cache=False)
 def note(title: str = "Test Note") -> Note:
     return Note(id=uuid4(), title=title)
 
-notes_suite.use_fixtures([note])
+notes_suite.bind(note)
 
 # Tests for this domain
 @notes_suite.test()
@@ -152,24 +154,26 @@ di_suite = ProTestSuite(
 
 ```python
 # tests/fixtures.py
-from protest import fixture, FixtureScope
+from protest import fixture
 
-@fixture(scope=FixtureScope.SESSION, tags=["database"])
+@fixture(tags=["database"])
 async def database() -> AsyncGenerator[Database, None]:
     db = await Database.connect()
     yield db
     await db.close()
+
+# In session.py: session.bind(database)
 ```
 
 ### Suite Fixtures: Domain-Specific Setup
 
 ```python
 # tests/unit/api.py
-from protest import ProTestSuite, fixture, FixtureScope
+from protest import ProTestSuite, fixture
 
 api_suite = ProTestSuite("API")
 
-@fixture(scope=FixtureScope.SUITE)
+@fixture()
 async def authenticated_client(
     db: Annotated[Database, Use(database)]
 ) -> AsyncGenerator[APIClient, None]:
@@ -178,7 +182,7 @@ async def authenticated_client(
     yield client
     await client.logout()
 
-api_suite.use_fixtures([authenticated_client])
+api_suite.bind(authenticated_client)
 ```
 
 ### Test Fixtures: Fresh Per Test
@@ -197,7 +201,7 @@ def request_payload() -> dict:
 ProTest manages lifecycle - use `yield` for teardown:
 
 ```python
-@factory(scope=FixtureScope.SUITE, cache=False)
+@factory(cache=False)
 async def user(
     db: Annotated[Database, Use(database)],
     email: str = "test@example.com",
@@ -207,7 +211,7 @@ async def user(
     yield user
     await user.delete()  # Automatic cleanup
 
-suite.use_fixtures([user])
+suite.bind(user)
 ```
 
 Usage:
@@ -225,11 +229,11 @@ async def test_user_permissions(
 
 ```python
 # Each call creates a fresh instance
-@factory(scope=FixtureScope.SUITE, cache=False)
+@factory(cache=False)
 def note(title: str = "Test") -> Note:
     return Note(id=uuid4(), title=title)
 
-suite.use_fixtures([note])
+suite.bind(note)
 
 # Usage: creates two distinct notes
 n1 = await note_factory(title="First")
@@ -371,11 +375,12 @@ api_suite.add_suite(users_suite)  # Clear: API::Users
 ### 4. Overusing Session Scope
 
 ```python
-# BAD: Should be test-scoped
-@fixture(scope=FixtureScope.SESSION)
-def request_id(): ...  # Fresh value needed per test!
+# BAD: Should be test-scoped but bound to session
+@fixture()
+def request_id(): ...
+session.bind(request_id)  # Fresh value needed per test!
 
-# GOOD
+# GOOD: Test-scoped (not bound)
 @fixture()
 def request_id() -> str:
     return str(uuid4())
@@ -389,7 +394,7 @@ def request_id() -> str:
 from typing import Annotated
 from uuid import uuid4
 
-from protest import FixtureFactory, ProTestSuite, Use, raises, factory, FixtureScope
+from protest import FixtureFactory, ProTestSuite, Use, raises, factory
 
 from myapp.domain import Note, NoteStatus, InvalidTransitionError
 
@@ -398,14 +403,14 @@ notes_suite = ProTestSuite("Notes", tags=["domain"])
 
 # === Factories ===
 
-@factory(scope=FixtureScope.SUITE, cache=False)
+@factory(cache=False)
 def note(
     title: str = "Test Note",
     status: NoteStatus = NoteStatus.DRAFT,
 ) -> Note:
     return Note(id=uuid4(), title=title, status=status)
 
-notes_suite.use_fixtures([note])
+notes_suite.bind(note)
 
 
 # === Tests ===

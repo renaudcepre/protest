@@ -411,10 +411,10 @@ class TestTransitiveFixtureTags:
         ) -> str:
             return f"a-{b}-{c}"
 
-        session.fixture(shared_fixture)
-        session.fixture(fixture_b)
-        session.fixture(fixture_c)
-        session.fixture(fixture_a)
+        session.bind(shared_fixture)
+        session.bind(fixture_b)
+        session.bind(fixture_c)
+        session.bind(fixture_a)
 
         @session.test()
         def test_diamond(
@@ -449,9 +449,9 @@ class TestTransitiveFixtureTags:
         ) -> str:
             return dep
 
-        session.fixture(deep_fixture)
-        session.fixture(mid_fixture)
-        session.fixture(top_fixture)
+        session.bind(deep_fixture)
+        session.bind(mid_fixture)
+        session.bind(top_fixture)
 
         @session.test()
         def test_deep(

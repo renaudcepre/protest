@@ -2,7 +2,7 @@
 
 These decorators mark functions with intrinsic metadata (is_factory, cache,
 managed, tags). Scope and autouse are determined at binding time via
-session.fixture() or suite.fixture(). Unbound fixtures default to TEST scope.
+session.bind() or suite.bind(). Unbound fixtures default to TEST scope.
 """
 
 import functools
@@ -48,8 +48,8 @@ def fixture(
     """Decorator to mark a function as a fixture.
 
     Scope is determined at binding time:
-    - session.fixture(fn) → SESSION scope
-    - suite.fixture(fn) → SUITE scope
+    - session.bind(fn) → SESSION scope
+    - suite.bind(fn) → SUITE scope
     - No binding → TEST scope (default)
 
     Args:
@@ -62,7 +62,7 @@ def fixture(
             yield db
             await db.close()
 
-        session.fixture(database)  # SESSION scope
+        session.bind(database)  # SESSION scope
 
         @fixture()
         def request_id():
@@ -104,8 +104,8 @@ def factory(
     """Decorator to mark a function as a factory fixture.
 
     Scope is determined at binding time:
-    - session.fixture(fn) → SESSION scope
-    - suite.fixture(fn) → SUITE scope
+    - session.bind(fn) → SESSION scope
+    - suite.bind(fn) → SUITE scope
     - No binding → TEST scope (default)
 
     Args:
@@ -121,7 +121,7 @@ def factory(
             yield user
             await user.delete()
 
-        session.fixture(user)  # SESSION scope
+        session.bind(user)  # SESSION scope
 
         @factory(cache=True)
         def payload(data: dict | None = None) -> dict:

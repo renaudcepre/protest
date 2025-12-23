@@ -50,7 +50,6 @@ def test_senior_needs_grooming_sync() -> None:
 @seniors_suite.test(skip="Astronaut program suspended until 2026")
 async def test_senior_astronaut_mission() -> None:
     """Skipped test - astronaut program on hold."""
-    pass
 
 
 # =============================================================================

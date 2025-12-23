@@ -19,7 +19,7 @@ session.add_suite(api_suite)
 
 
 # Define a function-scoped fixture (fresh instance per test)
-# Use @session.fixture() for session scope, @suite.fixture() for suite scope
+# Use @session.bind() for session scope, @suite.bind() for suite scope
 @fixture()
 def config():
     return {"api_url": "https://api.example.com"}

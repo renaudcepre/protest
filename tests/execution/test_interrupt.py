@@ -247,7 +247,7 @@ class TestRunnerInterruptIntegration:
             yield "value"
             teardown_called.append("cleaned")
 
-        session.fixture(resource)
+        session.bind(resource)
 
         @session.test()
         def test_with_fixture(res: Annotated[str, Use(resource)]) -> None:

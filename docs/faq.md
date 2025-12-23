@@ -25,7 +25,7 @@ class TestUser:
 ```python
 user_suite = ProTestSuite("User")
 
-@user_suite.fixture()
+@user_suite.bind()
 def user():
     return User("alice")
 
@@ -44,7 +44,7 @@ def test_delete(user: Annotated[User, Use(user)]):
 | Feature | pytest classes | ProTest suites |
 |---------|---------------|----------------|
 | Group related tests | ✓ | ✓ |
-| Shared fixtures | `self` or class-scoped fixtures | `@suite.fixture()` |
+| Shared fixtures | `self` or class-scoped fixtures | `@suite.bind()` |
 | Setup/teardown | `setup_method`/`teardown_method` | `yield` in fixtures |
 | Named groups in output | ✓ | ✓ |
 | Inheritance | ✓ | ✗ |
@@ -83,11 +83,11 @@ If fixtures could use `From()`, you'd get hidden cartesian products:
 
 ```python
 # Hypothetical - NOT SUPPORTED
-@session.fixture()
+@session.bind()
 def db(engine: Annotated[str, From(ENGINES)]):  # 3 engines
     ...
 
-@session.fixture()
+@session.bind()
 def user(role: Annotated[str, From(ROLES)], db: ...):  # 2 roles
     ...
 

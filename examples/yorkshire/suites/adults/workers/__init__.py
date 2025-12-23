@@ -3,7 +3,7 @@
 This module showcases:
 - Suite fixtures depending on session fixtures
 - Child suite fixtures depending on parent suite fixtures
-- Autouse fixtures via suite.fixture(fn, autouse=True)
+- Autouse fixtures via suite.bind(fn, autouse=True)
 - Unbound fixtures defaulting to TEST scope
 - Factory fixtures bound to suites
 """

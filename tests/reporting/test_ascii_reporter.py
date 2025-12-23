@@ -470,8 +470,6 @@ class TestAsciiReporterLifecycle:
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test teardown start prints test teardown message."""
-        from protest.events.types import Event
-
         ascii_reporter.on_test_teardown_start(
             TestTeardownInfo(name="test_foo", node_id="x", outcome=Event.TEST_PASS)
         )

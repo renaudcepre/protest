@@ -2,7 +2,7 @@
 
 Demonstrates:
 - max_concurrency=1 for sequential test execution
-- Suite-level fixture with suite.fixture()
+- Suite-level fixture with suite.bind()
 - Sync fixtures and tests (no async)
 """
 
@@ -34,7 +34,7 @@ def fax_machine() -> Generator[str, None, None]:
     print("  [legacy] fax machine cooling down")  # noqa: T201
 
 
-legacy_suite.fixture(fax_machine)
+legacy_suite.bind(fax_machine)
 
 
 # =============================================================================
