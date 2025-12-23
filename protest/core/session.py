@@ -40,7 +40,7 @@ class ProTestSession:
     Manages test collection, fixture resolution, and plugin coordination.
     Use as async context manager to ensure proper fixture teardown.
 
-    Fixtures registered with @session.fixture() live for the entire session.
+    Fixtures registered with @session.bind() live for the entire session.
     Use @session.autouse() for fixtures that should be resolved at session start.
 
     Args:
@@ -170,7 +170,7 @@ class ProTestSession:
         """Alias for add_suite (backward compatibility)."""
         self.add_suite(suite)
 
-    def fixture(
+    def bind(
         self,
         fn: FixtureCallable,
         autouse: bool = False,
@@ -194,8 +194,8 @@ class ProTestSession:
                 yield connect()
 
             session = ProTestSession()
-            session.fixture(database)  # SESSION scope
-            session.fixture(config, autouse=True)  # SESSION + auto-resolve
+            session.bind(database)  # SESSION scope
+            session.bind(config, autouse=True)  # SESSION + auto-resolve
         """
         from protest.di.decorators import unwrap_fixture
 

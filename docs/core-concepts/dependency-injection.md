@@ -47,13 +47,17 @@ def undefined_fixture():
 Fixtures can depend on other fixtures:
 
 ```python
-@session.fixture()
+@fixture()
 def config():
     return {"db_url": "postgres://localhost"}
 
-@session.fixture()
+@fixture()
 async def database(cfg: Annotated[dict, Use(config)]):
     return await connect(cfg["db_url"])
+
+# Bind both to session scope
+session.bind(config)
+session.bind(database)
 
 @session.test()
 async def test_query(db: Annotated[Database, Use(database)]):
@@ -87,14 +91,15 @@ If two tests both use `database`, and `database` is session-scoped, they share t
 Raised when a fixture depends on a narrower scope:
 
 ```python
-@fixture()  # Function scope
+@fixture()  # Test scope (not bound)
 def per_test():
     return "fresh"
 
-@session.fixture()  # Session scope
+@fixture()
 def shared(x: Annotated[str, Use(per_test)]):
-    # ERROR: session can't depend on function-scoped
     return x
+
+session.bind(shared)  # ERROR: session can't depend on test-scoped
 ```
 
 Fix: Either widen the dependency's scope or narrow the dependent fixture's scope.

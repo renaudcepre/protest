@@ -21,9 +21,9 @@ from protest import ProTestSession
 session = ProTestSession(concurrency=4)
 
 # Bind session fixtures
-session.fixture(configure_kennel_logging, autouse=True)
-session.fixture(kennel)
-session.fixture(yorkshire)
+session.bind(configure_kennel_logging, autouse=True)
+session.bind(kennel)
+session.bind(yorkshire)
 
 # Assemble the session
 session.add_suite(puppies_suite)

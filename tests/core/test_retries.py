@@ -514,7 +514,7 @@ class TestRetriesWithFixtureErrors:
         def broken_fixture() -> str:
             raise RuntimeError("Fixture broken")
 
-        session.fixture(broken_fixture)
+        session.bind(broken_fixture)
 
         @session.test(retry=3)
         def test_with_broken_fixture(

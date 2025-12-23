@@ -108,7 +108,7 @@ class TestValidFixtures:
         def good_fixture() -> str:
             return "ok"
 
-        session.fixture(good_fixture)
+        session.bind(good_fixture)
 
         assert len(session.fixtures) == 1
 
@@ -119,6 +119,6 @@ class TestValidFixtures:
         def good_factory(name: str) -> dict[str, str]:
             return {"name": name}
 
-        session.fixture(good_factory)
+        session.bind(good_factory)
 
         assert len(session.fixtures) == 1

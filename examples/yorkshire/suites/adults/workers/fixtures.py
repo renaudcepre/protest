@@ -13,7 +13,6 @@ from examples.yorkshire.suites.adults.workers.domain import (
 )
 from protest import Use, factory, fixture
 
-
 # =============================================================================
 # WORKERS FIXTURES
 # =============================================================================

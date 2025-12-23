@@ -32,8 +32,8 @@ ProTestSession
 
 | Decorator            | Scope   | Internal `scope_path`                    |
 |----------------------|---------|------------------------------------------|
-| `@session.fixture()` | Session | `None`                                   |
-| `@suite.fixture()`   | Suite   | `suite.full_path` (e.g., `"API::Users"`) |
+| `@session.bind()` | Session | `None`                                   |
+| `@suite.bind()`   | Suite   | `suite.full_path` (e.g., `"API::Users"`) |
 | `@fixture()`         | Test    | `"<test_scope>"`                         |
 
 ### Nested Suite Paths
@@ -67,7 +67,7 @@ def per_test():
     return "fresh"
 
 
-@session.fixture()
+@session.bind()
 def shared(x: Annotated[str, Use(per_test)]):
     # ERROR: Session can't depend on test-scoped fixture
     pass
@@ -112,7 +112,7 @@ wait for the first resolution to complete, then share the cached value.
 Generator fixtures use `yield` to separate setup from teardown:
 
 ```python
-@session.fixture()
+@session.bind()
 async def database():
     db = await connect()  # Setup
     yield db  # Value used by tests

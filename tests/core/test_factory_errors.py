@@ -23,7 +23,7 @@ class TestFactoryErrorDistinction:
         def user(username: str) -> dict[str, str]:
             raise RuntimeError("DB unavailable")
 
-        session.fixture(user)
+        session.bind(user)
 
         @session.test()
         async def test_using_factory(
@@ -106,7 +106,7 @@ class TestFactoryErrorDistinction:
                 raise RuntimeError("Factory failed")
             return {"name": username}
 
-        session.fixture(user)
+        session.bind(user)
 
         @session.test()
         def test_passing() -> None:
@@ -148,7 +148,7 @@ class TestFactoryErrorPreservesOriginal:
         def user(username: str) -> dict[str, str]:
             raise ValueError("Custom message with details")
 
-        session.fixture(user)
+        session.bind(user)
 
         @session.test()
         async def test_it(
@@ -179,7 +179,7 @@ class TestAsyncFactoryErrors:
         async def user(username: str) -> dict[str, str]:
             raise ConnectionError("API timeout")
 
-        session.fixture(user)
+        session.bind(user)
 
         @session.test()
         async def test_async_factory(
@@ -214,7 +214,7 @@ class TestFactoryWithTeardown:
             yield {"name": username}
             teardown_called.append(username)
 
-        session.fixture(user)
+        session.bind(user)
 
         @session.test()
         async def test_create_users(
@@ -250,7 +250,7 @@ class TestFactoryCaching:
             call_count += 1
             return {"name": username, "call": call_count}
 
-        session.fixture(user)
+        session.bind(user)
 
         @session.test()
         async def test_caching(
@@ -285,7 +285,7 @@ class TestFactoryCaching:
             call_count += 1
             return {"name": username, "call": call_count}
 
-        session.fixture(user)
+        session.bind(user)
 
         @session.test()
         async def test_no_caching(

@@ -28,7 +28,7 @@ FuncT = TypeVar("FuncT", bound="Callable[..., object]")
 class ProTestSuite:
     """Groups related tests with optional max concurrency and nested suites.
 
-    Suites provide scoped fixture context. Fixtures registered with @suite.fixture()
+    Suites provide scoped fixture context. Fixtures registered with @suite.bind()
     are created once per suite and torn down when the suite completes.
 
     Suites can be nested: child suites can access parent's fixtures but not vice-versa.
@@ -158,7 +158,7 @@ class ProTestSuite:
             suite._attach_to_session(self._session)
         self._suites.append(suite)
 
-    def fixture(
+    def bind(
         self,
         fn: Callable[..., object],
         autouse: bool = False,
@@ -187,8 +187,8 @@ class ProTestSuite:
                 yield Client()
 
             api_suite = ProTestSuite("API")
-            api_suite.fixture(api_client)  # SUITE scope
-            api_suite.fixture(setup_env, autouse=True)  # SUITE + auto-resolve
+            api_suite.bind(api_client)  # SUITE scope
+            api_suite.bind(setup_env, autouse=True)  # SUITE + auto-resolve
         """
 
         actual_func = unwrap_fixture(fn)

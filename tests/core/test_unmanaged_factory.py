@@ -48,7 +48,7 @@ class TestUnmanagedFactoryBasic:
         def user_factory() -> UserFactory:
             return UserFactory(db="test_db")
 
-        session.fixture(user_factory)
+        session.bind(user_factory)
 
         @session.test()
         def test_use_factory(
@@ -82,7 +82,7 @@ class TestUnmanagedFactoryErrorHandling:
         def user_factory() -> FailingUserFactory:
             return FailingUserFactory()
 
-        session.fixture(user_factory)
+        session.bind(user_factory)
 
         @session.test()
         def test_trigger_factory_error(
@@ -113,7 +113,7 @@ class TestUnmanagedFactoryErrorHandling:
         def user_factory() -> UserFactory:
             return UserFactory(db="test_db")
 
-        session.fixture(user_factory)
+        session.bind(user_factory)
 
         @session.test()
         def test_assertion_failure(
@@ -152,8 +152,8 @@ class TestUnmanagedFactoryWithDependencies:
         ) -> UserFactory:
             return UserFactory(db=db)
 
-        session.fixture(database)
-        session.fixture(user_factory)
+        session.bind(database)
+        session.bind(user_factory)
 
         @session.test()
         def test_factory_has_db(
@@ -187,7 +187,7 @@ class TestUnmanagedFactoryWithTeardown:
             yield factory
             teardown_called.append(factory.created.copy())
 
-        session.fixture(user_factory)
+        session.bind(user_factory)
 
         @session.test()
         def test_create_users(

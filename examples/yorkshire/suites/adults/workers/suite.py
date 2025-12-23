@@ -20,7 +20,6 @@ from examples.yorkshire.suites.adults.workers.fixtures import (
 )
 from protest import FixtureFactory, ProTestSuite, Use
 
-
 # =============================================================================
 # WORKERS SUITE (parent)
 # =============================================================================
@@ -32,9 +31,9 @@ workers_suite = ProTestSuite(
     description="Tests for employed yorkshires with nested job-specific suites",
 )
 
-workers_suite.fixture(setup_work_environment, autouse=True)
-workers_suite.fixture(work_schedule)
-workers_suite.fixture(scheduled_worker)
+workers_suite.bind(setup_work_environment, autouse=True)
+workers_suite.bind(work_schedule)
+workers_suite.bind(scheduled_worker)
 
 
 # =============================================================================
@@ -47,7 +46,7 @@ detectives_suite = ProTestSuite(
     description="Tests for detective yorkshires",
 )
 workers_suite.add_suite(detectives_suite)
-detectives_suite.fixture(detective_tools)
+detectives_suite.bind(detective_tools)
 
 
 @detectives_suite.test()
@@ -93,7 +92,7 @@ chefs_suite = ProTestSuite(
     description="Tests for chef yorkshires",
 )
 workers_suite.add_suite(chefs_suite)
-chefs_suite.fixture(chef_kitchen)
+chefs_suite.bind(chef_kitchen)
 
 
 @chefs_suite.test()
@@ -118,7 +117,7 @@ async def test_chef_cooks_recipe(
     assert julia.can_work
     current_recipe["steps"].append("Mix ingredients")
     current_recipe["steps"].append("Bake at 180C")
-    assert len(current_recipe["steps"]) == 2
+    assert len(current_recipe["steps"]) == 2  # noqa: PLR2004
 
 
 # =============================================================================
@@ -134,7 +133,7 @@ async def test_worker_has_schedule(
     """Any worker can check the schedule."""
     worker = await dog_factory(name="Worker", job=Job.THERAPIST, age=30)
     assert worker.can_work
-    assert schedule.shift_hours == 10  # 18 - 8
+    assert schedule.shift_hours == 10  # noqa: PLR2004
 
 
 @workers_suite.test()
@@ -146,7 +145,7 @@ async def test_scheduled_worker_factory(
     bodyguard = await worker_factory(name="Bruno", job=Job.BODYGUARD)
 
     # Both workers have age based on 10h shift (24 + 10 = 34)
-    assert therapist.age == 34
-    assert bodyguard.age == 34
+    assert therapist.age == 34  # noqa: PLR2004
+    assert bodyguard.age == 34  # noqa: PLR2004
     assert therapist.can_work
     assert bodyguard.can_work

@@ -22,11 +22,11 @@ Le scope est déterminé par **où** on décore la fixture :
 # fixtures.py
 from myproject.session import session  # Import nécessaire
 
-@session.fixture()
+@session.bind()
 def database():
     yield connect()
 
-@api_suite.fixture()
+@api_suite.bind()
 def client():
     return Client()
 ```
@@ -45,7 +45,7 @@ fixtures.py  ←──imports──  session.py
      └────imports───────────────┘
 ```
 
-Pour décorer avec `@session.fixture()`, le fichier fixtures.py doit importer `session`. Mais session.py doit importer les fixtures pour les utiliser dans les tests.
+Pour décorer avec `@session.bind()`, le fichier fixtures.py doit importer `session`. Mais session.py doit importer les fixtures pour les utiliser dans les tests.
 
 **Verdict** : Incompatible avec une architecture modulaire (fichiers > 400 lignes sinon).
 
@@ -130,8 +130,8 @@ from .fixtures import database, client
 session = ProTestSession()
 api_suite = ProTestSuite("API")
 
-session.fixture(database)      # database → SESSION scope
-api_suite.fixture(client)      # client → SUITE scope
+session.bind(database)      # database → SESSION scope
+api_suite.bind(client)      # client → SUITE scope
 # temp_file non bindée         # temp_file → TEST scope (défaut)
 
 session.add_suite(api_suite)
@@ -162,7 +162,7 @@ def test_example(
 | **Pas de cycle d'import** | fixtures.py n'importe pas session.py |
 | **Source de vérité unique** | Le scope est défini au binding, pas au décorateur |
 | **Pas d'orphelins ambigus** | Non bindé = TEST scope (comportement sain et prévisible) |
-| **API familière** | `session.fixture(fn)` ressemble à `@session.fixture()` |
+| **API familière** | `session.bind(fn)` ressemble à `@session.bind()` |
 | **Simplicité du décorateur** | `@fixture()` fait une seule chose : marquer comme fixture |
 | **Erreurs explicites** | Double binding = erreur, pas de comportement implicite |
 
@@ -193,14 +193,14 @@ session.use_fixtures([database])
 def database():
     yield connect()
 
-session.fixture(database)
+session.bind(database)
 ```
 
 ### Changements
 
 1. Retirer `scope=` du décorateur `@fixture()`
-2. Remplacer `session.use_fixtures([fn])` par `session.fixture(fn)`
-3. Remplacer `suite.use_fixtures([fn])` par `suite.fixture(fn)`
+2. Remplacer `session.use_fixtures([fn])` par `session.bind(fn)`
+3. Remplacer `suite.use_fixtures([fn])` par `suite.bind(fn)`
 
 ---
 
@@ -217,7 +217,7 @@ session.fixture(database)
                         │
           ┌─────────────┼─────────────┐
           ▼             ▼             ▼
-   session.fixture() suite.fixture()  (rien)
+   session.bind() suite.bind()  (rien)
           │             │             │
           ▼             ▼             ▼
       SESSION         SUITE         TEST
@@ -243,18 +243,18 @@ def config():
 def database(cfg: Annotated[dict, Use(config)]):
     yield connect(cfg)
 
-session.fixture(config)    # SESSION
-session.fixture(database)  # SESSION - OK (dépend de SESSION)
+session.bind(config)    # SESSION
+session.bind(database)  # SESSION - OK (dépend de SESSION)
 ```
 
 ```python
-session.fixture(config)    # SESSION
-api_suite.fixture(database)  # SUITE dépend de SESSION → OK
+session.bind(config)    # SESSION
+api_suite.bind(database)  # SUITE dépend de SESSION → OK
 ```
 
 ```python
-api_suite.fixture(config)  # SUITE
-session.fixture(database)  # SESSION dépend de SUITE → ERREUR
+api_suite.bind(config)  # SUITE
+session.bind(database)  # SESSION dépend de SUITE → ERREUR
 ```
 
 ---
@@ -263,7 +263,7 @@ session.fixture(database)  # SESSION dépend de SUITE → ERREUR
 
 L'approche "Scope au Binding" combine les avantages des deux approches précédentes :
 
-- **De Tree-Based** : une seule action pour définir le scope (`session.fixture(fn)`)
+- **De Tree-Based** : une seule action pour définir le scope (`session.bind(fn)`)
 - **De Mark & Collect** : pas de cycles d'import
 
 Elle élimine les inconvénients :

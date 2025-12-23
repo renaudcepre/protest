@@ -15,12 +15,10 @@ session = ProTestSession()
 
 @fixture()
 def session_db() -> Generator[str, None, None]:
-    print("  [session_db] setup")
     yield "session_db_value"
-    print("  [session_db] teardown")
 
 
-session.fixture(session_db)
+session.bind(session_db)
 
 
 # =============================================================================
@@ -38,12 +36,10 @@ session.add_suite(my_suite)
 
 @fixture()
 def suite_client(db: Annotated[str, Use(session_db)]) -> Generator[str, None, None]:
-    print(f"  [suite_client] setup (db={db})")
     yield "suite_client_value"
-    print("  [suite_client] teardown")
 
 
-my_suite.fixture(suite_client)
+my_suite.bind(suite_client)
 
 
 # =============================================================================
@@ -53,10 +49,7 @@ my_suite.fixture(suite_client)
 
 @fixture()
 def test_data(client: Annotated[str, Use(suite_client)]) -> Generator[str, None, None]:
-    print(f"  [test_data] setup (client={client})")
     yield "test_data_value"
-    print("  [test_data] teardown")
-
 
 
 # =============================================================================
@@ -70,18 +63,6 @@ def test_all_fixtures(
     client: Annotated[str, Use(suite_client)],
     data: Annotated[str, Use(test_data)],
 ) -> None:
-    print(f"  [test] db={db}, client={client}, data={data}")
-    assert db == "session_db_value"
-    assert client == "suite_client_value"
-    assert data == "test_data_value"
-
-@my_suite.test()
-def test_all_fixtures(
-    db: Annotated[str, Use(session_db)],
-    client: Annotated[str, Use(suite_client)],
-    data: Annotated[str, Use(test_data)],
-) -> None:
-    print(f"  [test] db={db}, client={client}, data={data}")
     assert db == "session_db_value"
     assert client == "suite_client_value"
     assert data == "test_data_value"

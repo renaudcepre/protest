@@ -73,19 +73,19 @@ Les décorateurs définissent uniquement les **propriétés intrinsèques** (tag
 ```python
 from protest import fixture, factory
 
-# Session scope - lié via session.fixture()
+# Session scope - lié via session.bind()
 @fixture(tags=["database"])
 def database():
     yield connect()
 
-session.fixture(database)  # → SESSION scope
+session.bind(database)  # → SESSION scope
 
-# Suite scope - lié via suite.fixture()
+# Suite scope - lié via suite.bind()
 @fixture()
 def api_client(db: Annotated[DB, Use(database)]):
     return Client(db)
 
-api_suite.fixture(api_client)  # → SUITE scope
+api_suite.bind(api_client)  # → SUITE scope
 
 # Test scope (défaut) - pas de binding
 @fixture()
@@ -113,7 +113,7 @@ def configure_logging():
     yield
     logging.shutdown()
 
-session.fixture(configure_logging, autouse=True)  # autouse au binding
+session.bind(configure_logging, autouse=True)  # autouse au binding
 
 # Suite autouse - résolu quand la suite démarre (avant son premier test)
 @fixture()
@@ -123,7 +123,7 @@ def clean_environment():
     yield
     os.environ.update(old)
 
-api_suite.fixture(clean_environment, autouse=True)  # autouse au binding
+api_suite.bind(clean_environment, autouse=True)  # autouse au binding
 ```
 
 Quand utiliser autouse :
@@ -201,7 +201,7 @@ def user(name: str, role: str = "guest") -> User:
     yield user
     user.delete()  # Teardown automatique par instance
 
-session.fixture(user)  # → SESSION scope
+session.bind(user)  # → SESSION scope
 
 # Usage - async obligatoire
 alice = await user_factory(name="alice")
@@ -214,7 +214,7 @@ bob = await user_factory(name="bob")
 def user_factory(db: Annotated[Session, Use(db_session)]) -> UserFactory:
     return UserFactory(db=db)
 
-session.fixture(user_factory)  # → SESSION scope
+session.bind(user_factory)  # → SESSION scope
 
 # Usage - sync, méthodes custom
 alice = factory.create(name="alice")
@@ -252,7 +252,7 @@ ProTestError (base)
 
 - **Évite les scope mismatches** : le scope est déterminé au binding, pas à la définition
 - **Séparation des préoccupations** : décorateur = propriétés intrinsèques, binding = contexte
-- **Explicite** : `session.fixture(fn)` rend visible où chaque fixture est liée
+- **Explicite** : `session.bind(fn)` rend visible où chaque fixture est liée
 - **Flexible** : même fixture peut être liée avec différents scopes (pas recommandé mais possible)
 
 ### Pourquoi Use(ref) au lieu de Use("name")?
@@ -291,7 +291,7 @@ api_suite = ProTestSuite("API", tags=["api", "integration"])
 @fixture(tags=["database"])
 def db(): ...
 
-session.fixture(db)  # SESSION scope
+session.bind(db)  # SESSION scope
 
 # Tags sur un test
 @api_suite.test(tags=["slow"])
@@ -327,7 +327,7 @@ protest tags list -r demo:session                # Tags effectifs par test
 ### Points d'attention
 
 - Toutes les fixtures doivent être décorées avec `@fixture()` ou `@factory()`
-- Session/Suite fixtures doivent être liées via `session.fixture()` ou `suite.fixture()`
+- Session/Suite fixtures doivent être liées via `session.bind()` ou `suite.bind()`
 - Les tags de suites sont hérités par les suites enfants
 - La propagation via fixtures est **transitive** : si A dépend de B qui dépend de C tagué "x", A hérite "x"
 

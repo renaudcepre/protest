@@ -39,11 +39,11 @@ Tag a fixture once, and **every test using it inherits the tag automatically**â€
 through deep dependency chains.
 
 ```python
-@session.fixture(tags=["database"])
+@session.bind(tags=["database"])
 def db(): ...
 
 
-@session.fixture()
+@session.bind()
 def user_repo(db: Annotated[DB, Use(db)]): ...  # Inherits "database" tag
 
 
@@ -149,7 +149,7 @@ from protest import ProTestSession, Use, fixture
 session = ProTestSession()
 
 
-@session.fixture()
+@session.bind()
 async def database():
     db = await Database.connect()
     yield db
@@ -250,8 +250,8 @@ session.add_suite(api_suite)
 
 Fixtures are scoped based on where they are decorated:
 
-- `@session.fixture()` - Session scope (lives entire session)
-- `@suite.fixture()` - Suite scope (lives while suite runs)
+- `@session.bind()` - Session scope (lives entire session)
+- `@suite.bind()` - Suite scope (lives while suite runs)
 - `@fixture()` - Function scope (fresh per test)
 
 For fixtures that should be auto-resolved at scope start (without explicit `Use()`):
@@ -261,7 +261,7 @@ For fixtures that should be auto-resolved at scope start (without explicit `Use(
 
 ```python
 # Session-scoped fixture with teardown
-@session.fixture()
+@session.bind()
 async def database():
     db = await connect()
     yield db  # Teardown after yield
@@ -269,7 +269,7 @@ async def database():
 
 
 # Suite-scoped fixture
-@api_suite.fixture()
+@api_suite.bind()
 def api_config():
     return load_config()
 
@@ -330,7 +330,7 @@ In pytest, parameterized fixtures hide the iteration from the test:
 
 ```python
 # pytest - the test runs twice but you can't tell by reading it
-@pytest.fixture(params=["postgres", "sqlite"])
+@pytest.bind(params=["postgres", "sqlite"])
 def db(request):
     return connect(request.param)
 
@@ -379,10 +379,10 @@ async def test_postgres_only(db_factory: Annotated[..., Use(database)]):
 The scope of a fixture is determined by **where** it's decorated, not by an enum:
 
 ```python
-@session.fixture()      # Session scope - lives entire session
+@session.bind()      # Session scope - lives entire session
 def database(): ...
 
-@api_suite.fixture()    # Suite scope - lives while suite runs
+@api_suite.bind()    # Suite scope - lives while suite runs
 def api_client(): ...
 
 @fixture()              # Function scope - fresh per test
@@ -391,8 +391,8 @@ def payload(): ...
 
 | Decorator               | Scope      | Lifecycle                             |
 |-------------------------|------------|---------------------------------------|
-| `@session.fixture()`    | Session    | Created once, shared across all tests |
-| `@suite.fixture()`      | Suite      | Created once per suite                |
+| `@session.bind()`    | Session    | Created once, shared across all tests |
+| `@suite.bind()`      | Suite      | Created once per suite                |
 | `@fixture()`            | Function   | Fresh instance per test               |
 
 **Rule:** A fixture can only depend on fixtures with equal or wider scope.

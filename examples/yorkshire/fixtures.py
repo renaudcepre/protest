@@ -1,8 +1,8 @@
 """Shared fixtures for Yorkshire examples.
 
 Fixtures defined here can be bound to different scopes:
-- SESSION: session.fixture(fn)
-- SUITE: suite.fixture(fn)
+- SESSION: session.bind(fn)
+- SUITE: suite.bind(fn)
 - TEST: no binding needed (default)
 
 For SUITE-scoped fixtures examples, see suites/workers/suite.py

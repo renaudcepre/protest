@@ -56,7 +56,7 @@ class FixtureMarker:
 
     This enables the "Scope at Binding" pattern: decorators mark functions with
     intrinsic properties (is_factory, cache, managed, tags). Scope and autouse
-    are determined at binding time via session.fixture() or suite.fixture().
+    are determined at binding time via session.bind() or suite.bind().
     """
 
     is_factory: bool = False
@@ -69,8 +69,8 @@ class FixtureMarker:
 class FixtureRegistration:
     """Registration info for a fixture before it's added to the resolver.
 
-    Note: This is the legacy registration mechanism used by @session.fixture()
-    and @suite.fixture(). New code should use FixtureMarker instead.
+    Note: This is the legacy registration mechanism used by @session.bind()
+    and @suite.bind(). New code should use FixtureMarker instead.
     """
 
     func: FixtureCallable

@@ -130,7 +130,7 @@ class TestParameterizedCollection:
         def multiplier() -> int:
             return 10
 
-        session.fixture(multiplier)
+        session.bind(multiplier)
 
         numbers = ForEach([1, 2, 3])
 
@@ -261,7 +261,7 @@ class TestParameterizedExecution:
         def multiplier() -> int:
             return 10
 
-        session.fixture(multiplier)
+        session.bind(multiplier)
 
         numbers = ForEach([1, 2, 3])
 

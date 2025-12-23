@@ -87,7 +87,7 @@ class TestScopeAtBinding:
             call_count += 1
             return f"connection_{call_count}"
 
-        session.fixture(database_connection)  # SESSION scope
+        session.bind(database_connection)  # SESSION scope
 
         async with session:
             result1 = await session.resolver.resolve(database_connection)
@@ -114,7 +114,7 @@ class TestScopeAtBinding:
             call_count += 1
             return f"resource_{call_count}"
 
-        suite_a.fixture(suite_resource_a)  # SUITE scope
+        suite_a.bind(suite_resource_a)  # SUITE scope
 
         @fixture()
         def suite_resource_b() -> str:
@@ -122,7 +122,7 @@ class TestScopeAtBinding:
             call_count += 1
             return f"resource_{call_count}"
 
-        suite_b.fixture(suite_resource_b)  # SUITE scope
+        suite_b.bind(suite_resource_b)  # SUITE scope
 
         async with session:
             result_a1 = await session.resolver.resolve(
@@ -165,13 +165,13 @@ class TestScopeAtBinding:
         def database() -> str:
             return "db_connection"
 
-        session.fixture(database)  # SESSION scope
+        session.bind(database)  # SESSION scope
 
         @fixture()
         def repository(db: Annotated[str, Use(database)]) -> str:
             return f"Repository({db})"
 
-        session.fixture(repository)  # SESSION scope
+        session.bind(repository)  # SESSION scope
 
         async with session:
             result = await session.resolver.resolve(repository)
@@ -190,13 +190,13 @@ class TestScopeAtBinding:
         def global_config() -> str:
             return "global"
 
-        session.fixture(global_config)  # SESSION scope
+        session.bind(global_config)  # SESSION scope
 
         @fixture()
         def suite_service(cfg: Annotated[str, Use(global_config)]) -> str:
             return f"suite_{cfg}"
 
-        my_suite.fixture(suite_service)  # SUITE scope
+        my_suite.bind(suite_service)  # SUITE scope
 
         @fixture()
         def test_helper(svc: Annotated[str, Use(suite_service)]) -> str:
@@ -230,7 +230,7 @@ class TestAutouse:
             setup_done = True
             return "initialized"
 
-        session.fixture(setup_database, autouse=True)  # SESSION + autouse
+        session.bind(setup_database, autouse=True)  # SESSION + autouse
 
         assert setup_done is False
 
@@ -249,14 +249,14 @@ class TestAutouse:
             log.append("database")
             return "db"
 
-        session.fixture(database)  # SESSION scope
+        session.bind(database)  # SESSION scope
 
         @fixture()
         def init_tables(db: Annotated[str, Use(database)]) -> str:
             log.append(f"tables_on_{db}")
             return "tables"
 
-        session.fixture(init_tables, autouse=True)  # SESSION + autouse
+        session.bind(init_tables, autouse=True)  # SESSION + autouse
 
         async with session:
             await session.resolve_autouse()
@@ -276,7 +276,7 @@ class TestAutouse:
             log.append("suite_setup")
             return "setup"
 
-        suite.fixture(suite_setup, autouse=True)  # SUITE + autouse
+        suite.bind(suite_setup, autouse=True)  # SUITE + autouse
 
         async with session:
             assert log == []
@@ -296,14 +296,14 @@ class TestAutouse:
             log.append("database")
             return "db"
 
-        session.fixture(database)  # SESSION scope
+        session.bind(database)  # SESSION scope
 
         @fixture()
         def suite_init(db: Annotated[str, Use(database)]) -> str:
             log.append(f"suite_init_{db}")
             return "init"
 
-        suite.fixture(suite_init, autouse=True)  # SUITE + autouse
+        suite.bind(suite_init, autouse=True)  # SUITE + autouse
 
         async with session:
             await session.resolve_autouse()
@@ -324,7 +324,7 @@ class TestAutouse:
             yield "resource"
             teardown_log.append("torn_down")
 
-        suite.fixture(suite_resource, autouse=True)  # SUITE + autouse
+        suite.bind(suite_resource, autouse=True)  # SUITE + autouse
 
         async with session:
             await session.resolver.resolve_suite_autouse("TestSuite")
@@ -353,14 +353,14 @@ class TestAutouse:
             call_counts["parent"] += 1
             return "parent"
 
-        parent.fixture(parent_setup, autouse=True)  # SUITE + autouse
+        parent.bind(parent_setup, autouse=True)  # SUITE + autouse
 
         @fixture()
         def child_setup() -> str:
             call_counts["child"] += 1
             return "child"
 
-        child.fixture(child_setup, autouse=True)  # SUITE + autouse
+        child.bind(child_setup, autouse=True)  # SUITE + autouse
 
         async with session:
             # Resolve autouse for parent suite - only parent_setup runs
@@ -391,7 +391,7 @@ class TestSuiteTeardown:
             yield "resource"
             teardown_log.append("torn_down")
 
-        test_suite.fixture(suite_resource)  # SUITE scope
+        test_suite.bind(suite_resource)  # SUITE scope
 
         async with session:
             await session.resolver.resolve(suite_resource, current_path="test_suite")
@@ -415,7 +415,7 @@ class TestSuiteTeardown:
             call_count += 1
             return f"resource_{call_count}"
 
-        suite.fixture(counted_resource)  # SUITE scope
+        suite.bind(counted_resource)  # SUITE scope
 
         async with session:
             result1 = await session.resolver.resolve(
@@ -449,7 +449,7 @@ class TestNestedSuites:
         def parent_resource() -> str:
             return "parent_data"
 
-        parent.fixture(parent_resource)  # SUITE scope
+        parent.bind(parent_resource)  # SUITE scope
 
         @fixture()
         def child_resource(
@@ -457,7 +457,7 @@ class TestNestedSuites:
         ) -> str:
             return f"child_using_{parent}"
 
-        child.fixture(child_resource)  # SUITE scope
+        child.bind(child_resource)  # SUITE scope
 
         async with session:
             result = await session.resolver.resolve(
@@ -479,7 +479,7 @@ class TestNestedSuites:
         def session_resource() -> str:
             return "session_data"
 
-        session.fixture(session_resource)  # SESSION scope
+        session.bind(session_resource)  # SESSION scope
 
         @fixture()
         def child_resource(
@@ -487,7 +487,7 @@ class TestNestedSuites:
         ) -> str:
             return f"child_using_{sess}"
 
-        child.fixture(child_resource)  # SUITE scope
+        child.bind(child_resource)  # SUITE scope
 
         async with session:
             result = await session.resolver.resolve(
@@ -508,7 +508,7 @@ class TestSuiteFactory:
         def user_factory(name: str) -> Generator[str, None, None]:
             yield f"user_{name}"
 
-        suite.fixture(user_factory)  # SUITE scope
+        suite.bind(user_factory)  # SUITE scope
 
         async with session:
             factory_inst = await session.resolver.resolve(
@@ -531,7 +531,7 @@ class TestSuiteFactory:
             call_count += 1
             return f"instance_{call_count}_{tag}"
 
-        suite.fixture(uncached_factory)  # SUITE scope
+        suite.bind(uncached_factory)  # SUITE scope
 
         async with session:
             factory_inst = await session.resolver.resolve(
@@ -558,7 +558,7 @@ class TestSuiteFactory:
         def user_factory() -> UserFactory:
             return UserFactory()
 
-        suite.fixture(user_factory)  # SUITE scope
+        suite.bind(user_factory)  # SUITE scope
 
         async with session:
             factory_inst = await session.resolver.resolve(
@@ -597,18 +597,18 @@ class TestSuiteAddAfterAttach:
 
 
 class TestFixtureBinding:
-    """Tests for session.fixture() and suite.fixture() API."""
+    """Tests for session.bind() and suite.bind() API."""
 
     @pytest.mark.asyncio
     async def test_session_fixture_binds_to_session_scope(self) -> None:
-        """session.fixture() binds a fixture to SESSION scope."""
+        """session.bind() binds a fixture to SESSION scope."""
 
         @fixture()
         def config() -> str:
             return "session_config"
 
         session = ProTestSession()
-        session.fixture(config)  # SESSION scope
+        session.bind(config)  # SESSION scope
 
         async with session:
             result = await session.resolver.resolve(config)
@@ -617,7 +617,7 @@ class TestFixtureBinding:
 
     @pytest.mark.asyncio
     async def test_session_fixture_with_autouse(self) -> None:
-        """session.fixture(fn, autouse=True) auto-resolves at session start."""
+        """session.bind(fn, autouse=True) auto-resolves at session start."""
 
         setup_done = False
 
@@ -628,7 +628,7 @@ class TestFixtureBinding:
             return "initialized"
 
         session = ProTestSession()
-        session.fixture(auto_setup, autouse=True)  # SESSION + autouse
+        session.bind(auto_setup, autouse=True)  # SESSION + autouse
 
         assert setup_done is False
 
@@ -638,7 +638,7 @@ class TestFixtureBinding:
 
     @pytest.mark.asyncio
     async def test_suite_fixture_binds_to_suite_scope(self) -> None:
-        """suite.fixture() binds a fixture to SUITE scope."""
+        """suite.bind() binds a fixture to SUITE scope."""
 
         @fixture()
         def suite_resource() -> str:
@@ -646,7 +646,7 @@ class TestFixtureBinding:
 
         session = ProTestSession()
         suite = ProTestSuite("TestSuite")
-        suite.fixture(suite_resource)  # SUITE scope
+        suite.bind(suite_resource)  # SUITE scope
         session.add_suite(suite)
 
         async with session:
@@ -665,7 +665,7 @@ class TestFixtureBinding:
         session = ProTestSession()
 
         with pytest.raises(ValueError, match="not decorated"):
-            session.fixture(plain_func)
+            session.bind(plain_func)
 
 
 class TestNestedSuiteFixtureLifetime:
@@ -697,7 +697,7 @@ class TestNestedSuiteFixtureLifetime:
             call_count += 1
             yield f"resource_{call_count}"
 
-        parent.fixture(parent_resource)  # SUITE scope
+        parent.bind(parent_resource)  # SUITE scope
 
         # Test in parent suite that uses the fixture
         @parent.test()
@@ -740,7 +740,7 @@ class TestNestedSuiteFixtureLifetime:
             yield "parent"
             teardown_order.append("parent")
 
-        parent.fixture(parent_resource)  # SUITE scope
+        parent.bind(parent_resource)  # SUITE scope
 
         @fixture()
         def child_resource(
@@ -749,7 +749,7 @@ class TestNestedSuiteFixtureLifetime:
             yield f"child_of_{p}"
             teardown_order.append("child")
 
-        child.fixture(child_resource)  # SUITE scope
+        child.bind(child_resource)  # SUITE scope
 
         @parent.test()
         def test_in_parent(res: Annotated[str, Use(parent_resource)]) -> None:
