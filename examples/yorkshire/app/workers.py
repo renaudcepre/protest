@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from examples.yorkshire.kennel import Kennel
+from examples.yorkshire.app.kennel import Kennel
 
 
 @dataclass

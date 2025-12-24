@@ -2,14 +2,14 @@
 
 from typing import Annotated
 
-from examples.yorkshire.domain import Job, Yorkshire
-from examples.yorkshire.fixtures import yorkshire
-from examples.yorkshire.suites.adults.workers.domain import (
+from examples.yorkshire.app.domain import Job, Yorkshire
+from examples.yorkshire.app.workers import (
     ChefKitchen,
     DetectiveTools,
     WorkSchedule,
 )
-from examples.yorkshire.suites.adults.workers.fixtures import (
+from examples.yorkshire.tests.fixtures import yorkshire
+from examples.yorkshire.tests.suites.adults.workers.fixtures import (
     case_file,
     chef_kitchen,
     detective_tools,

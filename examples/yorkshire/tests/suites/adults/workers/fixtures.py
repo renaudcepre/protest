@@ -3,14 +3,14 @@
 from collections.abc import Generator
 from typing import Annotated
 
-from examples.yorkshire.domain import Job, Size, Yorkshire
-from examples.yorkshire.fixtures import kennel
-from examples.yorkshire.kennel import Kennel
-from examples.yorkshire.suites.adults.workers.domain import (
+from examples.yorkshire.app.domain import Job, Size, Yorkshire
+from examples.yorkshire.app.kennel import Kennel
+from examples.yorkshire.app.workers import (
     ChefKitchen,
     DetectiveTools,
     WorkSchedule,
 )
+from examples.yorkshire.tests.fixtures import kennel
 from protest import Use, factory, fixture
 
 # =============================================================================

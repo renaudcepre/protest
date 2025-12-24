@@ -6,9 +6,9 @@ This module demonstrates advanced ProTest features in one place.
 import asyncio
 from typing import Annotated
 
-from examples.yorkshire.domain import Coat, Job, Size, Yorkshire
-from examples.yorkshire.fixtures import grooming_quote, yorkshire
-from examples.yorkshire.services import GroomingService, VetService
+from examples.yorkshire.app.domain import Coat, Job, Size, Yorkshire
+from examples.yorkshire.app.services import GroomingService, VetService
+from examples.yorkshire.tests.fixtures import grooming_quote, yorkshire
 from protest import (
     FixtureFactory,
     ForEach,
