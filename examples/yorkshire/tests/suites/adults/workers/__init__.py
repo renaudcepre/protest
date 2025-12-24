@@ -8,6 +8,6 @@ This module showcases:
 - Factory fixtures bound to suites
 """
 
-from examples.yorkshire.suites.adults.workers.suite import workers_suite
+from examples.yorkshire.tests.suites.adults.workers.suite import workers_suite
 
 __all__ = ["workers_suite"]

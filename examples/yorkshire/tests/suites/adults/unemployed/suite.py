@@ -2,9 +2,9 @@
 
 from typing import Annotated
 
-from examples.yorkshire.domain import Job, Yorkshire
-from examples.yorkshire.fixtures import kennel, yorkshire
-from examples.yorkshire.kennel import Kennel
+from examples.yorkshire.app.domain import Job, Yorkshire
+from examples.yorkshire.app.kennel import Kennel
+from examples.yorkshire.tests.fixtures import kennel, yorkshire
 from protest import FixtureFactory, ProTestSuite, Use
 
 unemployed_suite = ProTestSuite("Unemployed")

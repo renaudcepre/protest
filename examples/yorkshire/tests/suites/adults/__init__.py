@@ -3,8 +3,8 @@
 Demonstrates 3-level suite hierarchy: session → adults → workers/unemployed.
 """
 
-from examples.yorkshire.suites.adults.unemployed import unemployed_suite
-from examples.yorkshire.suites.adults.workers import workers_suite
+from examples.yorkshire.tests.suites.adults.unemployed.suite import unemployed_suite
+from examples.yorkshire.tests.suites.adults.workers import workers_suite
 from protest import ProTestSuite
 
 adults_suite = ProTestSuite("Adults")

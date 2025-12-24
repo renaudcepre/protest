@@ -1,7 +1,7 @@
 import logging
 from dataclasses import replace
 
-from examples.yorkshire.domain import Job, Yorkshire
+from examples.yorkshire.app.domain import Job, Yorkshire
 
 logger = logging.getLogger(__name__)
 

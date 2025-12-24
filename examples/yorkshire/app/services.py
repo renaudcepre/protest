@@ -1,4 +1,4 @@
-from examples.yorkshire.domain import Yorkshire
+from examples.yorkshire.app.domain import Yorkshire
 
 
 class VetService:

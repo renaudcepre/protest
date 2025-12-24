@@ -1,6 +1,6 @@
 """Yorkshire Terrier Test Session - Entry Point.
 
-Run with: protest run examples.yorkshire.session:session
+Run with: protest run examples.yorkshire.tests.session:session
 
 Structure:
 - Puppies suite (basic tests)
@@ -10,12 +10,16 @@ Structure:
 - Showcase suite (ForEach, mocker, caplog, raises, Retry)
 """
 
-from examples.yorkshire.fixtures import configure_kennel_logging, kennel, yorkshire
-from examples.yorkshire.suites.adults import adults_suite
-from examples.yorkshire.suites.legacy import legacy_suite
-from examples.yorkshire.suites.puppies import puppies_suite
-from examples.yorkshire.suites.seniors import seniors_suite
-from examples.yorkshire.suites.showcase import showcase_suite
+from examples.yorkshire.tests.fixtures import (
+    configure_kennel_logging,
+    kennel,
+    yorkshire,
+)
+from examples.yorkshire.tests.suites.adults import adults_suite
+from examples.yorkshire.tests.suites.legacy.suite import legacy_suite
+from examples.yorkshire.tests.suites.puppies.suite import puppies_suite
+from examples.yorkshire.tests.suites.seniors.suite import seniors_suite
+from examples.yorkshire.tests.suites.showcase.suite import showcase_suite
 from protest import ProTestSession
 
 session = ProTestSession(concurrency=4)

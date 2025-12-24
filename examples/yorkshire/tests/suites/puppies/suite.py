@@ -2,8 +2,8 @@
 
 from typing import Annotated
 
-from examples.yorkshire.domain import Coat, Job, Size, Yorkshire
-from examples.yorkshire.fixtures import yorkshire
+from examples.yorkshire.app.domain import Coat, Job, Size, Yorkshire
+from examples.yorkshire.tests.fixtures import yorkshire
 from protest import FixtureFactory, ProTestSuite, Use
 
 puppies_suite = ProTestSuite("Puppies", tags=["puppy"])

@@ -13,8 +13,8 @@ import logging
 from collections.abc import AsyncGenerator, Generator
 from typing import Annotated
 
-from examples.yorkshire.domain import Job, Size, Yorkshire
-from examples.yorkshire.kennel import Kennel
+from examples.yorkshire.app.domain import Job, Size, Yorkshire
+from examples.yorkshire.app.kennel import Kennel
 from protest import Use, factory, fixture
 
 
@@ -27,7 +27,6 @@ def configure_kennel_logging() -> Generator[None, None, None]:
 
 @fixture(tags=["database", "slow-setup"])
 async def kennel() -> AsyncGenerator[Kennel, None]:
-    """Shared kennel instance - expensive to create, reused across tests."""
     kennel_instance = Kennel()
     await asyncio.sleep(0.1)
     yield kennel_instance
@@ -50,11 +49,6 @@ async def yorkshire(
     await kennel_fixture.add(dog)
     yield dog
     await kennel_fixture.remove(dog.name)
-
-
-# =============================================================================
-# TEST-SCOPED FIXTURES (used by showcase)
-# =============================================================================
 
 
 @fixture(tags=["temp"])
