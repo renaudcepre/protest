@@ -536,16 +536,18 @@ class TestRunner:
 
             try:
                 if item.timeout is not None:
-                    await asyncio.wait_for(
-                        ensure_async(item.func, **kwargs),
-                        timeout=item.timeout,
-                    )
+                    try:
+                        await asyncio.wait_for(
+                            ensure_async(item.func, **kwargs),
+                            timeout=item.timeout,
+                        )
+                    except asyncio.TimeoutError:
+                        # Only wrap timeout from wait_for, not from test code
+                        raise asyncio.TimeoutError(
+                            f"Test exceeded timeout of {item.timeout}s"
+                        ) from None
                 else:
                     await ensure_async(item.func, **kwargs)
-            except asyncio.TimeoutError:
-                error = asyncio.TimeoutError(
-                    f"Test exceeded timeout of {item.timeout}s"
-                )
             except FixtureError as exc:
                 error = exc.original
                 is_fixture_error = True
