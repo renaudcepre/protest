@@ -277,9 +277,6 @@ async def test_subprocess():
     # Command as list
     result = await Shell.run(["ls", "-la", "/tmp"])
     assert result.success
-
-    # Assert success automatically
-    result = await Shell.run_ok("make build")  # Raises AssertionError if exit != 0
 ```
 
 ### Shell Features (pipes, &&, etc.)

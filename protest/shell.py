@@ -3,19 +3,31 @@
 Provides isolated, async-safe subprocess execution with captured output.
 Use this for CLI/integration tests where you need to capture subprocess output.
 
+Security: When using shell=True, only literal strings are accepted to prevent
+command injection. Dynamic strings (f-strings with variables) will be rejected
+by type checkers.
+
 Example:
     @suite.test()
     async def test_cli():
         result = await Shell.run("my-app --version")
         assert result.exit_code == 0
         assert "1.0.0" in result.stdout
+
+    # Shell features (pipes, &&) require shell=True
+    result = await Shell.run("echo hello && echo world", shell=True)
 """
 
 from __future__ import annotations
 
 import asyncio
 import shlex
+import sys
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal, overload
+
+if TYPE_CHECKING:
+    from protest.compat import LiteralString
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,23 +61,66 @@ class Shell:
     Uses asyncio.create_subprocess_exec with dedicated pipes,
     ensuring thread-safe capture even in concurrent tests.
 
-    Example:
-        result = await Shell.run("echo hello")
-        assert result.stdout == "hello\\n"
+    Security:
+        When shell=True, only literal strings are accepted to prevent injection.
+        Type checkers (mypy, pyright) will reject dynamic strings like f-strings.
 
-        # With args as list
+    Example:
+        # Safe: list of args (no shell interpretation)
         result = await Shell.run(["ls", "-la"])
 
-        # Check success
-        result = await Shell.run("false")
-        assert not result.success
+        # Safe: literal string without shell
+        result = await Shell.run("echo hello")
 
-        # Timeout
-        result = await Shell.run("sleep 10", timeout=1.0)  # Raises TimeoutError
+        # Safe: literal string WITH shell (for pipes, &&, etc)
+        result = await Shell.run("echo hello && echo world", shell=True)
+
+        # UNSAFE - Type checker will reject this:
+        user_input = get_user_input()
+        result = await Shell.run(f"echo {user_input}", shell=True)  # Error!
     """
 
+    # Overload 1: list[str] command - always safe, shell param ignored
+    @overload
     @staticmethod
     async def run(
+        command: list[str],
+        *,
+        timeout: float | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        print_output: bool = True,
+        shell: bool = False,
+    ) -> CommandResult: ...
+
+    # Overload 2: str command without shell - safe
+    @overload
+    @staticmethod
+    async def run(
+        command: str,
+        *,
+        timeout: float | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        print_output: bool = True,
+        shell: Literal[False] = False,
+    ) -> CommandResult: ...
+
+    # Overload 3: str command WITH shell - must be LiteralString
+    @overload
+    @staticmethod
+    async def run(
+        command: LiteralString,
+        *,
+        timeout: float | None = None,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        print_output: bool = True,
+        shell: Literal[True],
+    ) -> CommandResult: ...
+
+    @staticmethod
+    async def run(  # noqa: PLR0913
         command: str | list[str],
         *,
         timeout: float | None = None,
@@ -83,18 +138,21 @@ class Shell:
             env: Environment variables (replaces current env if set).
             print_output: If True, print stdout/stderr for test capture.
             shell: If True, run through shell (supports pipes, &&, etc).
+                   When True, command must be a literal string for security.
 
         Returns:
             CommandResult with stdout, stderr, exit_code.
 
         Raises:
             asyncio.TimeoutError: If timeout is exceeded.
+
+        Security:
+            When shell=True, only literal strings (not f-strings with variables)
+            are accepted. This prevents command injection attacks. Type checkers
+            will reject dynamic strings at development time.
         """
         if shell:
-            if isinstance(command, list):
-                command_str = shlex.join(command)
-            else:
-                command_str = command
+            command_str = shlex.join(command) if isinstance(command, list) else command
             process = await asyncio.create_subprocess_shell(
                 command_str,
                 stdout=asyncio.subprocess.PIPE,
@@ -103,10 +161,7 @@ class Shell:
                 env=env,
             )
         else:
-            if isinstance(command, str):
-                args = shlex.split(command)
-            else:
-                args = list(command)
+            args = shlex.split(command) if isinstance(command, str) else list(command)
             command_str = shlex.join(args)
             process = await asyncio.create_subprocess_exec(
                 *args,
@@ -133,11 +188,9 @@ class Shell:
         # Print output so it gets captured by ProTest's TaskAwareStream
         if print_output:
             if stdout:
-                print(stdout, end="")
+                print(stdout, end="")  # noqa: T201
             if stderr:
-                import sys
-
-                print(stderr, end="", file=sys.stderr)
+                print(stderr, end="", file=sys.stderr)  # noqa: T201
 
         return CommandResult(
             stdout=stdout,
@@ -145,32 +198,3 @@ class Shell:
             exit_code=exit_code,
             command=command_str,
         )
-
-    @staticmethod
-    async def run_ok(
-        command: str | list[str],
-        *,
-        timeout: float | None = None,
-        cwd: str | None = None,
-        env: dict[str, str] | None = None,
-        print_output: bool = True,
-        shell: bool = False,
-    ) -> CommandResult:
-        """Run a command and assert it succeeds (exit code 0).
-
-        Same as run() but raises AssertionError if exit code != 0.
-        """
-        result = await Shell.run(
-            command,
-            timeout=timeout,
-            cwd=cwd,
-            env=env,
-            print_output=print_output,
-            shell=shell,
-        )
-        if not result.success:
-            raise AssertionError(
-                f"Command failed with exit code {result.exit_code}: {result.command}\n"
-                f"stderr: {result.stderr}"
-            )
-        return result
