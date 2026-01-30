@@ -135,6 +135,111 @@ async def test_not_ready():
     await something()  # Never executed
 ```
 
+## Skip
+
+Mark tests to be skipped:
+
+```python
+# Simple skip
+@session.test(skip=True)
+def test_not_ready():
+    pass  # Never runs
+
+# With reason
+@session.test(skip="Waiting for API v2")
+def test_new_feature():
+    pass
+```
+
+### Skip Object
+
+For advanced use, import the `Skip` dataclass:
+
+```python
+from protest import Skip
+
+@session.test(skip=Skip(reason="Blocked by #123"))
+def test_blocked():
+    pass
+```
+
+## Expected Failure (xfail)
+
+Mark tests expected to fail:
+
+```python
+# Simple xfail
+@session.test(xfail=True)
+def test_known_bug():
+    assert False  # XFAIL, not FAIL
+
+# With reason
+@session.test(xfail="Bug #456")
+def test_reported_issue():
+    raise ValueError()
+```
+
+### Xfail Object
+
+```python
+from protest import Xfail
+
+# strict=True (default): unexpected pass is a failure (XPASS → FAIL)
+@session.test(xfail=Xfail(reason="Flaky", strict=True))
+def test_strict():
+    pass  # FAIL (unexpected pass)
+
+# strict=False: unexpected pass is OK (XPASS → PASS)
+@session.test(xfail=Xfail(reason="Flaky", strict=False))
+def test_lenient():
+    pass  # PASS (OK)
+```
+
+## Retry
+
+Retry failed tests automatically:
+
+```python
+# Simple retry (3 attempts)
+@session.test(retry=3)
+async def test_flaky_api():
+    await call_external_api()
+
+# With delay between retries
+from protest import Retry
+
+@session.test(retry=Retry(times=3, delay=1.0))
+async def test_with_backoff():
+    await call_api()
+
+# Only retry specific exceptions
+@session.test(retry=Retry(times=2, on=ConnectionError))
+async def test_network():
+    await fetch_data()
+
+# Multiple exception types
+@session.test(retry=Retry(times=2, on=(ConnectionError, TimeoutError)))
+async def test_resilient():
+    await risky_operation()
+```
+
+### Retry Behavior
+
+- `times`: Maximum number of attempts (including the first)
+- `delay`: Seconds to wait between retries (default: 0)
+- `on`: Exception type(s) to retry on (default: `Exception`)
+
+## Behavior Interactions
+
+When combining options:
+
+| Combination | Behavior |
+|-------------|----------|
+| `skip + xfail` | Skip takes priority (test not executed) |
+| `skip + retry` | Skip takes priority |
+| `xfail + retry` | Retry first, then xfail/xpass evaluation |
+| `timeout + retry` | Timeout triggers retry |
+
 ## Output Capture
 
 stdout and stderr are captured during test execution. If a test fails, the captured output is displayed in the error report.

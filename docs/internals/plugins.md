@@ -214,7 +214,67 @@ Plugins with `add_cli_options` are auto-discovered. Their options appear in
 - Don't raise exceptions to control flow
 - Don't modify shared mutable state across `await` points without synchronization
 
+## Shared Cache Storage
+
+Plugins can share data via `session.cache`, a `CacheStorage` instance. This enables cross-plugin communication without direct coupling.
+
+### Accessing the Cache
+
+```python
+from protest.plugin import PluginBase
+from protest.entities import TestResult
+
+
+class MyPlugin(PluginBase):
+    name = "my-plugin"
+
+    def setup(self, session) -> None:
+        # Read previous run data
+        durations = session.cache.get_durations()
+        failed = session.cache.get_failed_node_ids()
+
+    def on_test_pass(self, result: TestResult) -> None:
+        # Record result
+        session.cache.set_result(result.node_id, "passed", result.duration)
+
+    def on_session_end(self, result) -> None:
+        # Persist to disk
+        session.cache.save()
+```
+
+### CacheStorage API
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `load()` | `None` | Load cache from `.protest/cache.json` |
+| `save()` | `None` | Persist cache to disk |
+| `clear()` | `None` | Delete cache file |
+| `get_result(node_id)` | `TestCacheEntry \| None` | Get cached result for a test |
+| `set_result(node_id, status, duration)` | `None` | Record a test result |
+| `get_results()` | `dict[str, TestCacheEntry]` | All cached results |
+| `get_durations()` | `dict[str, float]` | Test durations by node_id |
+| `get_failed_node_ids()` | `set[str]` | Node IDs of failed tests |
+| `get_passed_node_ids()` | `set[str]` | Node IDs of passed tests |
+
+### Example: Duration-Based Ordering
+
+```python
+class FastFirstPlugin(PluginBase):
+    """Run fast tests first based on previous durations."""
+    name = "fast-first"
+
+    def setup(self, session) -> None:
+        session.cache.load()
+        self.durations = session.cache.get_durations()
+
+    def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
+        def sort_key(item):
+            return self.durations.get(item.node_id, float("inf"))
+        return sorted(items, key=sort_key)
+```
+
 ## See Also
 
 - [Event Bus](event-bus.md) - How the bus dispatches events
 - [Events](events.md) - Complete event reference with payloads
+- [Architecture](architecture.md) - Overall system design
