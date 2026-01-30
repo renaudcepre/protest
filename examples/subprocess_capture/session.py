@@ -8,6 +8,8 @@ The recommended approach is to use the Shell helper, which provides
 async-safe subprocess execution with automatic output capture.
 """
 
+import subprocess
+
 from protest import ProTestSession, ProTestSuite, Shell
 
 session = ProTestSession()
@@ -37,18 +39,11 @@ async def test_shell_with_args_list() -> None:
 
 
 @suite.test()
-async def test_shell_run_ok() -> None:
-    """Shell.run_ok() asserts success automatically."""
-    result = await Shell.run_ok("echo 'Must succeed'")
-
-    # No need to check exit_code - run_ok() already did
-    assert "Must succeed" in result.stdout
-
-
-@suite.test()
 async def test_shell_with_timeout() -> None:
     """Shell supports timeout for long-running commands."""
-    result = await Shell.run("sleep 0.1 && echo done", timeout=5.0, shell=True)
+    result = await Shell.run(  # noqa: S604
+        "sleep 0.1 && echo done", timeout=5.0, shell=True
+    )
 
     assert result.success
     assert "done" in result.stdout
@@ -57,7 +52,7 @@ async def test_shell_with_timeout() -> None:
 @suite.test()
 async def test_shell_failure() -> None:
     """Shell captures failures cleanly (shell=True for builtins like exit)."""
-    result = await Shell.run("exit 1", shell=True)
+    result = await Shell.run("exit 1", shell=True)  # noqa: S604
 
     assert not result.success
     assert result.exit_code == 1
@@ -66,7 +61,7 @@ async def test_shell_failure() -> None:
 @suite.test()
 async def test_shell_stderr() -> None:
     """Shell captures both stdout and stderr."""
-    result = await Shell.run("echo 'out' && echo 'err' >&2", shell=True)
+    result = await Shell.run("echo 'out' && echo 'err' >&2", shell=True)  # noqa: S604
 
     assert "out" in result.stdout
     assert "err" in result.stderr
@@ -76,30 +71,28 @@ async def test_shell_stderr() -> None:
 @suite.test()
 async def test_failing_to_show_capture() -> None:
     """This test fails intentionally to demonstrate captured output."""
-    result = await Shell.run("echo 'This output will be shown in the failure report'")
+    await Shell.run("echo 'This output will be shown in the failure report'")
 
-    assert False, "Intentional failure to show captured subprocess output"
+    raise AssertionError("Intentional failure to show captured subprocess output")
 
 
 # --- Alternative: sync subprocess with manual capture ---
 # Use this if you need sync subprocess or specific subprocess options
 
 
-import subprocess
-
-
 @suite.test()
 def test_sync_subprocess() -> None:
     """Sync subprocess with capture_output=True."""
     result = subprocess.run(
-        ["echo", "Sync subprocess"],
+        ["echo", "Sync subprocess"],  # noqa: S607
+        check=False,
         capture_output=True,
         text=True,
     )
 
     # Print captured output so ProTest can capture it
     if result.stdout:
-        print(result.stdout, end="")
+        print(result.stdout, end="")  # noqa: T201
 
     assert result.returncode == 0
     assert "Sync" in result.stdout

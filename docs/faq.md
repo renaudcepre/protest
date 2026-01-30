@@ -164,14 +164,5 @@ async def test_pipeline() -> None:
     assert result.success
 ```
 
-**Assert success automatically:**
-
-```python
-@suite.test()
-async def test_must_succeed() -> None:
-    # Raises AssertionError if exit code != 0
-    result = await Shell.run_ok("make build")
-```
-
 See `examples/subprocess_capture/session.py` for complete examples and [Built-ins](core-concepts/builtins.md#shell) for full API.
 
