@@ -4,6 +4,20 @@
 
 ProTest est un framework de test async-first avec injection de dépendances explicite (style FastAPI).
 
+## Règles de Documentation
+
+**IMPORTANT** : Après chaque modification significative du code :
+
+1. **Toujours documenter** : Mettre à jour la doc utilisateur (`docs/`) et interne (`CLAUDE.md`)
+2. **Vérifier la cohérence** : S'assurer que la documentation existante ne contredit pas les changements
+3. **Exemples à jour** : Vérifier que les exemples dans `examples/` reflètent l'API actuelle
+
+Checklist après un changement :
+- [ ] `docs/core-concepts/*.md` - doc utilisateur à jour ?
+- [ ] `CLAUDE.md` - architecture/décisions documentées ?
+- [ ] `examples/` - exemples fonctionnels ?
+- [ ] Pas de doc obsolète qui contredit le nouveau comportement ?
+
 ## Structure des Modules
 
 ```
@@ -677,41 +691,86 @@ from protest import Mocker, MockType, AsyncMockType
 - `Mocker._mock_to_patcher` : mapping mock → patcher pour `stop()`
 - Teardown LIFO garanti via `reversed(self._patchers)`
 
+## Shell Helper
+
+ProTest fournit un helper `Shell` pour exécuter des subprocesses dans les tests avec capture isolée et thread-safe.
+
+### Usage
+
+```python
+from protest import Shell
+
+@suite.test()
+async def test_cli() -> None:
+    # Simple command
+    result = await Shell.run("my-app --version")
+    assert result.success
+    assert "1.0.0" in result.stdout
+
+    # With shell features (pipes, &&, etc)
+    result = await Shell.run("echo hello && echo world", shell=True)
+    assert "hello" in result.stdout
+
+    # Assert success automatically
+    result = await Shell.run_ok("my-app build")  # Raises if exit != 0
+
+    # With timeout
+    result = await Shell.run("slow-command", timeout=30.0)
+```
+
+### API
+
+```python
+await Shell.run(
+    command: str | list[str],  # Command string or list of args
+    timeout: float | None,      # Timeout in seconds
+    cwd: str | None,            # Working directory
+    env: dict[str, str] | None, # Environment variables
+    print_output: bool = True,  # Print output for capture
+    shell: bool = False,        # Use shell (for pipes, &&, etc)
+) -> CommandResult
+
+@dataclass
+class CommandResult:
+    stdout: str
+    stderr: str
+    exit_code: int
+    command: str
+    success: bool      # exit_code == 0
+    output: str        # Combined stdout + stderr
+```
+
+### Pourquoi Shell plutôt que subprocess direct ?
+
+- **Async-safe** : utilise `asyncio.create_subprocess_exec/shell`
+- **Thread-safe** : chaque appel a ses propres pipes isolés
+- **Auto-capture** : `print_output=True` réimprime pour la capture ProTest
+- **Concurrent-safe** : fonctionne avec `-n N` sans attribution ambiguë
+
 ## Limitations Connues
 
-### Capture de Subprocess
+### Capture de Subprocess (sans Shell helper)
 
-**Limitation** : ProTest capture automatiquement `print()` et `logging`, mais PAS la sortie directe des subprocesses.
+**Limitation** : ProTest capture automatiquement `print()` et `logging`, mais PAS la sortie directe des subprocesses lancés avec `subprocess.run()` sans capture explicite.
 
 **Pourquoi** : Les subprocesses écrivent directement sur les file descriptors OS (fd 1/2), pas via `sys.stdout`. Dans une architecture async-concurrent où tous les tests partagent le même process, il est impossible d'attribuer la sortie d'un subprocess à un test spécifique.
 
 **Différence avec pytest-xdist** : xdist lance des workers dans des processes séparés (chacun avec ses propres fd). ProTest utilise async dans un seul process.
 
-**Solution : capturer explicitement**
+**Solutions** :
 
+1. **Recommandé : Shell helper** (voir section ci-dessus)
 ```python
-import subprocess
-
-@suite.test()
-def test_with_subprocess() -> None:
-    # ✓ capture_output=True route stdout/stderr vers result
-    result = subprocess.run(
-        ["echo", "Hello"],
-        capture_output=True,
-        text=True,
-    )
-
-    # Re-print pour que ProTest le capture
-    if result.stdout:
-        print(result.stdout, end="")
-
-    assert "Hello" in result.stdout
+result = await Shell.run("my-command")
+assert result.success
 ```
 
-**Patterns recommandés** :
-- `subprocess.run(..., capture_output=True)` - le plus simple
-- `subprocess.check_output(...)` - pour les commandes qui doivent réussir
-- Helper function `run_and_capture()` - pour usage répété
+2. **Alternative : subprocess avec capture manuelle**
+```python
+result = subprocess.run(["cmd"], capture_output=True, text=True)
+if result.stdout:
+    print(result.stdout, end="")  # Re-print pour capture
+```
 
 **Voir** : `examples/subprocess_capture/session.py` pour des exemples complets.
 

@@ -374,27 +374,46 @@ api_suite.add_suite(users_suite)  # Clear: API::Users
 
 ### 4. Uncaptured Subprocess Output
 
+**Case 1: Testing a CLI/executable directly**
+
+Use the `Shell` helper:
+
 ```python
-# BAD: Output goes to terminal, not captured by ProTest
+from protest import Shell
+
 @session.test()
-def test_ffmpeg():
-    subprocess.run(["ffmpeg", "-i", "input.mp4", "output.webm"])
-    # ffmpeg output is LOST - not in test report
+async def test_my_cli():
+    result = await Shell.run("my-cli --version")
+    assert result.success
+    assert "1.0.0" in result.stdout
+    # Output automatically captured and shown on failure
+```
+
+**Case 2: Testing production code that calls subprocesses**
+
+If your production code calls subprocesses without capturing output, that's already a code smell:
+
+```python
+# BAD PRODUCTION CODE: No output capture = no logs, no debug, no error handling
+def convert_video(input_path: str, output_path: str) -> None:
+    subprocess.run(["ffmpeg", "-i", input_path, output_path])  # Where do errors go?
 ```
 
 ```python
-# GOOD: Capture and re-print
-@session.test()
-def test_ffmpeg():
+# GOOD PRODUCTION CODE: Capture output for logging and error handling
+def convert_video(input_path: str, output_path: str) -> ConversionResult:
     result = subprocess.run(
-        ["ffmpeg", "-i", "input.mp4", "output.webm"],
+        ["ffmpeg", "-i", input_path, output_path],
         capture_output=True,
         text=True,
     )
-    if result.stderr:
-        print(result.stderr, end="")  # Now ProTest captures it
-    assert result.returncode == 0
+    if result.returncode != 0:
+        logger.error(f"FFmpeg failed: {result.stderr}")
+        raise ConversionError(result.stderr)
+    return ConversionResult(stdout=result.stdout)
 ```
+
+**Bottom line**: If you're fighting to capture subprocess output in tests, either use `Shell` for CLI tests, or your production code probably needs improvement.
 
 ### 5. Overusing Session Scope
 
