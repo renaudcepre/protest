@@ -36,18 +36,18 @@ These tests don't belong to any suite.
 
 ### Session Fixtures
 
-Bind fixtures to the session with `use_fixtures()`:
+Bind fixtures to the session with `bind()`:
 
 ```python
-from protest import fixture, FixtureScope
+from protest import fixture
 
-@fixture(scope=FixtureScope.SESSION)
+@fixture()
 def database():
     db = connect()
     yield db
     db.close()
 
-session.use_fixtures([database])
+session.bind(database)  # → SESSION scope
 ```
 
 ## ProTestSuite
@@ -78,14 +78,14 @@ api_suite = ProTestSuite(
 
 ### Suite Fixtures
 
-Bind fixtures to a suite with `use_fixtures()`:
+Bind fixtures to a suite with `bind()`:
 
 ```python
-@fixture(scope=FixtureScope.SUITE)
+@fixture()
 def api_client():
     return Client()
 
-api_suite.use_fixtures([api_client])
+api_suite.bind(api_client)  # → SUITE scope
 ```
 
 ## Nested Suites
@@ -126,11 +126,11 @@ orders_suite.full_path # "API::Orders"
 Child suites can access fixtures from parent suites:
 
 ```python
-@fixture(scope=FixtureScope.SUITE)
+@fixture()
 def api_client():
     return Client()
 
-api_suite.use_fixtures([api_client])
+api_suite.bind(api_client)  # → SUITE scope
 
 @users_suite.test()
 async def test_get_user(client: Annotated[Client, Use(api_client)]):
