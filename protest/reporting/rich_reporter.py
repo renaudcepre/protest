@@ -9,14 +9,14 @@ from rich.text import Text  # type: ignore[import-not-found]
 from typing_extensions import Self
 
 from protest.entities import (
-    FixtureInfo,
     HandlerInfo,
     SessionResult,
+    SessionSetupInfo,
     SuiteResult,
+    SuiteSetupInfo,
     TestItem,
     TestResult,
     TestRetryInfo,
-    format_fixture_scope,
 )
 from protest.plugin import PluginBase, PluginContext
 
@@ -49,12 +49,9 @@ class RichReporter(PluginBase):
 
     def __init__(self) -> None:
         self.console = Console(highlight=False)
-        self._printed_suites: set[str | None] = set()
         self._total_tests = 0
         self._failed_results: list[TestResult] = []
         self._error_results: list[TestResult] = []
-        self._setup_started: set[str] = set()
-        self._teardown_started: set[str] = set()
 
         self._live: Live | None = None
         self._start_time: float = 0
@@ -145,17 +142,20 @@ class RichReporter(PluginBase):
 
         return items
 
-    def on_fixture_setup_start(self, info: FixtureInfo) -> None:
-        display = format_fixture_scope(info.scope, info.scope_path)
-        if display not in self._setup_started:
-            self._print(f"[yellow]  {display} setup...[/]")
-            self._setup_started.add(display)
+    def on_session_start(self) -> None:
+        self._print("[dim]  session setup...[/]")
 
-    def on_fixture_teardown_start(self, info: FixtureInfo) -> None:
-        display = format_fixture_scope(info.scope, info.scope_path)
-        if display not in self._teardown_started:
-            self._print(f"[yellow]  {display} teardown...[/]")
-            self._teardown_started.add(display)
+    def on_session_setup_done(self, info: SessionSetupInfo) -> None:
+        pass
+
+    def on_suite_setup_done(self, info: SuiteSetupInfo) -> None:
+        self._print(f"[cyan]       ◈ {info.name}[/]")
+
+    def on_session_teardown_start(self) -> None:
+        self._print("[dim]  session teardown...[/]")
+
+    def on_suite_teardown_start(self, name: str) -> None:
+        self._print(f"[dim]  suite '{name}' teardown...[/]")
 
     def on_suite_end(self, result: SuiteResult) -> None:
         if result.teardown_duration > 0:
@@ -170,16 +170,9 @@ class RichReporter(PluginBase):
             )
 
     def on_suite_start(self, name: str) -> None:
-        pass
-
-    def _print_suite_header_if_needed(self, suite_path: str | None) -> None:
-        if suite_path not in self._printed_suites:
-            self._printed_suites.add(suite_path)
-            if suite_path:
-                self._print(f"[cyan]       ◈ {suite_path}[/]")
+        self._print(f"[dim]  suite '{name}' setup...[/]")
 
     def on_test_retry(self, info: TestRetryInfo) -> None:
-        self._print_suite_header_if_needed(info.suite_path)
         delay_msg = f", retrying in {info.delay}s" if info.delay > 0 else ""
         error_name = type(info.error).__name__
         self._print(
@@ -189,7 +182,6 @@ class RichReporter(PluginBase):
 
     def on_test_pass(self, result: TestResult) -> None:
         self._passed += 1
-        self._print_suite_header_if_needed(result.suite_path)
         name = _format_test_name(result)
         duration = _format_duration(result.duration)
         retry_suffix = ""
@@ -201,7 +193,6 @@ class RichReporter(PluginBase):
         self._update_live()
 
     def on_test_fail(self, result: TestResult) -> None:
-        self._print_suite_header_if_needed(result.suite_path)
         name = _format_test_name(result)
         retry_suffix = ""
         if result.max_attempts > 1:
@@ -233,14 +224,12 @@ class RichReporter(PluginBase):
 
     def on_test_skip(self, result: TestResult) -> None:
         self._skipped += 1
-        self._print_suite_header_if_needed(result.suite_path)
         name = _format_test_name(result)
         self._print(f"   [yellow]○[/]   {name} [dim]({result.skip_reason})[/]")
         self._update_live()
 
     def on_test_xfail(self, result: TestResult) -> None:
         self._xfailed += 1
-        self._print_suite_header_if_needed(result.suite_path)
         name = _format_test_name(result)
         duration = _format_duration(result.duration)
         self._print(
@@ -250,7 +239,6 @@ class RichReporter(PluginBase):
 
     def on_test_xpass(self, result: TestResult) -> None:
         self._xpassed += 1
-        self._print_suite_header_if_needed(result.suite_path)
         name = _format_test_name(result)
         duration = _format_duration(result.duration)
         self._print(f"   [red]⚡[/]   {name} [red]XPASS[/] [dim]({duration})[/]")

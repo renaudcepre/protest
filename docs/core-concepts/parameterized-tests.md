@@ -71,11 +71,15 @@ def test_permissions(api_user):  # Where does the role come from? Magic.
 ### The ProTest way (explicit)
 
 ```python
+from protest import factory, ForEach, From, FixtureFactory, Use
+
 ROLES = ForEach([UserRole.creator, UserRole.admin])
 
-@session.factory()
+@factory()
 def user(role: UserRole):
     return user_factory.create(role=role)
+
+session.bind(user)
 
 @session.test()
 async def test_permissions(

@@ -3,12 +3,14 @@ from __future__ import annotations
 import pytest
 
 from protest.entities import (
-    FixtureInfo,
-    FixtureScope,
     HandlerInfo,
     SessionResult,
+    SessionSetupInfo,
+    SuiteSetupInfo,
     TestResult,
     TestRetryInfo,
+    TestStartInfo,
+    TestTeardownInfo,
 )
 from protest.events.types import Event
 from protest.reporting.ascii import (
@@ -437,56 +439,58 @@ class TestAsciiReporterSummaryParts:
             assert text in captured.out
 
 
-class TestAsciiReporterFixtureSetup:
-    """Test on_fixture_setup_start hook."""
+class TestAsciiReporterLifecycle:
+    """Test lifecycle hooks (setup/teardown)."""
 
-    def test_on_fixture_setup_start_autouse(
+    def test_session_setup_done(
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Autouse fixture displays both scope setup and autouse messages."""
-        ascii_reporter.on_fixture_setup_start(
-            FixtureInfo(
-                name="my_autouse_fixture", scope=FixtureScope.SESSION, autouse=True
-            )
-        )
+        """Session setup done prints session setup message."""
+        ascii_reporter.on_session_setup_done(SessionSetupInfo(duration=0.1))
         captured = capsys.readouterr()
         assert "session setup" in captured.out
-        assert "autouse" in captured.out
-        assert "my_autouse_fixture" in captured.out
-        assert "session" in captured.out
 
-    def test_on_fixture_setup_start_not_autouse(
+    def test_suite_setup_done(
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Non-autouse fixture displays only scope setup message."""
-        ascii_reporter.on_fixture_setup_start(
-            FixtureInfo(
-                name="regular_fixture",
-                scope=FixtureScope.SUITE,
-                scope_path="TestSuite",
-                autouse=False,
-            )
-        )
+        """Suite setup done prints suite name."""
+        ascii_reporter.on_suite_setup_done(SuiteSetupInfo(name="MySuite", duration=0.1))
         captured = capsys.readouterr()
-        assert "suite 'TestSuite' setup" in captured.out
-        assert "autouse" not in captured.out
+        assert "suite 'MySuite' setup" in captured.out
 
-    def test_on_fixture_setup_start_same_scope_prints_once(
+    def test_test_setup_done(
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Multiple fixtures in same scope only print scope setup once."""
-        ascii_reporter.on_fixture_setup_start(
-            FixtureInfo(name="first_fixture", scope=FixtureScope.SESSION, autouse=False)
-        )
-        capsys.readouterr()  # Clear first output
+        """Test setup done is silent (too verbose)."""
+        ascii_reporter.on_test_setup_done(TestStartInfo(name="test_foo", node_id="x"))
+        captured = capsys.readouterr()
+        assert captured.out == ""
 
-        ascii_reporter.on_fixture_setup_start(
-            FixtureInfo(
-                name="second_fixture", scope=FixtureScope.SESSION, autouse=False
-            )
+    def test_test_teardown_start(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Test teardown start is silent (too verbose)."""
+        ascii_reporter.on_test_teardown_start(
+            TestTeardownInfo(name="test_foo", node_id="x", outcome=Event.TEST_PASS)
         )
         captured = capsys.readouterr()
-        assert "session setup" not in captured.out
+        assert captured.out == ""
+
+    def test_suite_teardown_start(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Suite teardown start prints suite name."""
+        ascii_reporter.on_suite_teardown_start("MySuite")
+        captured = capsys.readouterr()
+        assert "suite 'MySuite' teardown" in captured.out
+
+    def test_session_teardown_start(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Session teardown start prints session teardown message."""
+        ascii_reporter.on_session_teardown_start()
+        captured = capsys.readouterr()
+        assert "session teardown" in captured.out
 
 
 class TestAsciiReporterRetry:

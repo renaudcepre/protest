@@ -11,12 +11,14 @@ from protest.fixtures.builtins import caplog, mocker
 from protest.fixtures.mocker import AsyncMockType, Mocker, MockType
 from protest.loader import LoadError, load_session
 from protest.plugin import PluginBase
+from protest.shell import CommandResult, Shell
 
 __version__ = "0.1.0"
 
 __all__ = [
     "AsyncMockType",
     "CircularDependencyError",
+    "CommandResult",
     "ExceptionInfo",
     "FixtureCallable",
     "FixtureError",
@@ -32,6 +34,7 @@ __all__ = [
     "ProTestSuite",
     "RaisesContext",
     "Retry",
+    "Shell",
     "Skip",
     "Use",
     "Xfail",

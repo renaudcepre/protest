@@ -28,13 +28,13 @@ ProTestSession
 
 ## Scope Rules
 
-### Decorator → Scope Mapping
+### Binding → Scope Mapping
 
-| Decorator            | Scope   | Internal `scope_path`                    |
+| Binding              | Scope   | Internal `scope_path`                    |
 |----------------------|---------|------------------------------------------|
-| `@session.fixture()` | Session | `None`                                   |
-| `@suite.fixture()`   | Suite   | `suite.full_path` (e.g., `"API::Users"`) |
-| `@fixture()`         | Test    | `"<test_scope>"`                         |
+| `session.bind(fn)`   | Session | `None`                                   |
+| `suite.bind(fn)`     | Suite   | `suite.full_path` (e.g., `"API::Users"`) |
+| No binding           | Test    | `"<test_scope>"`                         |
 
 ### Nested Suite Paths
 
@@ -62,15 +62,16 @@ A fixture can only depend on fixtures with **equal or wider** scope:
 Violating this raises `ScopeMismatchError`:
 
 ```python
-@fixture()  # Test scope
+@fixture()  # Test scope (not bound)
 def per_test():
     return "fresh"
 
 
-@session.fixture()
+@fixture()
 def shared(x: Annotated[str, Use(per_test)]):
-    # ERROR: Session can't depend on test-scoped fixture
     pass
+
+session.bind(shared)  # ERROR: Session can't depend on test-scoped fixture
 ```
 
 ## Resolution Flow
@@ -112,11 +113,13 @@ wait for the first resolution to complete, then share the cached value.
 Generator fixtures use `yield` to separate setup from teardown:
 
 ```python
-@session.fixture()
+@fixture()
 async def database():
     db = await connect()  # Setup
     yield db  # Value used by tests
     await db.close()  # Teardown
+
+session.bind(database)  # SESSION scope
 ```
 
 ### Event Sequence

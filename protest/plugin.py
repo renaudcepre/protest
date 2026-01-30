@@ -107,16 +107,16 @@ class PluginBase:
     # ─────────────────────────────────────────────────────────────────────
 
     def on_session_start(self) -> None | Awaitable[None]:
-        """Called before any test runs."""
+        """Session begins (before fixture setup)."""
 
     def on_session_setup_done(self, info: SessionSetupInfo) -> None | Awaitable[None]:
-        """Called after session fixtures resolved, before any suite starts."""
+        """Session fixtures resolved, ready to run suites."""
 
     def on_session_teardown_start(self) -> None | Awaitable[None]:
-        """Called after all suites complete, before session fixture teardown."""
+        """All suites complete, starting session fixture teardown."""
 
     def on_session_end(self, result: SessionResult) -> None | Awaitable[None]:
-        """Tests done, teardown complete. result.setup_duration and teardown_duration available."""
+        """Session ends (after fixture teardown)."""
 
     def on_waiting_handlers(self, pending_count: int) -> None | Awaitable[None]:
         """Called when waiting for async handlers to complete."""
@@ -129,16 +129,16 @@ class PluginBase:
     # ─────────────────────────────────────────────────────────────────────
 
     def on_suite_start(self, name: str) -> None | Awaitable[None]:
-        """Called before a suite's tests run."""
+        """Suite begins (before fixture setup)."""
 
     def on_suite_setup_done(self, info: SuiteSetupInfo) -> None | Awaitable[None]:
-        """Called after suite fixtures resolved, before any test starts."""
+        """Suite fixtures resolved, ready to run tests."""
 
     def on_suite_teardown_start(self, name: str) -> None | Awaitable[None]:
-        """Called after all suite tests complete, before suite fixture teardown."""
+        """All tests complete, starting suite fixture teardown."""
 
     def on_suite_end(self, result: SuiteResult) -> None | Awaitable[None]:
-        """Called after a suite's tests and teardown complete."""
+        """Suite ends (after fixture teardown)."""
 
     # ─────────────────────────────────────────────────────────────────────
     # Fixture lifecycle

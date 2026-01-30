@@ -3,6 +3,7 @@ from typing import Annotated
 
 from protest import ProTestSession, ProTestSuite, Use
 from protest.core.runner import TestRunner
+from protest.di.decorators import fixture
 from protest.entities import TestItem, TestRegistration
 from protest.plugin import PluginBase
 from tests.conftest import (
@@ -138,9 +139,11 @@ class TestRunnerWithFixtures:
         session = ProTestSession()
         received_value: list[str] = []
 
-        @session.fixture()
+        @fixture()
         def my_fixture() -> str:
             return "fixture_value"
+
+        session.bind(my_fixture)
 
         @session.test()
         def test_with_fixture(val: Annotated[str, Use(my_fixture)]) -> None:
@@ -156,11 +159,13 @@ class TestRunnerWithFixtures:
         session = ProTestSession()
         teardown_called = False
 
-        @session.fixture()
+        @fixture()
         def generator_fixture():
             yield "gen_value"
             nonlocal teardown_called
             teardown_called = True
+
+        session.bind(generator_fixture)
 
         @session.test()
         def test_with_gen(val: Annotated[str, Use(generator_fixture)]) -> None:
@@ -341,9 +346,11 @@ class TestRunnerSmartTeardown:
         suite = ProTestSuite("my_suite")
         session.add_suite(suite)
 
-        @suite.fixture()
+        @fixture()
         def suite_resource() -> str:
             return "resource_value"
+
+        suite.bind(suite_resource)
 
         results: list[str] = []
 
@@ -371,11 +378,13 @@ class TestRunnerSmartTeardown:
         teardown_at_test_count = -1
         test_execution_count = 0
 
-        @suite.fixture()
+        @fixture()
         def tracked_fixture():
             yield "tracked"
             nonlocal teardown_at_test_count, test_execution_count
             teardown_at_test_count = test_execution_count
+
+        suite.bind(tracked_fixture)
 
         @suite.test()
         def test_one(val: Annotated[str, Use(tracked_fixture)]) -> None:
@@ -430,9 +439,11 @@ class TestRunnerNestedSuites:
         parent.add_suite(child)
         session.add_suite(parent)
 
-        @parent.fixture()
+        @fixture()
         def parent_resource() -> str:
             return "parent_data"
+
+        parent.bind(parent_resource)
 
         results: list[str] = []
 
@@ -526,9 +537,11 @@ class TestRunnerExitFirst:
 
         executed: list[str] = []
 
-        @session.fixture()
+        @fixture()
         def broken_fixture() -> str:
             raise RuntimeError("fixture error")
+
+        session.bind(broken_fixture)
 
         @session.test()
         async def test_fast_error(val: Annotated[str, Use(broken_fixture)]) -> None:

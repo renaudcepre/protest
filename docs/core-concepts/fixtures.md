@@ -4,71 +4,86 @@ Fixtures provide reusable setup and teardown logic for tests.
 
 ## What is a Fixture?
 
-A fixture is a function that provides a value to tests. It can be a simple function or include cleanup logic.
+A fixture is a function decorated with `@fixture()` that provides a value to tests.
 
 ```python
+from protest import fixture
+
+@fixture()
 def config():
     return {"debug": True}
 ```
 
-## Scopes
+## Scope at Binding
 
-Fixture scope is determined by **where** you define it, not by a parameter.
+**Important:** Fixture scope is determined by WHERE you bind it, not by the decorator.
+
+The `@fixture()` decorator only marks a function as a fixture. The scope is set when you bind the fixture to a session or suite.
 
 ### Session Scope
 
-Defined with `@session.fixture()`. Lives for the entire test session.
+Bind to session with `session.bind()`. Lives for the entire test session.
 
 ```python
-@session.fixture()
+from protest import fixture, ProTestSession
+
+@fixture()
 async def database():
     db = await connect()
     yield db
     await db.close()
+
+session = ProTestSession()
+session.bind(database)  # → SESSION scope
 ```
 
 Use case: Expensive resources shared across all tests (database connections, HTTP clients).
 
 ### Suite Scope
 
-Defined with `@suite.fixture()`. Lives for the duration of the suite.
+Bind to suite with `suite.bind()`. Lives for the duration of the suite.
 
 ```python
-@api_suite.fixture()
+from protest import fixture, ProTestSuite
+
+@fixture()
 def api_client(db: Annotated[Database, Use(database)]):
     return Client(db)
+
+api_suite = ProTestSuite("API")
+api_suite.bind(api_client)  # → SUITE scope
 ```
 
 Use case: Resources shared within a group of related tests.
 
-### Function Scope
+### Test Scope (Default)
 
-Use `@fixture()` decorator. Fresh instance for each test.
+Don't bind the fixture. Fresh instance for each test.
 
 ```python
 @fixture()
 def request_id():
     return str(uuid.uuid4())
 
-# With tags:
-@fixture(tags=["slow"])
-def temp_file():
-    path = Path("/tmp/test.txt")
-    path.touch()
-    yield path
-    path.unlink()
+# No binding → TEST scope (default)
 ```
 
 Use case: Isolated state per test, unique IDs, temporary files.
 
-**Note:** All fixtures must be decorated. Plain functions without `@fixture()` raise `PlainFunctionError` when used with `Use()`.
+## Summary
+
+| Binding | Scope | Caching |
+|---------|-------|---------|
+| `session.bind(fn)` | SESSION | One instance for entire session |
+| `suite.bind(fn)` | SUITE | One instance per suite execution |
+| No binding | TEST | Fresh instance per test |
 
 ## Teardown with yield
 
 Use `yield` to separate setup from teardown:
 
 ```python
-@session.fixture()
+@fixture()
 async def database():
     # Setup
     db = await connect()
@@ -77,6 +92,8 @@ async def database():
 
     # Teardown (runs even if test fails)
     await db.close()
+
+session.bind(database)
 ```
 
 Teardown runs in reverse order (LIFO). If multiple fixtures are used, the last one set up is the first one torn down.
@@ -89,29 +106,32 @@ A fixture can only depend on fixtures with equal or wider scope:
 |---------------|---------------|
 | Session | Session only |
 | Suite | Session, parent suites, same suite |
-| Function | Anything |
+| Test | Anything |
 
 Violating this raises `ScopeMismatchError`:
 
 ```python
 @fixture()
-def function_scoped():
+def per_test_data():
     return "per-test"
 
-@session.fixture()
-def session_scoped(x: Annotated[str, Use(function_scoped)]):
-    # ERROR: session fixture can't depend on function-scoped
+@fixture()
+def shared_resource(x: Annotated[str, Use(per_test_data)]):
     return x
+
+session.bind(shared_resource)  # ERROR: session can't depend on test-scoped
 ```
 
 ## Fixture Tags
 
-Tags on fixtures propagate to tests that use them:
+Tags are declared on the decorator and propagate to tests:
 
 ```python
 @fixture(tags=["database"])
 def db():
     return Database()
+
+session.bind(db)
 
 @session.test()
 async def test_query(db: Annotated[Database, Use(db)]):
@@ -123,36 +143,36 @@ This works transitively: if fixture A depends on fixture B with tag "x", tests u
 
 ## Autouse Fixtures
 
-Autouse fixtures are automatically resolved at their scope start, without being explicitly requested by tests.
+Autouse fixtures are automatically resolved at their scope start, without being explicitly requested by tests. The `autouse=True` flag is passed to `bind()`.
 
 ### Session Autouse
 
-Use `@session.autouse()` for fixtures that must run before any test:
-
 ```python
-@session.autouse()
+@fixture()
 def configure_logging():
     logging.basicConfig(level=logging.DEBUG)
     yield
     logging.shutdown()
+
+session.bind(configure_logging, autouse=True)
 ```
 
 Session autouse fixtures are resolved at `SESSION_SETUP_START`, before any test runs.
 
 ### Suite Autouse
 
-Use `@suite.autouse()` for fixtures that must run when a suite starts:
-
 ```python
-@api_suite.autouse()
+@fixture()
 def clear_environment():
     old = os.environ.copy()
     os.environ.clear()
     yield
     os.environ.update(old)
+
+api_suite.bind(clear_environment, autouse=True)
 ```
 
-Suite autouse fixtures are resolved when the suite starts (before its first test). For nested suites, parent autouse fixtures run before child autouse fixtures.
+Suite autouse fixtures are resolved when the suite starts (before its first test).
 
 ### When to Use Autouse
 
@@ -164,9 +184,15 @@ Use autouse when:
 
 Don't use autouse when tests need the fixture's value - use explicit `Use()` instead.
 
-### Function-scope Autouse
+## Plain Functions
 
-There is no `@fixture(autouse=True)` for function scope. It doesn't make semantic sense - if you need something for every test, either:
+All fixtures must be decorated with `@fixture()`. Plain functions raise `PlainFunctionError` when used with `Use()`:
 
-- Make it a suite/session autouse fixture
-- Add it explicitly to each test with `Use()`
+```python
+def not_a_fixture():  # Missing @fixture()!
+    return "value"
+
+@session.test()
+def test_error(x: Annotated[str, Use(not_a_fixture)]):
+    pass  # PlainFunctionError!
+```

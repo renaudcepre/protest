@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from protest import ProTestSession, ProTestSuite, collect_tests, list_tags, run_session
+from protest import (
+    ProTestSession,
+    ProTestSuite,
+    collect_tests,
+    fixture,
+    list_tags,
+    run_session,
+)
 
 
 class TestRunSession:
@@ -185,9 +192,11 @@ class TestListTags:
     def test_list_tags_from_fixtures(self) -> None:
         session = ProTestSession()
 
-        @session.fixture(tags=["database"])
+        @fixture(tags=["database"])
         def db_fixture() -> str:
             return "db"
+
+        session.bind(db_fixture)
 
         @session.test()
         def test_one() -> None:
@@ -215,9 +224,11 @@ class TestListTags:
         parent.add_suite(child)
         session.add_suite(parent)
 
-        @child.fixture(tags=["fixture_tag"])
+        @fixture(tags=["fixture_tag"])
         def child_fixture() -> str:
             return "fixture"
+
+        child.bind(child_fixture)
 
         @child.test(tags=["test_tag"])
         def test_child() -> None:

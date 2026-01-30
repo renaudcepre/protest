@@ -1,13 +1,21 @@
-"""Free-standing decorators for function-scoped fixtures and factories."""
+"""Standalone decorators for fixtures and factories (Scope at Binding pattern).
+
+These decorators mark functions with intrinsic metadata (is_factory, cache,
+managed, tags). Scope and autouse are determined at binding time via
+session.bind() or suite.bind(). Unbound fixtures default to TEST scope.
+"""
 
 import functools
 from collections.abc import Callable
 from typing import Any, Generic, TypeVar
 
 from protest.di.validation import validate_no_from_params
-from protest.entities import FixtureRegistration
+from protest.entities import FixtureMarker, FixtureRegistration
 
 FuncT = TypeVar("FuncT", bound=Callable[..., object])
+
+# Attribute name for the marker attached to decorated functions
+FIXTURE_MARKER_ATTR = "_protest_fixture"
 
 
 class FixtureWrapper(Generic[FuncT]):
@@ -37,23 +45,45 @@ def unwrap_fixture(func: Callable[..., Any]) -> Callable[..., Any]:
 def fixture(
     tags: list[str] | None = None,
 ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
-    """Decorator for function-scoped fixtures.
+    """Decorator to mark a function as a fixture.
 
-    Use this for fixtures that should be fresh per test and need tags.
-    For session/suite scoped fixtures, use @session.fixture() or @suite.fixture().
+    Scope is determined at binding time:
+    - session.bind(fn) → SESSION scope
+    - suite.bind(fn) → SUITE scope
+    - No binding → TEST scope (default)
 
     Args:
         tags: Tags for filtering tests that use this fixture.
 
     Example:
         @fixture(tags=["database"])
-        def db_session():
-            yield Session()
-            session.rollback()
+        async def database():
+            db = await connect()
+            yield db
+            await db.close()
+
+        session.bind(database)  # SESSION scope
+
+        @fixture()
+        def request_id():
+            return str(uuid4())
+        # No binding → TEST scope (fresh per test)
     """
 
     def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
         validate_no_from_params(func)
+
+        # Create marker with intrinsic properties only
+        marker = FixtureMarker(
+            is_factory=False,
+            cache=True,
+            managed=True,
+            tags=frozenset(tags) if tags else frozenset(),
+        )
+        # Attach marker to original function for discovery
+        setattr(func, FIXTURE_MARKER_ATTR, marker)
+
+        # Create registration for backwards compatibility with FixtureWrapper
         registration = FixtureRegistration(
             func=func,
             is_factory=False,
@@ -71,22 +101,32 @@ def factory(
     managed: bool = True,
     tags: list[str] | None = None,
 ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
-    """Decorator for function-scoped factory fixtures.
+    """Decorator to mark a function as a factory fixture.
 
-    Use this for factories that should be fresh per test.
-    For session/suite scoped factories, use @session.factory() or @suite.factory().
+    Scope is determined at binding time:
+    - session.bind(fn) → SESSION scope
+    - suite.bind(fn) → SUITE scope
+    - No binding → TEST scope (default)
 
     Args:
-        cache: If True, cache instances by kwargs within the test. Default False.
+        cache: If True, cache instances by kwargs within scope. Default False.
         managed: If True (default), wrap in FixtureFactory. If False, return as-is
-                 wrapped in SafeProxy (for custom factory classes).
+                 (for custom factory classes).
         tags: Tags for filtering tests that use this factory.
 
     Example:
-        @factory(tags=["slow"])
-        def user(name: str, role: str = "guest") -> User:
-            yield User.create(name=name, role=role)
-            user.delete()
+        @factory()
+        async def user(name: str, role: str = "guest") -> User:
+            user = await User.create(name=name, role=role)
+            yield user
+            await user.delete()
+
+        session.bind(user)  # SESSION scope
+
+        @factory(cache=True)
+        def payload(data: dict | None = None) -> dict:
+            return {"default": True, **(data or {})}
+        # No binding → TEST scope
 
         # Non-managed factory class
         @factory(managed=False)
@@ -96,6 +136,18 @@ def factory(
 
     def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
         validate_no_from_params(func)
+
+        # Create marker with intrinsic properties only
+        marker = FixtureMarker(
+            is_factory=True,
+            cache=cache,
+            managed=managed,
+            tags=frozenset(tags) if tags else frozenset(),
+        )
+        # Attach marker to original function for discovery
+        setattr(func, FIXTURE_MARKER_ATTR, marker)
+
+        # Create registration for backwards compatibility with FixtureWrapper
         registration = FixtureRegistration(
             func=func,
             is_factory=True,
@@ -106,3 +158,12 @@ def factory(
         return FixtureWrapper(func, registration)
 
     return decorator
+
+
+def get_fixture_marker(func: Callable[..., Any]) -> FixtureMarker | None:
+    """Get the FixtureMarker from a decorated function, if present."""
+    # Check the wrapper first
+    if isinstance(func, FixtureWrapper):
+        return getattr(func.func, FIXTURE_MARKER_ATTR, None)
+    # Check the function directly
+    return getattr(func, FIXTURE_MARKER_ATTR, None)

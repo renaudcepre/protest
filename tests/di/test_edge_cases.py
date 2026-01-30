@@ -14,7 +14,7 @@ from protest.di.factory import FixtureFactory
 from protest.di.hashable import make_hashable
 from protest.di.proxy import SafeProxy
 from protest.di.resolver import Resolver
-from protest.entities import Fixture
+from protest.entities import Fixture, FixtureScope
 from protest.events.bus import EventBus
 from protest.exceptions import (
     FixtureNotFoundError,
@@ -167,15 +167,15 @@ class TestResolverEdgeCases:
             return res
 
         # Register suite fixture first (at suite scope)
-        resolver.register(suite_resource.func, scope_path="MySuite")
+        resolver.register(suite_resource.func, scope=FixtureScope.SUITE)
 
         # Try to register session fixture that depends on suite fixture
         # This should fail - session fixture can't depend on suite fixture
         with pytest.raises(ScopeMismatchError) as exc_info:
-            resolver.register(bad_session_fixture.func, scope_path=None)
+            resolver.register(bad_session_fixture.func, scope=FixtureScope.SESSION)
 
         assert "session" in str(exc_info.value)
-        assert "MySuite" in str(exc_info.value)
+        assert "suite" in str(exc_info.value)
 
 
 class TestFixtureClearCache:

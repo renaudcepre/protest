@@ -4,14 +4,14 @@ from pathlib import Path
 from typing_extensions import Self
 
 from protest.entities import (
-    FixtureInfo,
     HandlerInfo,
     SessionResult,
+    SessionSetupInfo,
     SuiteResult,
+    SuiteSetupInfo,
     TestItem,
     TestResult,
     TestRetryInfo,
-    format_fixture_scope,
 )
 from protest.plugin import PluginBase, PluginContext
 
@@ -63,8 +63,6 @@ class AsciiReporter(PluginBase):
         self._is_parallel = False
         self._failed_results: list[TestResult] = []
         self._error_results: list[TestResult] = []
-        self._setup_started: set[str] = set()
-        self._teardown_started: set[str] = set()
 
     @classmethod
     def activate(cls, ctx: PluginContext) -> Self | None:
@@ -80,19 +78,17 @@ class AsciiReporter(PluginBase):
         print(">> Starting session")
         print()
 
-    def on_fixture_setup_start(self, info: FixtureInfo) -> None:
-        display = format_fixture_scope(info.scope, info.scope_path)
-        if display not in self._setup_started:
-            print(f"  {display} setup...")
-            self._setup_started.add(display)
-        if info.autouse:
-            print(f"  autouse: {info.name} ({display})")
+    def on_session_setup_done(self, info: SessionSetupInfo) -> None:
+        print("  session setup...")
 
-    def on_fixture_teardown_start(self, info: FixtureInfo) -> None:
-        display = format_fixture_scope(info.scope, info.scope_path)
-        if display not in self._teardown_started:
-            print(f"  {display} teardown...")
-            self._teardown_started.add(display)
+    def on_suite_setup_done(self, info: SuiteSetupInfo) -> None:
+        print(f"  suite '{info.name}' setup...")
+
+    def on_session_teardown_start(self) -> None:
+        print("  session teardown...")
+
+    def on_suite_teardown_start(self, name: str) -> None:
+        print(f"  suite '{name}' teardown...")
 
     def on_suite_end(self, result: SuiteResult) -> None:
         if result.teardown_duration > 0:
