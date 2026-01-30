@@ -35,11 +35,13 @@ def test_user(db: Annotated[Database, Use(database)]): ...
 Tag a fixture once, and **every test using it inherits the tag automatically**—even through deep dependency chains.
 
 ```python
-@session.bind(tags=["database"])
+@fixture(tags=["database"])
 def db(): ...
+session.bind(db)
 
-@session.bind()
+@fixture()
 def user_repo(db: Annotated[DB, Use(db)]): ...  # Inherits "database" tag
+session.bind(user_repo)
 
 @session.test()
 def test_users(repo: Annotated[Repo, Use(user_repo)]): ...  # Also tagged "database"
