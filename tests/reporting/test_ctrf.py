@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
-import urllib.request
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
 
@@ -14,7 +14,6 @@ from protest.reporting.ctrf import CTRFReporter
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
 
 
 class TestCTRFReportStructure:
@@ -446,14 +445,13 @@ class TestCTRFVersionError:
         assert tool["version"] == "unknown"
 
 
-CTRF_SCHEMA_URL = "https://raw.githubusercontent.com/ctrf-io/ctrf/main/specification/schema-0.0.0.json"
+CTRF_SCHEMA_PATH = Path(__file__).parent / "ctrf.schema.json"
 
 
 class TestCTRFSchemaValidation:
     @pytest.fixture
     def ctrf_schema(self) -> dict[str, Any]:
-        with urllib.request.urlopen(CTRF_SCHEMA_URL) as response:  # noqa: S310
-            return json.loads(response.read())
+        return json.loads(CTRF_SCHEMA_PATH.read_text())
 
     def test_full_report_validates_against_official_schema(
         self, tmp_path: Path, ctrf_schema: dict[str, Any]
