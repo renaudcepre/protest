@@ -487,7 +487,7 @@ async def test_draft_cannot_be_archived_directly(
 
 ## See Also
 
-- [Fixtures Guide](./fixtures.md)
-- [Factories Guide](./factories.md)
-- [Tags System](./tags.md)
-- [CLI Reference](./cli.md)
+- [Fixtures](core-concepts/fixtures.md)
+- [Factories](core-concepts/factories.md)
+- [Tags](core-concepts/tags.md) - Tag inheritance and filtering
+- [CLI Reference](cli.md)

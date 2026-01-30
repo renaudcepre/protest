@@ -13,9 +13,10 @@ ProTest est un framework de test async-first avec injection de dépendances expl
 3. **Exemples à jour** : Vérifier que les exemples dans `examples/` reflètent l'API actuelle
 
 Checklist après un changement :
-- [ ] `docs/core-concepts/*.md` - doc utilisateur à jour ?
+- [ ] `docs/*.md` - doc utilisateur à jour ?
 - [ ] `CLAUDE.md` - architecture/décisions documentées ?
 - [ ] `examples/` - exemples fonctionnels ?
+- [ ] `README.md`
 - [ ] Pas de doc obsolète qui contredit le nouveau comportement ?
 
 ## Structure des Modules
