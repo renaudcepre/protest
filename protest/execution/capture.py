@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from logging import LogRecord
 from typing import TextIO
 
+from protest.compat import Self
+
 _capture_buffer: ContextVar[io.StringIO | None] = ContextVar(
     "capture_buffer", default=None
 )
@@ -150,7 +152,7 @@ class GlobalCapturePatch:
         self._log_handler: TaskAwareLogHandler | None = None
         self._orig_log_level: int | None = None
 
-    def __enter__(self) -> "GlobalCapturePatch":
+    def __enter__(self) -> Self:
         # Clean up orphaned handler from a crashed previous run.
         # This is deterministic: we only clean up the specific handler we track.
         if GlobalCapturePatch._current_handler is not None:
