@@ -36,7 +36,14 @@
       "Bash(do echo \"=== $f ===\" head -5 \"$f\")",
       "Bash(uv add:*)",
       "Bash(comm -23:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(for:*)",
+      "Bash(do cd /Users/rcepre/dev/generic_rag/app)",
+      "Bash(done)",
+      "Bash(do echo \"=== Run $i ===\")",
+      "Bash(git stash:*)",
+      "Bash(git checkout:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

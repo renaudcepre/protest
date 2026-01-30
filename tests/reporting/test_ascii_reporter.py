@@ -461,20 +461,20 @@ class TestAsciiReporterLifecycle:
     def test_test_setup_done(
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Test setup done prints test setup message."""
+        """Test setup done is silent (too verbose)."""
         ascii_reporter.on_test_setup_done(TestStartInfo(name="test_foo", node_id="x"))
         captured = capsys.readouterr()
-        assert "test setup" in captured.out
+        assert captured.out == ""
 
     def test_test_teardown_start(
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Test teardown start prints test teardown message."""
+        """Test teardown start is silent (too verbose)."""
         ascii_reporter.on_test_teardown_start(
             TestTeardownInfo(name="test_foo", node_id="x", outcome=Event.TEST_PASS)
         )
         captured = capsys.readouterr()
-        assert "test teardown" in captured.out
+        assert captured.out == ""
 
     def test_suite_teardown_start(
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]

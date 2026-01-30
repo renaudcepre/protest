@@ -372,7 +372,31 @@ users_suite = ProTestSuite("Users")
 api_suite.add_suite(users_suite)  # Clear: API::Users
 ```
 
-### 4. Overusing Session Scope
+### 4. Uncaptured Subprocess Output
+
+```python
+# BAD: Output goes to terminal, not captured by ProTest
+@session.test()
+def test_ffmpeg():
+    subprocess.run(["ffmpeg", "-i", "input.mp4", "output.webm"])
+    # ffmpeg output is LOST - not in test report
+```
+
+```python
+# GOOD: Capture and re-print
+@session.test()
+def test_ffmpeg():
+    result = subprocess.run(
+        ["ffmpeg", "-i", "input.mp4", "output.webm"],
+        capture_output=True,
+        text=True,
+    )
+    if result.stderr:
+        print(result.stderr, end="")  # Now ProTest captures it
+    assert result.returncode == 0
+```
+
+### 5. Overusing Session Scope
 
 ```python
 # BAD: Should be test-scoped but bound to session

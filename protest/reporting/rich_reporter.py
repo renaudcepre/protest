@@ -17,8 +17,6 @@ from protest.entities import (
     TestItem,
     TestResult,
     TestRetryInfo,
-    TestStartInfo,
-    TestTeardownInfo,
 )
 from protest.plugin import PluginBase, PluginContext
 
@@ -153,17 +151,11 @@ class RichReporter(PluginBase):
     def on_suite_setup_done(self, info: SuiteSetupInfo) -> None:
         self._print(f"[cyan]       ◈ {info.name}[/]")
 
-    def on_test_setup_done(self, info: TestStartInfo) -> None:
-        self._print("[dim]  test setup...[/]")
-
     def on_session_teardown_start(self) -> None:
         self._print("[dim]  session teardown...[/]")
 
     def on_suite_teardown_start(self, name: str) -> None:
         self._print(f"[dim]  suite '{name}' teardown...[/]")
-
-    def on_test_teardown_start(self, info: TestTeardownInfo) -> None:
-        self._print("[dim]  test teardown...[/]")
 
     def on_suite_end(self, result: SuiteResult) -> None:
         if result.teardown_duration > 0:

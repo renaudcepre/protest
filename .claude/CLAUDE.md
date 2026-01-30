@@ -101,6 +101,36 @@ def payload():
 
 Les plain functions (sans décorateur) lèvent `PlainFunctionError` quand utilisées avec `Use()`.
 
+### Caching et Scope
+
+**Le caching est relatif au scope du binding :**
+
+| Binding | Scope | Comportement cache |
+|---------|-------|-------------------|
+| `session.bind(fn)` | SESSION | Une instance pour toute la session |
+| `suite.bind(fn)` | SUITE | Une instance par exécution de la suite |
+| Pas de binding | TEST | **Nouvelle instance par test** |
+
+**Conséquence importante** : Si une fixture ne doit PAS être partagée entre tests, ne pas la binder.
+
+```python
+# ❌ Mauvais : tracker partagé entre tous les tests de la suite
+@fixture()
+def call_tracker():
+    reset_counts()
+    return tracker
+
+suite.bind(call_tracker)  # SUITE scope → même instance pour tous les tests
+
+# ✓ Bon : tracker frais pour chaque test
+@fixture()
+def call_tracker():
+    reset_counts()
+    return tracker
+
+# Pas de binding → TEST scope → nouvelle instance par test
+```
+
 ### Autouse Fixtures
 
 Fixtures auto-résolues au démarrage de leur scope, via `autouse=True` au binding :
@@ -646,3 +676,47 @@ from protest import Mocker, MockType, AsyncMockType
 - `Mocker._mocks` : liste des mocks créés
 - `Mocker._mock_to_patcher` : mapping mock → patcher pour `stop()`
 - Teardown LIFO garanti via `reversed(self._patchers)`
+
+## Limitations Connues
+
+### Capture de Subprocess
+
+**Limitation** : ProTest capture automatiquement `print()` et `logging`, mais PAS la sortie directe des subprocesses.
+
+**Pourquoi** : Les subprocesses écrivent directement sur les file descriptors OS (fd 1/2), pas via `sys.stdout`. Dans une architecture async-concurrent où tous les tests partagent le même process, il est impossible d'attribuer la sortie d'un subprocess à un test spécifique.
+
+**Différence avec pytest-xdist** : xdist lance des workers dans des processes séparés (chacun avec ses propres fd). ProTest utilise async dans un seul process.
+
+**Solution : capturer explicitement**
+
+```python
+import subprocess
+
+@suite.test()
+def test_with_subprocess() -> None:
+    # ✓ capture_output=True route stdout/stderr vers result
+    result = subprocess.run(
+        ["echo", "Hello"],
+        capture_output=True,
+        text=True,
+    )
+
+    # Re-print pour que ProTest le capture
+    if result.stdout:
+        print(result.stdout, end="")
+
+    assert "Hello" in result.stdout
+```
+
+**Patterns recommandés** :
+- `subprocess.run(..., capture_output=True)` - le plus simple
+- `subprocess.check_output(...)` - pour les commandes qui doivent réussir
+- Helper function `run_and_capture()` - pour usage répété
+
+**Voir** : `examples/subprocess_capture/session.py` pour des exemples complets.
+
+**Tentatives abandonnées** : Une implémentation FDCapture (capture au niveau OS avec `os.dup2`, threads, pipes) a été évaluée mais abandonnée car :
+- Non portable Windows (`select.select()` ne supporte pas les pipes)
+- Race conditions entre threads
+- Complexité disproportionnée pour le bénéfice
+- En mode concurrent, impossible d'attribuer l'output au bon test

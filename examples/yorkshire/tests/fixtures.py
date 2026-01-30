@@ -27,7 +27,7 @@ def configure_kennel_logging() -> Generator[None, None, None]:
 
 @fixture(tags=["database", "slow-setup"])
 async def kennel() -> AsyncGenerator[Kennel, None]:
-    kennel_instance = Kennel()
+        kennel_instance = Kennel()
     await asyncio.sleep(0.1)
     yield kennel_instance
     await kennel_instance.clear()
