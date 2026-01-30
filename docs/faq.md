@@ -23,23 +23,28 @@ class TestUser:
 **ProTest:**
 
 ```python
+from protest import ProTestSuite, fixture, Use
+from typing import Annotated
+
 user_suite = ProTestSuite("User")
 
 
-@user_suite.bind()
+@fixture()
 def user():
     return User("alice")
 
-
-@user_suite.test()
-def test_create(user: Annotated[User, Use(user)]):
-    assert user.name == "alice"
+user_suite.bind(user)  # SUITE scope
 
 
 @user_suite.test()
-def test_delete(user: Annotated[User, Use(user)]):
-    user.delete()
-    assert user.deleted
+def test_create(u: Annotated[User, Use(user)]):
+    assert u.name == "alice"
+
+
+@user_suite.test()
+def test_delete(u: Annotated[User, Use(user)]):
+    u.delete()
+    assert u.deleted
 ```
 
 ### What classes provide vs suites
@@ -47,7 +52,7 @@ def test_delete(user: Annotated[User, Use(user)]):
 | Feature                | pytest classes                   | ProTest suites      |
 |------------------------|----------------------------------|---------------------|
 | Group related tests    | ✓                                | ✓                   |
-| Shared fixtures        | `self` or class-scoped fixtures  | `@suite.bind()`     |
+| Shared fixtures        | `self` or class-scoped fixtures  | `suite.bind(fn)`    |
 | Setup/teardown         | `setup_method`/`teardown_method` | `yield` in fixtures |
 | Named groups in output | ✓                                | ✓                   |
 | Inheritance            | ✓                                | ✗                   |
@@ -88,16 +93,17 @@ You can see exactly what each test uses. No hunting through class hierarchies.
 If fixtures could use `From()`, you'd get hidden cartesian products:
 
 ```python
-# Hypothetical - NOT SUPPORTED
-@session.bind()
+# Hypothetical - NOT SUPPORTED (decorator syntax doesn't exist either)
+# If this were possible:
+@fixture()
 def db(engine: Annotated[str, From(ENGINES)]):  # 3 engines
     ...
+session.bind(db)
 
-
-@session.bind()
+@fixture()
 def user(role: Annotated[str, From(ROLES)], db: ...):  # 2 roles
     ...
-
+session.bind(user)
 
 @session.test()
 def test_perms(method: Annotated[str, From(METHODS)], user: ...):  # 4 methods
@@ -121,7 +127,7 @@ def test_perms(
     # You SEE it's 3×2×4 = 24 tests
 ```
 
-## Why doesn't ProTest capture subprocess output?
+## Why doesn't ProTest capture subprocess output automatically?
 
 ProTest captures `print()` and `logging` automatically, but subprocess output goes directly to OS file descriptors (fd
 1/2), bypassing Python's `sys.stdout`.
@@ -129,48 +135,43 @@ ProTest captures `print()` and `logging` automatically, but subprocess output go
 In ProTest's async-concurrent architecture, all tests run in the same process sharing the same file descriptors. There's
 no way to attribute subprocess output to a specific test when multiple tests run concurrently.
 
-**Solution: capture explicitly in your code**
+**Solution: use the `Shell` helper**
 
 ```python
-import subprocess
+from protest import Shell
 
 
 @suite.test()
-def test_ffmpeg_conversion() -> None:
-    # Use capture_output=True to capture subprocess output
-    result = subprocess.run(
-        ["ffmpeg", "-i", "input.mp4", "output.webm"],
-        capture_output=True,
-        text=True,
-    )
+async def test_ffmpeg_conversion() -> None:
+    result = await Shell.run(["ffmpeg", "-i", "input.mp4", "output.webm"])
 
-    # Re-print so ProTest captures it
-    if result.stdout:
-        print(result.stdout, end="")
-    if result.stderr:
-        print(result.stderr, end="")
-
-    assert result.returncode == 0
+    assert result.success
+    # stdout/stderr automatically captured and shown on failure
 ```
 
-**Helper for repeated use:**
+The `Shell` helper:
+- Runs subprocesses with isolated pipes (no fd sharing issues)
+- Automatically prints output for ProTest to capture
+- Works safely with concurrent tests (`-n 4`)
+- Supports timeout, working directory, environment variables
+
+**With shell features (pipes, &&, etc.):**
 
 ```python
-def run_and_capture(cmd: list[str], **kwargs) -> subprocess.CompletedProcess[str]:
-    """Run subprocess and print output for ProTest to capture."""
-    result = subprocess.run(cmd, capture_output=True, text=True, **kwargs)
-    if result.stdout:
-        print(result.stdout, end="")
-    if result.stderr:
-        print(result.stderr, end="")
-    return result
-
-
 @suite.test()
-def test_with_helper() -> None:
-    result = run_and_capture(["echo", "Hello"])
-    assert result.returncode == 0
+async def test_pipeline() -> None:
+    result = await Shell.run("cat file.txt | grep pattern", shell=True)
+    assert result.success
 ```
 
-See `examples/subprocess_capture/session.py` for complete examples
+**Assert success automatically:**
+
+```python
+@suite.test()
+async def test_must_succeed() -> None:
+    # Raises AssertionError if exit code != 0
+    result = await Shell.run_ok("make build")
+```
+
+See `examples/subprocess_capture/session.py` for complete examples and [Built-ins](core-concepts/builtins.md#shell) for full API.
 

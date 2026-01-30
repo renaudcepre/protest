@@ -224,3 +224,121 @@ def test_typed(m: Annotated[Mocker, Use(mocker)]):
     mock: MockType = m.patch("myapp.service")
     async_mock: AsyncMockType = m.async_stub()
 ```
+
+## Shell
+
+Async-safe subprocess runner with isolated output capture. Use this for CLI and integration tests.
+
+```python
+from protest import ProTestSession, Shell
+
+session = ProTestSession()
+
+@session.test()
+async def test_cli():
+    result = await Shell.run("my-app --version")
+
+    assert result.success
+    assert "1.0.0" in result.stdout
+```
+
+### Why Shell instead of subprocess.run()?
+
+**Problem: Subprocess output is lost**
+
+```python
+# DON'T DO THIS - output not captured by ProTest
+@session.test()
+def test_bad():
+    subprocess.run(["my-app"])  # Output goes to terminal, not captured!
+```
+
+ProTest captures `print()` and `logging`, but subprocess output writes directly to OS file descriptors (fd 1/2), bypassing Python's `sys.stdout`.
+
+**Solution: Shell helper**
+
+```python
+# Output captured properly
+@session.test()
+async def test_good():
+    result = await Shell.run("my-app")
+    # stdout/stderr are in result, and auto-printed for ProTest capture
+```
+
+### Basic Usage
+
+```python
+@session.test()
+async def test_subprocess():
+    # Simple command (parsed with shlex)
+    result = await Shell.run("echo hello")
+    assert result.stdout == "hello\n"
+
+    # Command as list
+    result = await Shell.run(["ls", "-la", "/tmp"])
+    assert result.success
+
+    # Assert success automatically
+    result = await Shell.run_ok("make build")  # Raises AssertionError if exit != 0
+```
+
+### Shell Features (pipes, &&, etc.)
+
+For shell features like pipes, `&&`, `||`, redirections, use `shell=True`:
+
+```python
+@session.test()
+async def test_shell_features():
+    # Piping
+    result = await Shell.run("cat /etc/hosts | grep localhost", shell=True)
+
+    # Command chaining
+    result = await Shell.run("cd /tmp && ls", shell=True)
+
+    # Shell builtins (exit, cd, etc.)
+    result = await Shell.run("exit 1", shell=True)
+    assert result.exit_code == 1
+```
+
+### Timeout
+
+```python
+@session.test()
+async def test_with_timeout():
+    # Raises asyncio.TimeoutError if command takes > 30s
+    result = await Shell.run("slow-command", timeout=30.0)
+```
+
+### Working Directory & Environment
+
+```python
+@session.test()
+async def test_env():
+    result = await Shell.run(
+        "echo $MY_VAR",
+        cwd="/path/to/project",
+        env={"MY_VAR": "test-value", "PATH": "/usr/bin"},
+        shell=True,
+    )
+    assert "test-value" in result.stdout
+```
+
+### CommandResult API
+
+| Property | Description |
+|----------|-------------|
+| `stdout` | Captured stdout as string |
+| `stderr` | Captured stderr as string |
+| `exit_code` | Process exit code |
+| `command` | The command string that was run |
+| `success` | `True` if `exit_code == 0` |
+| `output` | Combined `stdout` and `stderr` |
+
+### Controlling Output Capture
+
+By default, Shell prints stdout/stderr so ProTest can capture it. Disable this if you only need the result:
+
+```python
+result = await Shell.run("noisy-command", print_output=False)
+# Output not printed to console, only in result.stdout/stderr
+```
