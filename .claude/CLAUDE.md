@@ -20,8 +20,15 @@ Checklist :
 - [ ] `docs/*.md` - doc utilisateur à jour ?
 - [ ] `examples/` - exemples fonctionnels ?
 - [ ] `README.md` - cohérent ?
-- - [ ] Pas de doc obsolète qui contredit le nouveau comportement ?
+- [ ] Pas de doc obsolète qui contredit le nouveau comportement ?
 
+### Règles de Tests
+
+**Après chaque implémentation :**
+
+1. Écrire les tests correspondants
+2. Lancer les tests avec coverage : `uv run pytest tests/test_xxx.py --cov=protest.module --cov-report=term-missing`
+3. Viser 100% de coverage sur le nouveau code
 
 ### Journal des Décisions
 
