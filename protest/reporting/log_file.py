@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, TextIO
 
 from typing_extensions import Self
 
+from protest.entities import SuitePath
 from protest.execution.capture import (
     add_log_callback,
     add_stdout_callback,
@@ -84,9 +85,9 @@ class LogFilePlugin(PluginBase):
 
     def _extract_test_id(self, node_id: str) -> str:
         """Extract readable test id from full node_id."""
-        parts = node_id.split("::")
+        parts = node_id.split(SuitePath.SEPARATOR)
         if len(parts) >= _MIN_NODE_ID_PARTS:
-            return "::".join(parts[1:])
+            return SuitePath.SEPARATOR.join(parts[1:])
         return node_id
 
     def on_session_complete(self, result: SessionResult) -> None:

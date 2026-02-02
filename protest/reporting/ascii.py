@@ -7,6 +7,7 @@ from protest.entities import (
     HandlerInfo,
     SessionResult,
     SessionSetupInfo,
+    SuitePath,
     SuiteResult,
     SuiteSetupInfo,
     TestItem,
@@ -20,11 +21,11 @@ _MIN_NODE_ID_PARTS = 2
 
 def _extract_suite_from_node_id(node_id: str) -> str | None:
     """Extract suite path from node_id like 'module::Suite::test_name'."""
-    parts = node_id.split("::")
+    parts = node_id.split(SuitePath.SEPARATOR)
     if len(parts) >= _MIN_NODE_ID_PARTS:
         suite_parts = parts[1:-1]
         if suite_parts:
-            return "::".join(suite_parts)
+            return SuitePath.SEPARATOR.join(suite_parts)
     return None
 
 
@@ -34,7 +35,7 @@ def _format_test_name(result: TestResult, include_suite: bool = False) -> str:
     if include_suite:
         suite = _extract_suite_from_node_id(result.node_id)
         if suite:
-            name = f"{suite}::{name}"
+            name = f"{suite}{SuitePath.SEPARATOR}{name}"
     if "[" in result.node_id:
         suffix = result.node_id[result.node_id.index("[") :]
         return f"{name}{suffix}"
