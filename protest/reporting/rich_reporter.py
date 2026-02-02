@@ -12,6 +12,7 @@ from protest.entities import (
     HandlerInfo,
     SessionResult,
     SessionSetupInfo,
+    SuitePath,
     SuiteResult,
     SuiteSetupInfo,
     TestItem,
@@ -284,7 +285,7 @@ class RichReporter(PluginBase):
 
     def _print_failure_detail(self, result: TestResult, *, is_error: bool) -> None:
         name = _format_test_name(result)
-        full_name = f"{result.suite_path}::{name}" if result.suite_path else name
+        full_name = f"{result.suite_path}{SuitePath.SEPARATOR}{name}" if result.suite_path else name
         color = "yellow" if is_error else "red"
         self.console.print(f"\n[bold {color}]___ {full_name} ___[/]")
 

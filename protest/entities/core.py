@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from protest.entities.xfail import Xfail
     from protest.events.types import Event
 
+from protest.entities.suite_path import SuitePath
 from protest.utils import get_callable_name
 
 FixtureCallable: TypeAlias = "Callable[..., Any]"
@@ -122,10 +123,11 @@ class TestItem:
 
     @property
     def node_id(self) -> str:
+        sep = SuitePath.SEPARATOR
         if self.suite_path:
-            base = f"{self.module_path}::{self.suite_path}::{self.test_name}"
+            base = f"{self.module_path}{sep}{self.suite_path}{sep}{self.test_name}"
         else:
-            base = f"{self.module_path}::{self.test_name}"
+            base = f"{self.module_path}{sep}{self.test_name}"
         if self.case_ids:
             return f"{base}[{'-'.join(self.case_ids)}]"
         return base

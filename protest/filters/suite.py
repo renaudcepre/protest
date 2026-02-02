@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import Self
 
+from protest.entities import SuitePath
 from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
@@ -38,5 +39,5 @@ class SuiteFilterPlugin(PluginBase):
         suite_lower = item.suite_path.lower()
         filter_lower = self._suite_filter.lower() if self._suite_filter else ""
         return suite_lower == filter_lower or suite_lower.startswith(
-            f"{filter_lower}::"
+            f"{filter_lower}{SuitePath.SEPARATOR}"
         )

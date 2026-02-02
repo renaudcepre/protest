@@ -30,6 +30,7 @@ from protest.entities import (
     FixtureInfo,
     FixtureRegistration,
     FixtureScope,
+    SuitePath,
     format_fixture_scope,
 )
 from protest.events.types import Event
@@ -620,7 +621,7 @@ class Resolver:
             if owner_path is None:
                 continue
             # Resolve if owner is this suite or an ancestor of this suite
-            if suite_path == owner_path or suite_path.startswith(owner_path + "::"):
+            if SuitePath(owner_path).is_ancestor_of(SuitePath(suite_path)):
                 await self.resolve(fixture_func, current_path=suite_path)
 
     async def resolve_session_autouse(self) -> None:

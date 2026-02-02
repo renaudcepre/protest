@@ -25,6 +25,7 @@ from protest.entities.events import (
 )
 from protest.entities.log_capture import LogCapture
 from protest.entities.retry import Retry, normalize_retry
+from protest.entities.suite_path import SuitePath
 from protest.entities.skip import Skip, normalize_skip
 from protest.entities.xfail import Xfail, normalize_xfail
 
@@ -42,6 +43,7 @@ __all__ = [
     "SessionResult",
     "SessionSetupInfo",
     "Skip",
+    "SuitePath",
     "SuiteResult",
     "SuiteSetupInfo",
     "TestCounts",

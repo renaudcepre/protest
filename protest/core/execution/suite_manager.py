@@ -6,9 +6,12 @@ import asyncio
 import time
 from typing import TYPE_CHECKING
 
-from protest.entities import SuiteResult, SuiteSetupInfo
+from protest.entities import SuitePath, SuiteResult, SuiteSetupInfo
 from protest.events.types import Event
-from protest.execution.capture import set_session_setup_capture, set_session_teardown_capture
+from protest.execution.capture import (
+    set_session_setup_capture,
+    set_session_teardown_capture,
+)
 
 if TYPE_CHECKING:
     from protest.core.session import ProTestSession
@@ -39,29 +42,28 @@ class SuiteManager:
 
     async def ensure_hierarchy_started(self, suite_path: str) -> None:
         """Ensure suite and all parent suites are started with autouse resolved."""
-        parts = suite_path.split("::")
-        for idx in range(len(parts)):
-            parent_path = "::".join(parts[: idx + 1])
-            if parent_path in self._started_suites:
+        for ancestor in SuitePath(suite_path).ancestors():
+            ancestor_str = str(ancestor)
+            if ancestor_str in self._started_suites:
                 continue
             async with self._lock:
-                if parent_path in self._started_suites:
+                if ancestor_str in self._started_suites:
                     continue
-                self._suite_start_times[parent_path] = time.perf_counter()
-                await self._session.events.emit(Event.SUITE_START, parent_path)
+                self._suite_start_times[ancestor_str] = time.perf_counter()
+                await self._session.events.emit(Event.SUITE_START, ancestor_str)
                 suite_setup_start = time.perf_counter()
                 set_session_setup_capture(True)
                 try:
-                    await self._session.resolver.resolve_suite_autouse(parent_path)
+                    await self._session.resolver.resolve_suite_autouse(ancestor_str)
                 finally:
                     set_session_setup_capture(False)
                 suite_setup_duration = time.perf_counter() - suite_setup_start
-                self._suite_setup_durations[parent_path] = suite_setup_duration
+                self._suite_setup_durations[ancestor_str] = suite_setup_duration
                 await self._session.events.emit(
                     Event.SUITE_SETUP_DONE,
-                    SuiteSetupInfo(name=parent_path, duration=suite_setup_duration),
+                    SuiteSetupInfo(name=ancestor_str, duration=suite_setup_duration),
                 )
-                self._started_suites.add(parent_path)
+                self._started_suites.add(ancestor_str)
 
     async def teardown(self, suite_path: str) -> None:
         """Teardown suite fixtures after all its tests complete."""

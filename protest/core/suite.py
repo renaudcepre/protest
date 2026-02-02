@@ -14,6 +14,7 @@ from protest.entities import (
     FixtureRegistration,
     Retry,
     Skip,
+    SuitePath,
     TestRegistration,
     Xfail,
     normalize_retry,
@@ -70,7 +71,7 @@ class ProTestSuite:
     def full_path(self) -> str:
         """Return hierarchical path: Parent::Child::GrandChild."""
         if self._parent_suite:
-            return f"{self._parent_suite.full_path}::{self._name}"
+            return f"{self._parent_suite.full_path}{SuitePath.SEPARATOR}{self._name}"
         return self._name
 
     @property
