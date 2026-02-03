@@ -58,7 +58,7 @@ Documenter les décisions architecturales dans `.claude/DECISIONS.md` :
 ```
 protest/
 ├── core/           # Session, Suite, Runner, Collector
-├── di/             # Resolver, Markers (Use), Validation
+├── di/             # FixtureContainer, Markers (Use), Validation
 ├── entities/       # Dataclasses centralisées
 ├── events/         # Event bus
 ├── execution/      # AsyncBridge, Capture, Context
@@ -142,7 +142,7 @@ Fixtures avec `yield` wrappées en context managers via `asynccontextmanager`.
 
 `TestExecutionContext` isole les fixtures TEST :
 - Cache local + exit stack local pour TEST scope
-- Délègue au Resolver parent pour Suite/Session
+- Délègue au FixtureContainer parent pour Suite/Session
 
 ### Event Bus (`events/bus.py`)
 

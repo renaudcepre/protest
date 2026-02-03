@@ -9,11 +9,11 @@ import pytest
 
 from protest import ProTestSession, Use
 from protest.api import run_session
+from protest.di.container import FixtureContainer
 from protest.di.decorators import fixture
 from protest.di.factory import FixtureFactory
 from protest.di.hashable import make_hashable
 from protest.di.proxy import SafeProxy
-from protest.di.resolver import Resolver
 from protest.entities import Fixture, FixtureScope
 from protest.events.bus import EventBus
 from protest.exceptions import (
@@ -116,22 +116,22 @@ class TestFixtureWrapperEdgeCases:
         assert result2 == 25
 
 
-class TestResolverEdgeCases:
-    """Edge cases for Resolver."""
+class TestFixtureContainerEdgeCases:
+    """Edge cases for FixtureContainer."""
 
     def test_resolver_event_bus_property(self) -> None:
         """event_bus property returns the configured event bus."""
 
         bus = EventBus()
-        resolver = Resolver(event_bus=bus)
+        resolver = FixtureContainer(event_bus=bus)
         assert resolver.event_bus is bus
 
-        resolver_no_bus = Resolver(event_bus=None)
+        resolver_no_bus = FixtureContainer(event_bus=None)
         assert resolver_no_bus.event_bus is None
 
     def test_get_dependencies_unwrapped(self) -> None:
         """get_dependencies works with wrapped and unwrapped fixtures."""
-        resolver = Resolver()
+        resolver = FixtureContainer()
 
         @fixture()
         def dep_fixture() -> str:
@@ -154,7 +154,7 @@ class TestResolverEdgeCases:
 
     def test_session_fixture_depends_on_suite_raises(self) -> None:
         """Session fixture depending on suite fixture raises ScopeMismatchError."""
-        resolver = Resolver()
+        resolver = FixtureContainer()
 
         @fixture()
         def suite_resource() -> str:

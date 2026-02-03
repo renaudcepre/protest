@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from types import TracebackType
 
     from protest.compat import Self
-    from protest.di.resolver import Resolver
+    from protest.di.container import FixtureContainer
     from protest.entities import FixtureCallable, SuitePath
 
 # Global cancellation signal for graceful shutdown.
@@ -23,11 +23,11 @@ class TestExecutionContext:
     """Isolated context for a single test execution.
 
     Manages FUNCTION-scoped fixtures independently per test, allowing parallel
-    execution. Provides its cache and exit stack to the Resolver which handles
+    execution. Provides its cache and exit stack to the FixtureContainer which handles
     all resolution logic.
     """
 
-    def __init__(self, parent: Resolver, suite_path: SuitePath | None = None) -> None:
+    def __init__(self, parent: FixtureContainer, suite_path: SuitePath | None = None) -> None:
         self._parent = parent
         self._suite_path = suite_path
         self._cache: dict[FixtureCallable, Any] = {}
@@ -62,7 +62,7 @@ class TestExecutionContext:
             await self._exit_stack.aclose()
 
     async def resolve(self, target_func: FixtureCallable) -> Any:
-        """Resolve a fixture by delegating to the parent Resolver with injected context."""
+        """Resolve a fixture by delegating to the parent FixtureContainer with injected context."""
         return await self._parent.resolve(
             target_func,
             current_path=self._suite_path,

@@ -9,10 +9,10 @@ from protest.core.collector import (
     chunk_by_suite,
     get_last_chunk_index_per_suite,
 )
-from protest.entities import SuitePath
 from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
 from protest.di.decorators import fixture
+from protest.entities import SuitePath
 
 
 class TestTestItemNodeId:

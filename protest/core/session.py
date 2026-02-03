@@ -13,8 +13,8 @@ if TYPE_CHECKING:
 
 from protest.cache.plugin import CachePlugin
 from protest.cache.storage import CacheStorage
+from protest.di.container import FixtureContainer
 from protest.di.decorators import get_fixture_marker
-from protest.di.resolver import Resolver
 from protest.entities import (
     FixtureRegistration,
     FixtureScope,
@@ -49,7 +49,7 @@ class ProTestSession:
 
     def __init__(self, concurrency: int = 1) -> None:
         self._events = EventBus()
-        self._resolver = Resolver(event_bus=self._events)
+        self._resolver = FixtureContainer(event_bus=self._events)
         self._suites: list[ProTestSuite] = []
         self._tests: list[TestRegistration] = []
         self._fixtures: list[FixtureRegistration] = []
@@ -107,7 +107,7 @@ class ProTestSession:
         return self._teardown_duration
 
     @property
-    def resolver(self) -> Resolver:
+    def resolver(self) -> FixtureContainer:
         return self._resolver
 
     @property

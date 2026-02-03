@@ -51,7 +51,7 @@ if TYPE_CHECKING:
     from protest.events.bus import EventBus
 
 
-class Resolver:
+class FixtureContainer:
     """Manages fixture registration, dependency analysis, and resolution.
 
     Scope is determined by the FixtureScope enum:
