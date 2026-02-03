@@ -225,6 +225,41 @@ def test_typed(m: Annotated[Mocker, Use(mocker)]):
     async_mock: AsyncMockType = m.async_stub()
 ```
 
+## tmp_path
+
+Provides a temporary directory that is automatically cleaned up after the test.
+
+```python
+from pathlib import Path
+from typing import Annotated
+from protest import ProTestSession, Use, tmp_path
+
+session = ProTestSession()
+
+@session.test()
+def test_file_operations(tmp: Annotated[Path, Use(tmp_path)]):
+    # Create files
+    test_file = tmp / "data.txt"
+    test_file.write_text("hello world")
+
+    # Read files
+    assert test_file.read_text() == "hello world"
+
+    # Create nested directories
+    nested = tmp / "a" / "b" / "c"
+    nested.mkdir(parents=True)
+    assert nested.is_dir()
+
+# Directory is automatically deleted after test completes
+```
+
+### Key Features
+
+- Returns a `pathlib.Path` object
+- Directory exists and is writable
+- Automatically cleaned up after each test
+- Each test gets a unique directory
+
 ## Shell
 
 Async-safe subprocess runner with isolated output capture. Use this for CLI and integration tests.
