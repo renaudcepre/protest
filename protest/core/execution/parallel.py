@@ -6,16 +6,16 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from protest.core.execution.suite_manager import SuiteManager
-from protest.core.execution.test_executor import TestExecutor
-from protest.core.tracker import SuiteTracker
 from protest.entities import SuitePath, TestCounts, TestItem, TestOutcome, TestStartInfo
 from protest.events.types import Event
-from protest.execution.interrupt import InterruptHandler
 from protest.utils import get_callable_name
 
 if TYPE_CHECKING:
+    from protest.core.execution.suite_manager import SuiteManager
+    from protest.core.execution.test_executor import TestExecutor
     from protest.core.session import ProTestSession
+    from protest.core.tracker import SuiteTracker
+    from protest.execution.interrupt import InterruptHandler
 
 
 @dataclass
@@ -245,9 +245,11 @@ class ParallelExecutor:
         if exitfirst_task:
             exitfirst_task.cancel()
         if self._interrupt_handler.soft_stop_event.is_set():
-            asyncio.create_task(
+            # Fire-and-forget: EventBus tracks pending tasks internally
+            task = asyncio.create_task(
                 self._session.events.emit(Event.SESSION_INTERRUPTED, False)
             )
+            task.add_done_callback(lambda _: None)  # prevent GC before completion
 
 
 def _cancel_tasks(tasks: list[asyncio.Task[None]]) -> None:
