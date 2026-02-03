@@ -6,6 +6,7 @@ from typing import Annotated
 import pytest
 
 from protest import ProTestSession, ProTestSuite, Use
+from protest.entities import SuitePath
 from protest.core.runner import TestRunner
 from protest.di.decorators import factory, fixture
 from protest.exceptions import PlainFunctionError
@@ -56,9 +57,9 @@ class TestSessionSuiteAPI:
         parent.add_suite(child)
         child.add_suite(grandchild)
 
-        assert parent.full_path == "Parent"
-        assert child.full_path == "Parent::Child"
-        assert grandchild.full_path == "Parent::Child::GrandChild"
+        assert parent.full_path == SuitePath("Parent")
+        assert child.full_path == SuitePath("Parent::Child")
+        assert grandchild.full_path == SuitePath("Parent::Child::GrandChild")
 
     def test_suite_description(self) -> None:
         """Suite can have an optional description."""
@@ -126,13 +127,13 @@ class TestScopeAtBinding:
 
         async with session:
             result_a1 = await session.resolver.resolve(
-                suite_resource_a, current_path="suite_a"
+                suite_resource_a, current_path=SuitePath("suite_a")
             )
             result_a2 = await session.resolver.resolve(
-                suite_resource_a, current_path="suite_a"
+                suite_resource_a, current_path=SuitePath("suite_a")
             )
             result_b1 = await session.resolver.resolve(
-                suite_resource_b, current_path="suite_b"
+                suite_resource_b, current_path=SuitePath("suite_b")
             )
 
         assert result_a1 == "resource_1"
@@ -207,7 +208,7 @@ class TestScopeAtBinding:
         # When: resolving test-scoped fixture that depends on suite and session
         async with (
             session,
-            TestExecutionContext(session.resolver, suite_path="my_suite") as ctx,
+            TestExecutionContext(session.resolver, suite_path=SuitePath("my_suite")) as ctx,
         ):
             result = await ctx.resolve(test_helper)
 
@@ -280,7 +281,7 @@ class TestAutouse:
 
         async with session:
             assert log == []
-            await session.resolver.resolve_suite_autouse("TestSuite")
+            await session.resolver.resolve_suite_autouse(SuitePath("TestSuite"))
             assert log == ["suite_setup"]
 
     @pytest.mark.asyncio
@@ -307,7 +308,7 @@ class TestAutouse:
 
         async with session:
             await session.resolve_autouse()
-            await session.resolver.resolve_suite_autouse("TestSuite")
+            await session.resolver.resolve_suite_autouse(SuitePath("TestSuite"))
 
         assert log == ["database", "suite_init_db"]
 
@@ -327,9 +328,9 @@ class TestAutouse:
         suite.bind(suite_resource, autouse=True)  # SUITE + autouse
 
         async with session:
-            await session.resolver.resolve_suite_autouse("TestSuite")
+            await session.resolver.resolve_suite_autouse(SuitePath("TestSuite"))
             assert teardown_log == []
-            await session.resolver.teardown_suite("TestSuite")
+            await session.resolver.teardown_suite(SuitePath("TestSuite"))
             assert teardown_log == ["torn_down"]
 
     @pytest.mark.asyncio
@@ -364,10 +365,10 @@ class TestAutouse:
 
         async with session:
             # Resolve autouse for parent suite - only parent_setup runs
-            await session.resolver.resolve_suite_autouse("Parent")
+            await session.resolver.resolve_suite_autouse(SuitePath("Parent"))
             # Resolve autouse for child suite - child_setup runs,
             # parent_setup is already cached (owner "Parent")
-            await session.resolver.resolve_suite_autouse("Parent::Child")
+            await session.resolver.resolve_suite_autouse(SuitePath("Parent::Child"))
 
         # Each fixture runs once (cached by owner suite)
         assert call_counts["parent"] == 1  # Runs for "Parent", cached
@@ -394,10 +395,10 @@ class TestSuiteTeardown:
         test_suite.bind(suite_resource)  # SUITE scope
 
         async with session:
-            await session.resolver.resolve(suite_resource, current_path="test_suite")
+            await session.resolver.resolve(suite_resource, current_path=SuitePath("test_suite"))
             assert teardown_log == []
 
-            await session.resolver.teardown_suite("test_suite")
+            await session.resolver.teardown_suite(SuitePath("test_suite"))
             assert teardown_log == ["torn_down"]
 
     @pytest.mark.asyncio
@@ -419,14 +420,14 @@ class TestSuiteTeardown:
 
         async with session:
             result1 = await session.resolver.resolve(
-                counted_resource, current_path="suite"
+                counted_resource, current_path=SuitePath("suite")
             )
             assert result1 == "resource_1"
 
-            await session.resolver.teardown_suite("suite")
+            await session.resolver.teardown_suite(SuitePath("suite"))
 
             result2 = await session.resolver.resolve(
-                counted_resource, current_path="suite"
+                counted_resource, current_path=SuitePath("suite")
             )
             assert result2 == "resource_2"
 
@@ -461,7 +462,7 @@ class TestNestedSuites:
 
         async with session:
             result = await session.resolver.resolve(
-                child_resource, current_path="Parent::Child"
+                child_resource, current_path=SuitePath("Parent::Child")
             )
 
         assert result == "child_using_parent_data"
@@ -491,7 +492,7 @@ class TestNestedSuites:
 
         async with session:
             result = await session.resolver.resolve(
-                child_resource, current_path="Parent::Child"
+                child_resource, current_path=SuitePath("Parent::Child")
             )
 
         assert result == "child_using_session_data"
@@ -512,7 +513,7 @@ class TestSuiteFactory:
 
         async with session:
             factory_inst = await session.resolver.resolve(
-                user_factory, current_path="MySuite"
+                user_factory, current_path=SuitePath("MySuite")
             )
             user = await factory_inst(name="alice")
 
@@ -535,7 +536,7 @@ class TestSuiteFactory:
 
         async with session:
             factory_inst = await session.resolver.resolve(
-                uncached_factory, current_path="MySuite"
+                uncached_factory, current_path=SuitePath("MySuite")
             )
             result1 = await factory_inst(tag="a")
             result2 = await factory_inst(tag="b")
@@ -562,7 +563,7 @@ class TestSuiteFactory:
 
         async with session:
             factory_inst = await session.resolver.resolve(
-                user_factory, current_path="MySuite"
+                user_factory, current_path=SuitePath("MySuite")
             )
             user = factory_inst.create(name="bob")
 
@@ -593,7 +594,7 @@ class TestSuiteAddAfterAttach:
 
         assert child._session is session
         assert grandchild._session is session
-        assert grandchild.full_path == "Parent::Child::GrandChild"
+        assert grandchild.full_path == SuitePath("Parent::Child::GrandChild")
 
 
 class TestFixtureBinding:
@@ -651,7 +652,7 @@ class TestFixtureBinding:
 
         async with session:
             result = await session.resolver.resolve(
-                suite_resource, current_path="TestSuite"
+                suite_resource, current_path=SuitePath("TestSuite")
             )
 
         assert result == "suite_data"

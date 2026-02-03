@@ -54,6 +54,10 @@ class SuitePath:
             return SuitePath(name)
         return SuitePath(f"{self._path}{self.SEPARATOR}{name}")
 
+    def lower(self) -> str:
+        """Return lowercase string representation for case-insensitive comparison."""
+        return self._path.lower()
+
     def __str__(self) -> str:
         return self._path
 

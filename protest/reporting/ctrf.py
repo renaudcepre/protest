@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, TypedDict
 
 from typing_extensions import NotRequired, Self
 
-from protest.entities import SuitePath
 from protest.plugin import PluginBase, PluginContext
 
 if TYPE_CHECKING:
@@ -152,8 +151,8 @@ class CTRFReporter(PluginBase):
         }
 
         if result.suite_path:
-            test["suite"] = list(SuitePath(result.suite_path).parts)
-            self._suites.add(result.suite_path)
+            test["suite"] = list(result.suite_path.parts)
+            self._suites.add(str(result.suite_path))
 
         if result.error:
             test["message"] = str(result.error)

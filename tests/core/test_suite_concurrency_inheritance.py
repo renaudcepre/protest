@@ -4,6 +4,7 @@ import pytest
 
 from protest import ProTestSession, ProTestSuite
 from protest.core.runner import TestRunner
+from protest.entities import SuitePath
 from protest.exceptions import ConcurrencyMismatchError
 from tests.conftest import ConcurrencyTracker, register_concurrent_tests
 
@@ -82,7 +83,7 @@ class TestConcurrencyValidation:
 
         parent.add_suite(child)
 
-        assert child.full_path == "parent::child"
+        assert child.full_path == SuitePath("parent::child")
 
     def test_child_equal_to_parent_allowed(self) -> None:
         """Child with equal max_concurrency to parent is valid."""

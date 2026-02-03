@@ -118,7 +118,7 @@ class TestItem:
         return getattr(self.func, "__module__", "<unknown>")
 
     @property
-    def suite_path(self) -> str | None:
+    def suite_path(self) -> SuitePath | None:
         return self.suite.full_path if self.suite else None
 
     @property

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
     from protest.compat import Self
     from protest.di.resolver import Resolver
-    from protest.entities import FixtureCallable
+    from protest.entities import FixtureCallable, SuitePath
 
 # Global cancellation signal for graceful shutdown.
 # When set, teardown code should abort ASAP.
@@ -27,7 +27,7 @@ class TestExecutionContext:
     all resolution logic.
     """
 
-    def __init__(self, parent: Resolver, suite_path: str | None = None) -> None:
+    def __init__(self, parent: Resolver, suite_path: SuitePath | None = None) -> None:
         self._parent = parent
         self._suite_path = suite_path
         self._cache: dict[FixtureCallable, Any] = {}
