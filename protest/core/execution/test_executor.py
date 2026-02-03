@@ -167,6 +167,8 @@ class TestExecutor:
                 and self._should_retry(error, retry_on)
             )
             if should_retry and error is not None:
+                # Clear traceback to save memory - type and message are preserved
+                error.__traceback__ = None
                 previous_errors.append(error)
                 retry_info = TestRetryInfo(
                     name=test_name,
