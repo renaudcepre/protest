@@ -7,7 +7,7 @@ from protest.di.factory import FixtureFactory
 from protest.di.markers import ForEach, From, Use
 from protest.entities import FixtureCallable, Retry, Skip, Xfail
 from protest.exceptions import CircularDependencyError, FixtureError, ProTestError
-from protest.fixtures.builtins import caplog, mocker
+from protest.fixtures.builtins import caplog, mocker, tmp_path
 from protest.fixtures.mocker import AsyncMockType, Mocker, MockType
 from protest.loader import LoadError, load_session
 from protest.plugin import PluginBase
@@ -48,4 +48,5 @@ __all__ = [
     "mocker",
     "raises",
     "run_session",
+    "tmp_path",
 ]
