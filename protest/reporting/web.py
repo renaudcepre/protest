@@ -96,14 +96,14 @@ def run_live_server(port: int = DEFAULT_PORT) -> None:  # pragma: no cover
             port,
             process_request=_process_request,
         ):
-            print(f"Live reporter running at http://localhost:{port}")  # noqa: T201
-            print("Press Ctrl+C to stop")  # noqa: T201
+            print(f"Live reporter running at http://localhost:{port}")  # noqa: T201 - intentional CLI output
+            print("Press Ctrl+C to stop")  # noqa: T201 - intentional CLI output
             await asyncio.get_running_loop().create_future()
 
     try:
         asyncio.run(serve())
     except KeyboardInterrupt:
-        print("\nStopped")  # noqa: T201
+        print("\nStopped")  # noqa: T201 - intentional CLI output
 
 
 class WebReporter(PluginBase):

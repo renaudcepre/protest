@@ -58,8 +58,8 @@ class LogFilePlugin(PluginBase):
 
     def setup(self, session: ProTestSession) -> None:
         self._log_dir.mkdir(exist_ok=True)
-        self._log_handle = open(self._log_file, "w", encoding="utf-8")  # noqa: SIM115
-        self._stdout_handle = open(self._stdout_file, "w", encoding="utf-8")  # noqa: SIM115
+        self._log_handle = open(self._log_file, "w", encoding="utf-8")  # noqa: SIM115 - handle kept open for session
+        self._stdout_handle = open(self._stdout_file, "w", encoding="utf-8")  # noqa: SIM115 - handle kept open for session
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self._write_log(f"# ProTest Log - {timestamp}\n\n")
         self._write_stdout(f"# ProTest Stdout - {timestamp}\n\n")

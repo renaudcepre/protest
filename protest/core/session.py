@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 from protest.cache.plugin import CachePlugin
 from protest.cache.storage import CacheStorage
 from protest.di.container import FixtureContainer
-from protest.di.decorators import get_fixture_marker
+from protest.di.decorators import get_fixture_marker, unwrap_fixture
 from protest.entities import (
     FixtureRegistration,
     FixtureScope,
@@ -28,7 +28,12 @@ from protest.entities import (
 )
 from protest.events.bus import EventBus
 from protest.events.types import Event
+from protest.execution.capture import set_session_teardown_capture
+from protest.filters.keyword import KeywordFilterPlugin
+from protest.filters.suite import SuiteFilterPlugin
+from protest.reporting.ascii import AsciiReporter
 from protest.reporting.log_file import LogFilePlugin
+from protest.reporting.rich_reporter import RichReporter
 from protest.tags.plugin import TagFilterPlugin
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
@@ -197,8 +202,6 @@ class ProTestSession:
             session.bind(database)  # SESSION scope
             session.bind(config, autouse=True)  # SESSION + auto-resolve
         """
-        from protest.di.decorators import unwrap_fixture
-
         actual_func = unwrap_fixture(fn)
         marker = get_fixture_marker(fn)
         if marker is None:
@@ -230,11 +233,6 @@ class ProTestSession:
         This includes: RichReporter, AsciiReporter, CachePlugin, LogFilePlugin,
         TagFilterPlugin, SuiteFilterPlugin, KeywordFilterPlugin.
         """
-        from protest.filters.keyword import KeywordFilterPlugin
-        from protest.filters.suite import SuiteFilterPlugin
-        from protest.reporting.ascii import AsciiReporter
-        from protest.reporting.rich_reporter import RichReporter
-
         self.use(RichReporter)
         self.use(AsciiReporter)
         self.use(CachePlugin)
@@ -330,8 +328,6 @@ class ProTestSession:
         exc_tb: TracebackType | None,
     ) -> bool:
         import time
-
-        from protest.execution.capture import set_session_teardown_capture
 
         teardown_start = time.perf_counter()
         set_session_teardown_capture(True)

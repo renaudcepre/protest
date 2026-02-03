@@ -219,7 +219,7 @@ class CTRFReporter(PluginBase):
     def _get_git_branch(self) -> str | None:
         try:
             result = subprocess.run(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"],  # noqa: S607
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],  # noqa: S607 - safe, no user input
                 capture_output=True,
                 text=True,
                 check=True,
@@ -231,7 +231,7 @@ class CTRFReporter(PluginBase):
     def _get_git_commit(self) -> str | None:
         try:
             result = subprocess.run(
-                ["git", "rev-parse", "HEAD"],  # noqa: S607
+                ["git", "rev-parse", "HEAD"],  # noqa: S607 - safe, no user input
                 capture_output=True,
                 text=True,
                 check=True,
@@ -242,6 +242,7 @@ class CTRFReporter(PluginBase):
 
     def _get_version(self) -> str:
         try:
+            # Lazy import: only needed when generating report
             from importlib.metadata import version  # noqa: PLC0415
 
             return version("protest")
