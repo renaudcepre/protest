@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import io
 import time
 from inspect import signature
 from typing import TYPE_CHECKING, Any, get_type_hints
@@ -28,6 +27,8 @@ from protest.execution.capture import (
 from protest.execution.context import TestExecutionContext
 
 if TYPE_CHECKING:
+    import io
+
     from protest.core.session import ProTestSession
     from protest.events.bus import EventBus
 
