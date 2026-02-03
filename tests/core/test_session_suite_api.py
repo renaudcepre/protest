@@ -208,7 +208,9 @@ class TestScopeAtBinding:
         # When: resolving test-scoped fixture that depends on suite and session
         async with (
             session,
-            TestExecutionContext(session.resolver, suite_path=SuitePath("my_suite")) as ctx,
+            TestExecutionContext(
+                session.resolver, suite_path=SuitePath("my_suite")
+            ) as ctx,
         ):
             result = await ctx.resolve(test_helper)
 
@@ -395,7 +397,9 @@ class TestSuiteTeardown:
         test_suite.bind(suite_resource)  # SUITE scope
 
         async with session:
-            await session.resolver.resolve(suite_resource, current_path=SuitePath("test_suite"))
+            await session.resolver.resolve(
+                suite_resource, current_path=SuitePath("test_suite")
+            )
             assert teardown_log == []
 
             await session.resolver.teardown_suite(SuitePath("test_suite"))

@@ -71,7 +71,9 @@ class CollectedEvents:
     session_results: list[SessionResult] = field(default_factory=list)
     collection_items: list[TestItem] = field(default_factory=list)
     events: list[str] = field(default_factory=list)
-    suite_events: list[tuple[str, SuitePath | SuiteResult]] = field(default_factory=list)
+    suite_events: list[tuple[str, SuitePath | SuiteResult]] = field(
+        default_factory=list
+    )
 
 
 @pytest.fixture

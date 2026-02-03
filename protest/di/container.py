@@ -533,7 +533,11 @@ class FixtureContainer:
         return result
 
     async def _emit_fixture_setup_start_async(
-        self, name: str, scope: FixtureScope, scope_path: SuitePath | None, autouse: bool
+        self,
+        name: str,
+        scope: FixtureScope,
+        scope_path: SuitePath | None,
+        autouse: bool,
     ) -> None:
         if self._event_bus is None:
             return
@@ -566,7 +570,11 @@ class FixtureContainer:
         )
 
     async def _emit_fixture_teardown_start_async(
-        self, name: str, scope: FixtureScope, scope_path: SuitePath | None, autouse: bool
+        self,
+        name: str,
+        scope: FixtureScope,
+        scope_path: SuitePath | None,
+        autouse: bool,
     ) -> None:
         if self._event_bus is None:
             return
