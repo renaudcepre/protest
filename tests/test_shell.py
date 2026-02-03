@@ -128,18 +128,24 @@ class TestShellOptions:
     @pytest.mark.asyncio
     async def test_cwd_changes_working_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = await Shell.run("pwd", cwd=tmpdir, print_output=False)
+            # Use Python to print cwd - works on all platforms
+            result = await Shell.run(
+                ["python", "-c", "import os; print(os.getcwd())"],
+                cwd=tmpdir,
+                print_output=False,
+            )
 
             # Resolve symlinks for macOS /var -> /private/var
-            expected = os.path.realpath(tmpdir)
-            actual = os.path.realpath(result.stdout.strip())
+            # and normalize case for Windows
+            expected = os.path.normcase(os.path.realpath(tmpdir))
+            actual = os.path.normcase(os.path.realpath(result.stdout.strip()))
             assert actual == expected
 
     @pytest.mark.asyncio
     async def test_env_sets_environment_variables(self) -> None:
+        # Use Python to print env var - works on all platforms
         result = await Shell.run(
-            "echo $MY_TEST_VAR",
-            shell=True,
+            ["python", "-c", "import os; print(os.environ.get('MY_TEST_VAR', ''))"],
             env={"MY_TEST_VAR": "test_value", "PATH": os.environ.get("PATH", "")},
             print_output=False,
         )
@@ -149,16 +155,15 @@ class TestShellOptions:
     @pytest.mark.asyncio
     async def test_env_replaces_environment(self) -> None:
         # When env is set, it replaces the environment entirely
-        # So we need PATH for shell to work
+        # Use Python to check that HOME is not set
         result = await Shell.run(
-            "echo $HOME",
-            shell=True,
+            ["python", "-c", "import os; print(os.environ.get('HOME', 'NOT_SET'))"],
             env={"PATH": os.environ.get("PATH", "")},  # No HOME
             print_output=False,
         )
 
-        # HOME should be empty/unset
-        assert result.stdout.strip() == ""
+        # HOME should not be set
+        assert result.stdout.strip() == "NOT_SET"
 
     @pytest.mark.asyncio
     async def test_print_output_false_suppresses_print(
@@ -223,11 +228,13 @@ class TestShellEdgeCases:
 
     @pytest.mark.asyncio
     async def test_multiline_output(self) -> None:
+        # Use Python for cross-platform multiline output
         result = await Shell.run(
-            "echo line1 && echo line2", shell=True, print_output=False
+            ["python", "-c", "print('line1'); print('line2')"],
+            print_output=False,
         )
 
-        lines = result.stdout.strip().split("\n")
+        lines = result.stdout.strip().splitlines()
         assert len(lines) == 2
         assert lines[0] == "line1"
         assert lines[1] == "line2"
