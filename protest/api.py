@@ -188,8 +188,8 @@ def list_tags(session: ProTestSession) -> set[str]:
 
     all_tags: set[str] = set()
 
-    for reg in session.fixtures:
-        all_tags.update(reg.tags)
+    for fixture_reg in session.fixtures:
+        all_tags.update(fixture_reg.tags)
 
     for test_reg in session.tests:
         all_tags.update(test_reg.tags)
@@ -197,8 +197,8 @@ def list_tags(session: ProTestSession) -> set[str]:
     def collect_from_suites(suites: list[ProTestSuite]) -> None:
         for suite in suites:
             all_tags.update(suite.tags)
-            for reg in suite.fixtures:
-                all_tags.update(reg.tags)
+            for fixture_reg in suite.fixtures:
+                all_tags.update(fixture_reg.tags)
             for test_reg in suite.tests:
                 all_tags.update(test_reg.tags)
             collect_from_suites(suite.suites)

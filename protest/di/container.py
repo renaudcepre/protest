@@ -24,7 +24,7 @@ from protest.di.decorators import (
 )
 from protest.di.factory import FixtureFactory
 from protest.di.markers import Use
-from protest.di.proxy import SafeProxy
+from protest.di.proxy import FixtureErrorWrapper
 from protest.entities import (
     Fixture,
     FixtureCallable,
@@ -446,7 +446,7 @@ class FixtureContainer:
 
         if fixture.is_factory and not fixture.managed:
             result = await self._execute_fixture(fixture, kwargs, exit_stack)
-            return SafeProxy(result, fixture_name)
+            return FixtureErrorWrapper(result, fixture_name)
 
         return await self._execute_fixture(fixture, kwargs, exit_stack)
 

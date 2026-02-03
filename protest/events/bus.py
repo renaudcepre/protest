@@ -92,7 +92,7 @@ class EventBus:
     def off(self, event: Event, handler: Callable[..., Any]) -> None:
         """Unregister a handler for an event."""
         self._handlers[event] = [
-            reg for reg in self._handlers[event] if reg.func != handler
+            entry for entry in self._handlers[event] if entry.func != handler
         ]
 
     async def emit(self, event: Event, data: Any = None) -> None:
@@ -102,9 +102,9 @@ class EventBus:
         (TestResult, str, HandlerInfo, None, etc.). Type safety is enforced at the
         plugin level via strongly-typed on_* methods in PluginBase.
         """
-        for registered in self._handlers[event]:
-            handler = registered.func
-            handler_name = registered.name
+        for handler_entry in self._handlers[event]:
+            handler = handler_entry.func
+            handler_name = handler_entry.name
             is_async = asyncio.iscoroutinefunction(handler)
 
             await self._emit_handler_start(handler_name, event, is_async)
@@ -171,14 +171,14 @@ class EventBus:
     ) -> None:
         """Emit HANDLER_START without triggering handler events (avoid recursion)."""
         info = HandlerInfo(name=name, event=event, is_async=is_async)
-        for registered in self._handlers[Event.HANDLER_START]:
+        for handler_entry in self._handlers[Event.HANDLER_START]:
             try:
-                if asyncio.iscoroutinefunction(registered.func):
-                    await registered.func(info)
+                if asyncio.iscoroutinefunction(handler_entry.func):
+                    await handler_entry.func(info)
                 else:
-                    await run_in_threadpool(registered.func, info)
+                    await run_in_threadpool(handler_entry.func, info)
             except Exception:
-                logger.exception("HANDLER_START listener %s failed", registered.name)
+                logger.exception("HANDLER_START listener %s failed", handler_entry.name)
 
     async def _emit_handler_end(
         self,
@@ -192,14 +192,14 @@ class EventBus:
         info = HandlerInfo(
             name=name, event=event, is_async=is_async, duration=duration, error=error
         )
-        for registered in self._handlers[Event.HANDLER_END]:
+        for handler_entry in self._handlers[Event.HANDLER_END]:
             try:
-                if asyncio.iscoroutinefunction(registered.func):
-                    await registered.func(info)
+                if asyncio.iscoroutinefunction(handler_entry.func):
+                    await handler_entry.func(info)
                 else:
-                    await run_in_threadpool(registered.func, info)
+                    await run_in_threadpool(handler_entry.func, info)
             except Exception:
-                logger.exception("HANDLER_END listener %s failed", registered.name)
+                logger.exception("HANDLER_END listener %s failed", handler_entry.name)
 
     @property
     def pending_count(self) -> int:
@@ -213,8 +213,8 @@ class EventBus:
 
     async def emit_and_collect(self, event: Event, data: Any) -> Any:
         """Emit event and allow handlers to modify data in chain."""
-        for registered in self._handlers[event]:
-            handler = registered.func
+        for handler_entry in self._handlers[event]:
+            handler = handler_entry.func
             try:
                 if asyncio.iscoroutinefunction(handler):
                     result = await handler(data)
@@ -225,7 +225,7 @@ class EventBus:
             except Exception:
                 logger.exception(
                     "Handler %s failed for event %s",
-                    registered.name,
+                    handler_entry.name,
                     event.value,
                 )
         return data

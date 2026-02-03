@@ -42,8 +42,8 @@ class Collector:
 
         items: list[TestItem] = []
 
-        for reg in session.tests:
-            items.extend(self._expand_registration(reg, suite=None))
+        for test_reg in session.tests:
+            items.extend(self._expand_registration(test_reg, suite=None))
 
         for suite in session.suites:
             items.extend(self._collect_from_suite(suite))
@@ -52,18 +52,22 @@ class Collector:
 
     def _build_fixture_index(self, session: ProTestSession) -> None:
         """Build index of all fixtures with their tags and dependencies."""
-        for reg in session.fixtures:
-            self._fixture_tags[reg.func] = reg.tags
-            self._fixture_deps[reg.func] = _extract_use_fixtures(reg.func)
+        for fixture_reg in session.fixtures:
+            self._fixture_tags[fixture_reg.func] = fixture_reg.tags
+            self._fixture_deps[fixture_reg.func] = _extract_use_fixtures(
+                fixture_reg.func
+            )
 
         self._index_suite_fixtures(session.suites)
 
     def _index_suite_fixtures(self, suites: list[ProTestSuite]) -> None:
         """Recursively index fixtures from suites."""
         for suite in suites:
-            for reg in suite.fixtures:
-                self._fixture_tags[reg.func] = reg.tags
-                self._fixture_deps[reg.func] = _extract_use_fixtures(reg.func)
+            for fixture_reg in suite.fixtures:
+                self._fixture_tags[fixture_reg.func] = fixture_reg.tags
+                self._fixture_deps[fixture_reg.func] = _extract_use_fixtures(
+                    fixture_reg.func
+                )
             self._index_suite_fixtures(suite.suites)
 
     def _get_transitive_fixture_tags(
@@ -83,36 +87,36 @@ class Collector:
         return tags
 
     def _compute_test_tags(
-        self, reg: TestRegistration, suite: ProTestSuite | None
+        self, test_reg: TestRegistration, suite: ProTestSuite | None
     ) -> set[str]:
         """Compute all tags for a test: explicit + suite + fixture (transitive)."""
-        tags = reg.tags.copy()
+        tags = test_reg.tags.copy()
 
         if suite:
             tags.update(suite.all_tags)
 
-        for fixture_func in _extract_use_fixtures(reg.func):
+        for fixture_func in _extract_use_fixtures(test_reg.func):
             tags.update(self._get_transitive_fixture_tags(fixture_func))
 
         return tags
 
     def _expand_registration(
-        self, reg: TestRegistration, suite: ProTestSuite | None
+        self, test_reg: TestRegistration, suite: ProTestSuite | None
     ) -> list[TestItem]:
         """Expand a TestRegistration into TestItems with computed tags."""
-        tags = self._compute_test_tags(reg, suite)
-        from_params = _extract_from_params(reg.func)
+        tags = self._compute_test_tags(test_reg, suite)
+        from_params = _extract_from_params(test_reg.func)
 
         if not from_params:
             return [
                 TestItem(
-                    func=reg.func,
+                    func=test_reg.func,
                     suite=suite,
                     tags=tags,
-                    skip=reg.skip,
-                    xfail=reg.xfail,
-                    timeout=reg.timeout,
-                    retry=reg.retry,
+                    skip=test_reg.skip,
+                    xfail=test_reg.xfail,
+                    timeout=test_reg.timeout,
+                    retry=test_reg.retry,
                 )
             ]
 
@@ -122,19 +126,21 @@ class Collector:
         items: list[TestItem] = []
         for combination in product(*sources):
             case_kwargs = dict(zip(param_names, combination, strict=True))
-            case_ids = [sources[idx].get_id(val) for idx, val in enumerate(combination)]
+            case_ids = [
+                sources[index].get_id(value) for index, value in enumerate(combination)
+            ]
 
             items.append(
                 TestItem(
-                    func=reg.func,
+                    func=test_reg.func,
                     suite=suite,
                     tags=tags.copy(),
                     case_kwargs=case_kwargs,
                     case_ids=case_ids,
-                    skip=reg.skip,
-                    xfail=reg.xfail,
-                    timeout=reg.timeout,
-                    retry=reg.retry,
+                    skip=test_reg.skip,
+                    xfail=test_reg.xfail,
+                    timeout=test_reg.timeout,
+                    retry=test_reg.retry,
                 )
             )
 
@@ -144,8 +150,8 @@ class Collector:
         """Recursively collect tests from suite and its children."""
         items: list[TestItem] = []
 
-        for reg in suite.tests:
-            items.extend(self._expand_registration(reg, suite))
+        for test_reg in suite.tests:
+            items.extend(self._expand_registration(test_reg, suite))
 
         for child in suite.suites:
             items.extend(self._collect_from_suite(child))

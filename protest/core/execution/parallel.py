@@ -19,8 +19,8 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class _WorkerContext:
-    """Shared state for worker coroutines during a single run."""
+class _ParallelExecutionState:
+    """Shared state for worker coroutines during a single parallel run."""
 
     queue: asyncio.Queue[TestItem | None]
     semaphores: dict[SuitePath | None, asyncio.Semaphore]
@@ -95,7 +95,7 @@ class ParallelExecutor:
         items: list[TestItem],
         suite_semaphores: dict[SuitePath | None, asyncio.Semaphore],
         tracker: SuiteTracker,
-    ) -> _WorkerContext:
+    ) -> _ParallelExecutionState:
         """Create and populate worker context with work queue."""
         queue: asyncio.Queue[TestItem | None] = asyncio.Queue()
         for item in items:
@@ -103,14 +103,14 @@ class ParallelExecutor:
         for _ in range(self._session.concurrency):
             await queue.put(None)  # Sentinel values
 
-        return _WorkerContext(
+        return _ParallelExecutionState(
             queue=queue,
             semaphores=suite_semaphores,
             tracker=tracker,
             exitfirst_flag=asyncio.Event() if self._session.exitfirst else None,
         )
 
-    async def _process_queue(self, ctx: _WorkerContext) -> None:
+    async def _process_queue(self, ctx: _ParallelExecutionState) -> None:
         """Process tests from the queue in FIFO order."""
         while True:
             if self._should_stop(ctx.exitfirst_flag):
@@ -138,7 +138,7 @@ class ParallelExecutor:
         )
 
     async def _process_test_item(
-        self, item: TestItem, ctx: _WorkerContext
+        self, item: TestItem, ctx: _ParallelExecutionState
     ) -> TestOutcome | None:
         """Process a single test item. Returns None if interrupted."""
         if self._should_stop(ctx.exitfirst_flag):
@@ -172,7 +172,7 @@ class ParallelExecutor:
         item: TestItem,
         start_info: TestStartInfo,
         suite_sem: asyncio.Semaphore | None,
-        ctx: _WorkerContext,
+        ctx: _ParallelExecutionState,
     ) -> TestOutcome:
         """Execute test, optionally within suite semaphore."""
         if suite_sem:
