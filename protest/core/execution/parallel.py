@@ -27,7 +27,6 @@ class _WorkerContext:
     tracker: SuiteTracker
     exitfirst_flag: asyncio.Event | None
     results: list[TestOutcome] = field(default_factory=list)
-    results_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
 class ParallelExecutor:
@@ -124,8 +123,7 @@ class ParallelExecutor:
 
             try:
                 if outcome := await self._process_test_item(test_item, ctx):
-                    async with ctx.results_lock:
-                        ctx.results.append(outcome)
+                    ctx.results.append(outcome)
                     if ctx.exitfirst_flag and (
                         outcome.counts.failed or outcome.counts.errored
                     ):
