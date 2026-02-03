@@ -20,6 +20,7 @@ from protest.di.decorators import (
     FIXTURE_MARKER_ATTR,
     FixtureWrapper,
     get_fixture_marker,
+    unwrap_fixture,
 )
 from protest.di.factory import FixtureFactory
 from protest.di.markers import Use
@@ -28,8 +29,8 @@ from protest.entities import (
     Fixture,
     FixtureCallable,
     FixtureInfo,
-    FixtureRegistration,
     FixtureScope,
+    SuitePath,
     format_fixture_scope,
 )
 from protest.events.types import Event
@@ -50,7 +51,7 @@ if TYPE_CHECKING:
     from protest.events.bus import EventBus
 
 
-class Resolver:
+class FixtureContainer:
     """Manages fixture registration, dependency analysis, and resolution.
 
     Scope is determined by the FixtureScope enum:
@@ -63,27 +64,18 @@ class Resolver:
     pattern where fixtures are decorated standalone without coupling to a suite instance.
     """
 
-    @staticmethod
-    def _unwrap(
-        func: FixtureCallable,
-    ) -> tuple[FixtureCallable, FixtureRegistration | None]:
-        """Extract the actual function and registration from a FixtureWrapper."""
-        if isinstance(func, FixtureWrapper):
-            return cast("FixtureCallable", func.func), func.registration
-        return func, None
-
     def __init__(self, event_bus: EventBus | None = None) -> None:
         self._registry: dict[FixtureCallable, Fixture] = {}
         self._dependencies: dict[FixtureCallable, dict[str, FixtureCallable]] = {}
         self._scopes: dict[FixtureCallable, FixtureScope] = {}
         self._suite_paths: dict[
-            FixtureCallable, str
+            FixtureCallable, SuitePath
         ] = {}  # Owner suite path for SUITE fixtures
         self._exit_stack: AsyncExitStack = AsyncExitStack()
         self._resolve_locks: dict[FixtureCallable, asyncio.Lock] = {}
         # For SUITE scope: cache and exit stacks keyed by owner suite path
-        self._path_caches: dict[str, dict[FixtureCallable, Any]] = {}
-        self._path_exit_stacks: dict[str, AsyncExitStack] = {}
+        self._suite_caches: dict[SuitePath, dict[FixtureCallable, Any]] = {}
+        self._suite_exit_stacks: dict[SuitePath, AsyncExitStack] = {}
         self._event_bus = event_bus
         self._autouse_fixtures: set[FixtureCallable] = set()
 
@@ -100,7 +92,7 @@ class Resolver:
         managed: bool = True,
         tags: set[str] | None = None,
         autouse: bool = False,
-        suite_path: str | None = None,
+        suite_path: SuitePath | None = None,
     ) -> None:
         """Register a fixture with a specific scope.
 
@@ -141,45 +133,45 @@ class Resolver:
 
     def has_fixture(self, func: FixtureCallable) -> bool:
         """Check if a fixture is registered."""
-        actual_func, _ = self._unwrap(func)
+        actual_func = unwrap_fixture(func)
         return actual_func in self._registry
 
     def get_fixture(self, func: FixtureCallable) -> Fixture | None:
         """Return the Fixture for a function, or None if not registered."""
-        actual_func, _ = self._unwrap(func)
+        actual_func = unwrap_fixture(func)
         return self._registry.get(actual_func)
 
     def get_scope(self, func: FixtureCallable) -> FixtureScope | None:
         """Return the scope for a fixture, or None if not registered."""
-        actual_func, _ = self._unwrap(func)
+        actual_func = unwrap_fixture(func)
         return self._scopes.get(actual_func)
 
-    def get_suite_path(self, func: FixtureCallable) -> str | None:
+    def get_suite_path(self, func: FixtureCallable) -> SuitePath | None:
         """Return the owner suite path for a SUITE-scoped fixture."""
-        actual_func, _ = self._unwrap(func)
+        actual_func = unwrap_fixture(func)
         return self._suite_paths.get(actual_func)
 
     def get_dependencies(self, func: FixtureCallable) -> dict[str, FixtureCallable]:
         """Return the dependencies of a fixture as {param_name: fixture_func}."""
-        actual_func, _ = self._unwrap(func)
+        actual_func = unwrap_fixture(func)
         return self._dependencies.get(actual_func, {})
 
     def get_fixture_tags(self, func: FixtureCallable) -> set[str]:
         """Get tags declared on a fixture."""
-        actual_func, _ = self._unwrap(func)
+        actual_func = unwrap_fixture(func)
         fixture = self._registry.get(actual_func)
         return fixture.tags.copy() if fixture else set()
 
     def get_transitive_tags(self, func: FixtureCallable) -> set[str]:
         """Get all tags from a fixture and its dependencies (transitive)."""
-        actual_func, _ = self._unwrap(func)
+        actual_func = unwrap_fixture(func)
         return self._collect_transitive_tags(actual_func, set())
 
     def _collect_transitive_tags(
         self, func: FixtureCallable, visited: set[FixtureCallable]
     ) -> set[str]:
         """Recursively collect tags from fixture and all its dependencies."""
-        actual_func, _ = self._unwrap(func)
+        actual_func = unwrap_fixture(func)
         if actual_func in visited:
             return set()
         visited.add(actual_func)
@@ -262,8 +254,8 @@ class Resolver:
     async def resolve(
         self,
         target_func: FixtureCallable,
-        current_path: str | None = None,
-        _resolution_stack: tuple[FixtureCallable, ...] = (),
+        current_path: SuitePath | None = None,
+        dependency_chain: tuple[FixtureCallable, ...] = (),
         context_cache: dict[FixtureCallable, Any] | None = None,
         context_exit_stack: AsyncExitStack | None = None,
     ) -> Any:
@@ -273,7 +265,7 @@ class Resolver:
             target_func: The fixture function (must be decorated with @fixture/@factory).
             current_path: Current execution context path (suite path for tests).
                 For SUITE-scoped fixtures, this determines the cache key.
-            _resolution_stack: Internal stack tracking fixtures being resolved (cycle detection).
+            dependency_chain: Stack tracking fixtures being resolved (for cycle detection).
             context_cache: External cache for TEST-scoped fixtures (injected by TestExecutionContext).
             context_exit_stack: External exit stack for TEST-scoped fixtures teardown.
 
@@ -283,20 +275,20 @@ class Resolver:
         target_fixture = self._ensure_registered(target_func)
         actual_func = target_fixture.func
 
-        if actual_func in _resolution_stack:
-            cycle_path = [get_callable_name(func) for func in _resolution_stack]
+        if actual_func in dependency_chain:
+            cycle_path = [get_callable_name(func) for func in dependency_chain]
             cycle_path.append(get_callable_name(actual_func))
             raise CircularDependencyError(cycle_path)
 
         scope = self._scopes[actual_func]
-        new_stack = (*_resolution_stack, actual_func)
+        new_chain = (*dependency_chain, actual_func)
 
         match scope:
             case FixtureScope.SESSION:
                 return await self._resolve_session_scoped(
                     target_fixture,
                     current_path,
-                    new_stack,
+                    new_chain,
                     context_cache,
                     context_exit_stack,
                 )
@@ -304,7 +296,7 @@ class Resolver:
                 return await self._resolve_suite_scoped(
                     target_fixture,
                     current_path,
-                    new_stack,
+                    new_chain,
                     context_cache,
                     context_exit_stack,
                 )
@@ -312,7 +304,7 @@ class Resolver:
                 return await self._resolve_test_scoped(
                     target_fixture,
                     current_path,
-                    new_stack,
+                    new_chain,
                     context_cache,
                     context_exit_stack,
                 )
@@ -320,8 +312,8 @@ class Resolver:
     async def _resolve_session_scoped(
         self,
         target_fixture: Fixture,
-        current_path: str | None,
-        resolution_stack: tuple[FixtureCallable, ...],
+        current_path: SuitePath | None,
+        dependency_chain: tuple[FixtureCallable, ...],
         context_cache: dict[FixtureCallable, Any] | None,
         context_exit_stack: AsyncExitStack | None,
     ) -> Any:
@@ -336,7 +328,7 @@ class Resolver:
             kwargs = await self._resolve_dependencies(
                 target_fixture.func,
                 current_path,
-                resolution_stack,
+                dependency_chain,
                 context_cache,
                 context_exit_stack,
             )
@@ -351,8 +343,8 @@ class Resolver:
     async def _resolve_suite_scoped(
         self,
         target_fixture: Fixture,
-        current_path: str | None,
-        resolution_stack: tuple[FixtureCallable, ...],
+        current_path: SuitePath | None,
+        dependency_chain: tuple[FixtureCallable, ...],
         context_cache: dict[FixtureCallable, Any] | None,
         context_exit_stack: AsyncExitStack | None,
     ) -> Any:
@@ -364,14 +356,14 @@ class Resolver:
         - Tests in "A::B", "A::B::C", "A::B::D" all share the same instance
         """
         # Use fixture's owner suite path as cache key
-        # Fallback to current_path for backward compat, then "__no_suite__"
+        # Fallback to current_path for backward compat, then empty path
         owner_path = self._suite_paths.get(target_fixture.func)
-        cache_key = owner_path or current_path or "__no_suite__"
+        cache_key = owner_path or current_path or SuitePath("")
 
-        if cache_key not in self._path_caches:
-            self._path_caches[cache_key] = {}
+        if cache_key not in self._suite_caches:
+            self._suite_caches[cache_key] = {}
 
-        cache = self._path_caches[cache_key]
+        cache = self._suite_caches[cache_key]
         if target_fixture.func in cache:
             return cache[target_fixture.func]
 
@@ -379,18 +371,18 @@ class Resolver:
             if target_fixture.func in cache:
                 return cache[target_fixture.func]
 
-            if cache_key not in self._path_exit_stacks:
-                self._path_exit_stacks[cache_key] = AsyncExitStack()
+            if cache_key not in self._suite_exit_stacks:
+                self._suite_exit_stacks[cache_key] = AsyncExitStack()
 
             kwargs = await self._resolve_dependencies(
                 target_fixture.func,
                 current_path,
-                resolution_stack,
+                dependency_chain,
                 context_cache,
                 context_exit_stack,
             )
             result = await self._resolve_fixture_value(
-                target_fixture, kwargs, self._path_exit_stacks[cache_key]
+                target_fixture, kwargs, self._suite_exit_stacks[cache_key]
             )
 
             cache[target_fixture.func] = result
@@ -399,8 +391,8 @@ class Resolver:
     async def _resolve_test_scoped(
         self,
         target_fixture: Fixture,
-        current_path: str | None,
-        resolution_stack: tuple[FixtureCallable, ...],
+        current_path: SuitePath | None,
+        dependency_chain: tuple[FixtureCallable, ...],
         context_cache: dict[FixtureCallable, Any] | None,
         context_exit_stack: AsyncExitStack | None,
     ) -> Any:
@@ -418,7 +410,7 @@ class Resolver:
         kwargs = await self._resolve_dependencies(
             actual_func,
             current_path,
-            resolution_stack,
+            dependency_chain,
             context_cache,
             context_exit_stack,
         )
@@ -454,8 +446,8 @@ class Resolver:
     async def _resolve_dependencies(
         self,
         target_func: FixtureCallable,
-        current_path: str | None,
-        resolution_stack: tuple[FixtureCallable, ...],
+        current_path: SuitePath | None,
+        dependency_chain: tuple[FixtureCallable, ...],
         context_cache: dict[FixtureCallable, Any] | None,
         context_exit_stack: AsyncExitStack | None,
     ) -> dict[str, Any]:
@@ -465,7 +457,7 @@ class Resolver:
             kwargs[param_name] = await self.resolve(
                 dep_func,
                 current_path,
-                resolution_stack,
+                dependency_chain,
                 context_cache,
                 context_exit_stack,
             )
@@ -541,7 +533,11 @@ class Resolver:
         return result
 
     async def _emit_fixture_setup_start_async(
-        self, name: str, scope: FixtureScope, scope_path: str | None, autouse: bool
+        self,
+        name: str,
+        scope: FixtureScope,
+        scope_path: SuitePath | None,
+        autouse: bool,
     ) -> None:
         if self._event_bus is None:
             return
@@ -555,7 +551,7 @@ class Resolver:
         self,
         name: str,
         scope: FixtureScope,
-        scope_path: str | None,
+        scope_path: SuitePath | None,
         duration: float,
         autouse: bool,
     ) -> None:
@@ -574,7 +570,11 @@ class Resolver:
         )
 
     async def _emit_fixture_teardown_start_async(
-        self, name: str, scope: FixtureScope, scope_path: str | None, autouse: bool
+        self,
+        name: str,
+        scope: FixtureScope,
+        scope_path: SuitePath | None,
+        autouse: bool,
     ) -> None:
         if self._event_bus is None:
             return
@@ -588,7 +588,7 @@ class Resolver:
         self,
         name: str,
         scope: FixtureScope,
-        scope_path: str | None,
+        scope_path: SuitePath | None,
         start_time: float,
         autouse: bool,
     ) -> None:
@@ -607,7 +607,7 @@ class Resolver:
             ),
         )
 
-    async def resolve_suite_autouse(self, suite_path: str) -> None:
+    async def resolve_suite_autouse(self, suite_path: SuitePath) -> None:
         """Resolve SUITE-scoped autouse fixtures accessible from this suite.
 
         Only resolves fixtures that are owned by this suite or an ancestor suite.
@@ -620,7 +620,7 @@ class Resolver:
             if owner_path is None:
                 continue
             # Resolve if owner is this suite or an ancestor of this suite
-            if suite_path == owner_path or suite_path.startswith(owner_path + "::"):
+            if owner_path.is_ancestor_of(suite_path):
                 await self.resolve(fixture_func, current_path=suite_path)
 
     async def resolve_session_autouse(self) -> None:
@@ -631,7 +631,7 @@ class Resolver:
 
     async def resolve_test_autouse(
         self,
-        current_path: str | None,
+        current_path: SuitePath | None,
         context_cache: dict[FixtureCallable, Any],
         context_exit_stack: AsyncExitStack,
     ) -> None:
@@ -656,20 +656,20 @@ class Resolver:
 
     def is_autouse(self, func: FixtureCallable) -> bool:
         """Check if a fixture is marked as autouse."""
-        actual_func, _ = self._unwrap(func)
+        actual_func = unwrap_fixture(func)
         return actual_func in self._autouse_fixtures
 
-    async def teardown_path(self, scope_path: str) -> None:
+    async def teardown_path(self, scope_path: SuitePath) -> None:
         """Teardown all fixtures for a given scope path."""
-        if scope_path in self._path_exit_stacks:
-            await self._path_exit_stacks[scope_path].aclose()
-            del self._path_exit_stacks[scope_path]
-        if scope_path in self._path_caches:
-            del self._path_caches[scope_path]
+        if scope_path in self._suite_exit_stacks:
+            await self._suite_exit_stacks[scope_path].aclose()
+            del self._suite_exit_stacks[scope_path]
+        if scope_path in self._suite_caches:
+            del self._suite_caches[scope_path]
 
-    async def teardown_suite(self, suite_name: str) -> None:
-        """Alias for teardown_path (backward compatibility)."""
-        await self.teardown_path(suite_name)
+    async def teardown_suite(self, suite_path: SuitePath) -> None:
+        """Teardown all fixtures for a suite path."""
+        await self.teardown_path(suite_path)
 
     async def __aenter__(self) -> Self:
         return self
@@ -682,17 +682,17 @@ class Resolver:
     ) -> bool:
         interrupt_event = cancellation_event.get()
 
-        for path in reversed(list(self._path_exit_stacks.keys())):
+        for path in reversed(list(self._suite_exit_stacks.keys())):
             if await self._run_teardown_interruptible(
-                self._path_exit_stacks[path], interrupt_event
+                self._suite_exit_stacks[path], interrupt_event
             ):
                 # Cancelled - abort remaining teardowns
-                self._path_exit_stacks.clear()
-                self._path_caches.clear()
+                self._suite_exit_stacks.clear()
+                self._suite_caches.clear()
                 return False
 
-        self._path_exit_stacks.clear()
-        self._path_caches.clear()
+        self._suite_exit_stacks.clear()
+        self._suite_caches.clear()
 
         if await self._run_teardown_interruptible(
             self._exit_stack, interrupt_event, exc_type, exc_val, exc_tb
@@ -761,7 +761,7 @@ class Resolver:
         self, func: FixtureCallable, scope: FixtureScope
     ) -> None:
         """Analyze function signature and store dependencies."""
-        actual_func, _ = self._unwrap(func)
+        actual_func = unwrap_fixture(func)
         func_signature = signature(actual_func)
 
         try:
@@ -775,7 +775,7 @@ class Resolver:
             if dependency := self._extract_dependency_from_annotation(
                 resolved_annotation
             ):
-                dep_func, _ = self._unwrap(dependency)
+                dep_func = unwrap_fixture(dependency)
                 self._ensure_registered(dependency)
                 self._validate_scope(func, scope, dep_func)
                 dependencies[param_name] = dep_func

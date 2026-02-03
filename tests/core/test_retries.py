@@ -15,6 +15,7 @@ from protest import ProTestSession, ProTestSuite, Retry
 from protest.core.runner import TestRunner
 from protest.di.decorators import fixture
 from protest.di.markers import Use
+from protest.entities import SuitePath
 from protest.events.types import Event
 
 if TYPE_CHECKING:
@@ -664,7 +665,7 @@ class TestRetryEvent:
         info = retry_events[0]
         assert info.name == "test_info"
         assert "MySuite" in info.node_id
-        assert info.suite_path == "MySuite"
+        assert info.suite_path == SuitePath("MySuite")
         assert info.attempt == 1
         assert info.max_attempts == 2
         assert isinstance(info.error, RuntimeError)

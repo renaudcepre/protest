@@ -5,15 +5,15 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from protest.entities import TestItem
+    from protest.entities import SuitePath, TestItem
 
 
 @dataclass
 class SuiteTracker:
     """Track test completion per suite for cross-suite parallelism."""
 
-    _counts: dict[str | None, int] = field(default_factory=dict)
-    _completed: dict[str | None, int] = field(default_factory=dict)
+    _counts: dict[SuitePath | None, int] = field(default_factory=dict)
+    _completed: dict[SuitePath | None, int] = field(default_factory=dict)
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
     @classmethod
@@ -43,7 +43,7 @@ class SuiteTracker:
 
         return tracker
 
-    async def mark_completed(self, suite_path: str | None) -> bool:
+    async def mark_completed(self, suite_path: SuitePath | None) -> bool:
         """Mark one test completed. Returns True if suite is fully done."""
         async with self._lock:
             self._completed[suite_path] = self._completed.get(suite_path, 0) + 1

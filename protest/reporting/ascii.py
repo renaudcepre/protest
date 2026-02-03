@@ -7,8 +7,10 @@ from protest.entities import (
     HandlerInfo,
     SessionResult,
     SessionSetupInfo,
+    SuitePath,
     SuiteResult,
     SuiteSetupInfo,
+    SuiteStartInfo,
     TestItem,
     TestResult,
     TestRetryInfo,
@@ -20,11 +22,11 @@ _MIN_NODE_ID_PARTS = 2
 
 def _extract_suite_from_node_id(node_id: str) -> str | None:
     """Extract suite path from node_id like 'module::Suite::test_name'."""
-    parts = node_id.split("::")
+    parts = node_id.split(SuitePath.SEPARATOR)
     if len(parts) >= _MIN_NODE_ID_PARTS:
         suite_parts = parts[1:-1]
         if suite_parts:
-            return "::".join(suite_parts)
+            return SuitePath.SEPARATOR.join(suite_parts)
     return None
 
 
@@ -34,7 +36,7 @@ def _format_test_name(result: TestResult, include_suite: bool = False) -> str:
     if include_suite:
         suite = _extract_suite_from_node_id(result.node_id)
         if suite:
-            name = f"{suite}::{name}"
+            name = f"{suite}{SuitePath.SEPARATOR}{name}"
     if "[" in result.node_id:
         suffix = result.node_id[result.node_id.index("[") :]
         return f"{name}{suffix}"
@@ -87,8 +89,8 @@ class AsciiReporter(PluginBase):
     def on_session_teardown_start(self) -> None:
         print("  session teardown...")
 
-    def on_suite_teardown_start(self, name: str) -> None:
-        print(f"  suite '{name}' teardown...")
+    def on_suite_teardown_start(self, path: SuitePath) -> None:
+        print(f"  suite '{path}' teardown...")
 
     def on_suite_end(self, result: SuiteResult) -> None:
         if result.teardown_duration > 0:
@@ -102,9 +104,9 @@ class AsciiReporter(PluginBase):
                 f"  session teardown done ({_format_duration(result.teardown_duration)})"
             )
 
-    def on_suite_start(self, name: str) -> None:
+    def on_suite_start(self, info: SuiteStartInfo) -> None:
         if not self._is_parallel:
-            print(f"[] {name}")
+            print(f"[] {info.name}")
 
     def on_test_retry(self, info: TestRetryInfo) -> None:
         delay_msg = f", retrying in {info.delay}s" if info.delay > 0 else ""

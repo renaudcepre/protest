@@ -6,7 +6,9 @@ from protest.entities import (
     HandlerInfo,
     SessionResult,
     SessionSetupInfo,
+    SuitePath,
     SuiteSetupInfo,
+    SuiteStartInfo,
     TestResult,
     TestRetryInfo,
     TestStartInfo,
@@ -78,7 +80,7 @@ class TestAsciiReporterHooks:
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Given a suite, when started, then suite name is printed."""
-        ascii_reporter.on_suite_start("MySuite")
+        ascii_reporter.on_suite_start(SuiteStartInfo(name=SuitePath("MySuite")))
         captured = capsys.readouterr()
         assert "MySuite" in captured.out
 
@@ -300,7 +302,7 @@ class TestAsciiReporterParallelMode:
         items = [make_test_item(f"test_{idx}") for idx in range(item_count)]
         ascii_reporter.on_collection_finish(items)
 
-        ascii_reporter.on_suite_start("MySuite")
+        ascii_reporter.on_suite_start(SuiteStartInfo(name=SuitePath("MySuite")))
         captured = capsys.readouterr()
         assert captured.out == ""
 

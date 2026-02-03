@@ -12,8 +12,10 @@ from protest.entities import (
     HandlerInfo,
     SessionResult,
     SessionSetupInfo,
+    SuitePath,
     SuiteResult,
     SuiteSetupInfo,
+    SuiteStartInfo,
     TestItem,
     TestResult,
     TestRetryInfo,
@@ -154,8 +156,8 @@ class RichReporter(PluginBase):
     def on_session_teardown_start(self) -> None:
         self._print("[dim]  session teardown...[/]")
 
-    def on_suite_teardown_start(self, name: str) -> None:
-        self._print(f"[dim]  suite '{name}' teardown...[/]")
+    def on_suite_teardown_start(self, path: SuitePath) -> None:
+        self._print(f"[dim]  suite '{path}' teardown...[/]")
 
     def on_suite_end(self, result: SuiteResult) -> None:
         if result.teardown_duration > 0:
@@ -169,8 +171,8 @@ class RichReporter(PluginBase):
                 f"[dim]  session teardown done ({_format_duration(result.teardown_duration)})[/]"
             )
 
-    def on_suite_start(self, name: str) -> None:
-        self._print(f"[dim]  suite '{name}' setup...[/]")
+    def on_suite_start(self, info: SuiteStartInfo) -> None:
+        self._print(f"[dim]  suite '{info.name}' setup...[/]")
 
     def on_test_retry(self, info: TestRetryInfo) -> None:
         delay_msg = f", retrying in {info.delay}s" if info.delay > 0 else ""
@@ -284,7 +286,11 @@ class RichReporter(PluginBase):
 
     def _print_failure_detail(self, result: TestResult, *, is_error: bool) -> None:
         name = _format_test_name(result)
-        full_name = f"{result.suite_path}::{name}" if result.suite_path else name
+        full_name = (
+            f"{result.suite_path}{SuitePath.SEPARATOR}{name}"
+            if result.suite_path
+            else name
+        )
         color = "yellow" if is_error else "red"
         self.console.print(f"\n[bold {color}]___ {full_name} ___[/]")
 

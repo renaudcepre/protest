@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 from protest.di.decorators import unwrap_fixture
 from protest.di.markers import Use
 from protest.di.validation import _extract_from_params
-from protest.entities import FixtureCallable, TestItem, TestRegistration
+from protest.entities import FixtureCallable, SuitePath, TestItem, TestRegistration
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -160,9 +160,11 @@ def chunk_by_suite(items: list[TestItem]) -> list[list[TestItem]]:
     return [list(group) for _, group in groupby(items, key=lambda item: item.suite)]
 
 
-def get_last_chunk_index_per_suite(chunks: list[list[TestItem]]) -> dict[str, int]:
+def get_last_chunk_index_per_suite(
+    chunks: list[list[TestItem]],
+) -> dict[SuitePath, int]:
     """For each suite, return the index of its last chunk (including descendants)."""
-    last_indices: dict[str, int] = {}
+    last_indices: dict[SuitePath, int] = {}
     for chunk_idx, chunk in enumerate(chunks):
         suite = chunk[0].suite
         if suite:
@@ -172,7 +174,7 @@ def get_last_chunk_index_per_suite(chunks: list[list[TestItem]]) -> dict[str, in
 
 
 def _update_parent_indices(
-    last_indices: dict[str, int], suite: ProTestSuite, chunk_idx: int
+    last_indices: dict[SuitePath, int], suite: ProTestSuite, chunk_idx: int
 ) -> None:
     """Update parent suite indices when a child chunk is seen."""
     parent = suite._parent_suite

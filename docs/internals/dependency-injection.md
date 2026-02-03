@@ -101,8 +101,8 @@ resolve(fixture_func)
 
 | Scope   | Where Cached                            | Lifetime         |
 |---------|-----------------------------------------|------------------|
-| Session | `Resolver._registry[func].cached_value` | Entire session   |
-| Suite   | `Resolver._path_caches[path][func]`     | While suite runs |
+| Session | `FixtureContainer._registry[func].cached_value` | Entire session   |
+| Suite   | `FixtureContainer._path_caches[path][func]`     | While suite runs |
 | Test    | `TestExecutionContext._cache[func]`     | Single test      |
 
 Resolution is thread-safe. Concurrent tests requesting the same session fixture will
@@ -166,7 +166,7 @@ Each test runs in its own `TestExecutionContext`, which provides:
 
 ```python
 class TestExecutionContext:
-    def __init__(self, parent: Resolver, suite_path: str | None):
+    def __init__(self, parent: FixtureContainer, suite_path: str | None):
         self._parent = parent
         self._cache: dict[FixtureCallable, Any] = {}
         self._exit_stack = AsyncExitStack()
@@ -183,7 +183,7 @@ class TestExecutionContext:
 When a test requests a fixture:
 
 - **Test-scoped**: Uses the context's local cache and exit stack
-- **Suite/Session-scoped**: Delegated to the parent Resolver's global caches
+- **Suite/Session-scoped**: Delegated to the parent FixtureContainer's global caches
 
 This allows parallel tests to have independent test-scoped fixtures while sharing
 session/suite fixtures.

@@ -1,41 +1,26 @@
+"""Test runner orchestration."""
+
 import asyncio
-import io
 import time
-from inspect import signature
-from typing import Any, get_type_hints
 
 from protest.core.collector import Collector
-from protest.core.outcome import OutcomeBuilder, TestExecutionResult
+from protest.core.execution import ParallelExecutor, SuiteManager, TestExecutor
+from protest.core.outcome import OutcomeBuilder
 from protest.core.session import ProTestSession
 from protest.core.tracker import SuiteTracker
-from protest.di.resolver import Resolver
 from protest.entities import (
     RunResult,
     SessionResult,
     SessionSetupInfo,
-    SuiteResult,
-    SuiteSetupInfo,
     TestCounts,
-    TestItem,
-    TestOutcome,
-    TestRetryInfo,
-    TestStartInfo,
-    TestTeardownInfo,
 )
 from protest.events.types import Event
-from protest.exceptions import FixtureError
-from protest.execution.async_bridge import ensure_async
 from protest.execution.capture import (
-    CaptureCurrentTest,
     GlobalCapturePatch,
-    reset_current_node_id,
-    set_current_node_id,
     set_session_setup_capture,
-    set_session_teardown_capture,
 )
-from protest.execution.context import TestExecutionContext, cancellation_event
+from protest.execution.context import cancellation_event
 from protest.execution.interrupt import InterruptHandler
-from protest.utils import get_callable_name
 
 
 class TestRunner:
@@ -48,14 +33,19 @@ class TestRunner:
     def __init__(self, session: ProTestSession) -> None:
         self._session = session
         self._outcome_builder = OutcomeBuilder()
-        self._started_suites: set[str] = set()
-        self._suite_start_times: dict[str, float] = {}
-        self._suite_setup_durations: dict[str, float] = {}
-        self._suite_teardown_durations: dict[str, float] = {}
-        self._suite_start_lock: asyncio.Lock | None = None
         self._interrupt_handler = InterruptHandler()
         self._interrupted = False
         self._force_interrupt_emitted = False
+
+        # Extracted components
+        self._suite_manager = SuiteManager(session)
+        self._test_executor = TestExecutor(session, self._outcome_builder)
+        self._parallel_executor = ParallelExecutor(
+            session=session,
+            test_executor=self._test_executor,
+            suite_manager=self._suite_manager,
+            interrupt_handler=self._interrupt_handler,
+        )
 
     def run(self) -> RunResult:
         """Run the test session synchronously. Returns RunResult with success and interrupted status."""
@@ -85,7 +75,7 @@ class TestRunner:
         await self._session.events.emit(Event.SESSION_START)
 
         tracker = SuiteTracker.from_items(items)
-        suite_semaphores = self._build_suite_semaphores(items)
+        suite_semaphores = self._parallel_executor.build_suite_semaphores(items)
 
         total_counts = TestCounts()
         # Inject cancellation event into context for teardown awareness
@@ -108,30 +98,19 @@ class TestRunner:
                         SessionSetupInfo(duration=setup_duration),
                     )
 
-                    self._started_suites = set()
-                    self._suite_start_lock = asyncio.Lock()
+                    self._suite_manager.reset()
 
-                    total_counts = await self._run_all_parallel(
+                    total_counts = await self._parallel_executor.run(
                         items,
                         suite_semaphores,
                         tracker,
                     )
 
-                    for suite_path in reversed(list(self._started_suites)):
-                        suite_start = self._suite_start_times.get(suite_path, 0)
-                        suite_duration = (
-                            time.perf_counter() - suite_start if suite_start else 0
-                        )
-                        setup_duration = self._suite_setup_durations.get(suite_path, 0)
-                        teardown_duration = self._suite_teardown_durations.get(
-                            suite_path, 0
-                        )
-                        suite_result = SuiteResult(
-                            name=suite_path,
-                            duration=suite_duration,
-                            setup_duration=setup_duration,
-                            teardown_duration=teardown_duration,
-                        )
+                    # Emit suite results in reverse order (LIFO)
+                    for suite_path in reversed(
+                        list(self._suite_manager.started_suites)
+                    ):
+                        suite_result = self._suite_manager.build_result(suite_path)
                         await self._session.events.emit(Event.SUITE_END, suite_result)
 
                     await self._session.events.emit(Event.SESSION_TEARDOWN_START)
@@ -140,7 +119,7 @@ class TestRunner:
             # (only if not already emitted during test execution)
             if (
                 self._interrupt_handler.force_teardown_event.is_set()
-                and not self._force_interrupt_emitted
+                and not self._parallel_executor.force_interrupt_emitted
             ):
                 await self._session.events.emit(Event.SESSION_INTERRUPTED, True)
                 self._force_interrupt_emitted = True
@@ -177,430 +156,3 @@ class TestRunner:
             and total_counts.errored == 0
             and total_counts.xpassed == 0
         )
-
-    def _build_suite_semaphores(
-        self, items: list[TestItem]
-    ) -> dict[str | None, asyncio.Semaphore]:
-        """Build per-suite semaphores for max_concurrency."""
-        semaphores: dict[str | None, asyncio.Semaphore] = {}
-        seen_suites: set[str | None] = set()
-
-        for item in items:
-            suite_path = item.suite.full_path if item.suite else None
-            if suite_path in seen_suites:
-                continue
-            seen_suites.add(suite_path)
-
-            if item.suite and item.suite.effective_max_concurrency:
-                max_conc = min(
-                    item.suite.effective_max_concurrency, self._session.concurrency
-                )
-                semaphores[suite_path] = asyncio.Semaphore(max_conc)
-
-        return semaphores
-
-    async def _ensure_suite_hierarchy_started(self, suite_path: str) -> None:
-        """Ensure suite and all parent suites are started with autouse resolved."""
-        assert self._suite_start_lock is not None
-        parts = suite_path.split("::")
-        for idx in range(len(parts)):
-            parent_path = "::".join(parts[: idx + 1])
-            if parent_path in self._started_suites:
-                continue
-            async with self._suite_start_lock:
-                if parent_path in self._started_suites:
-                    continue
-                self._suite_start_times[parent_path] = time.perf_counter()
-                await self._session.events.emit(Event.SUITE_START, parent_path)
-                suite_setup_start = time.perf_counter()
-                set_session_setup_capture(True)
-                try:
-                    await self._session.resolver.resolve_suite_autouse(parent_path)
-                finally:
-                    set_session_setup_capture(False)
-                suite_setup_duration = time.perf_counter() - suite_setup_start
-                self._suite_setup_durations[parent_path] = suite_setup_duration
-                await self._session.events.emit(
-                    Event.SUITE_SETUP_DONE,
-                    SuiteSetupInfo(name=parent_path, duration=suite_setup_duration),
-                )
-                self._started_suites.add(parent_path)
-
-    async def _run_all_parallel(
-        self,
-        items: list[TestItem],
-        suite_semaphores: dict[str | None, asyncio.Semaphore],
-        tracker: SuiteTracker,
-    ) -> TestCounts:
-        """Run all tests in parallel using a worker pool (FIFO order).
-
-        Uses a Queue + Workers pattern instead of creating all tasks at once.
-        This provides O(concurrency) memory usage instead of O(N) tasks,
-        and guarantees FIFO execution order.
-        """
-        if not items:
-            return TestCounts()
-
-        # Create work queue (FIFO)
-        work_queue: asyncio.Queue[TestItem | None] = asyncio.Queue()
-        for item in items:
-            await work_queue.put(item)
-
-        # Add sentinel values to stop workers
-        for _ in range(self._session.concurrency):
-            await work_queue.put(None)
-
-        # Shared state
-        stop_flag = asyncio.Event() if self._session.exitfirst else None
-        results: list[TestOutcome] = []
-        results_lock = asyncio.Lock()
-        handler = self._interrupt_handler
-
-        async def worker() -> None:
-            """Worker that processes tests from the queue in FIFO order."""
-            while True:
-                # Early exit checks before getting next item
-                if handler.soft_stop_event.is_set():
-                    return
-                if stop_flag and stop_flag.is_set():
-                    return
-
-                # Get next item (FIFO)
-                item = await work_queue.get()
-                if item is None:  # Sentinel - no more work
-                    work_queue.task_done()
-                    return
-
-                try:
-                    outcome = await self._process_test_item(
-                        item, suite_semaphores, tracker, stop_flag
-                    )
-                    if outcome:
-                        async with results_lock:
-                            results.append(outcome)
-
-                        # exitfirst: signal stop on failure
-                        if stop_flag and (
-                            outcome.counts.failed or outcome.counts.errored
-                        ):
-                            stop_flag.set()
-                finally:
-                    work_queue.task_done()
-
-        # Launch workers (number of workers = concurrency limit)
-        worker_tasks = [
-            asyncio.create_task(worker()) for _ in range(self._session.concurrency)
-        ]
-
-        # Wait for completion with interrupt support
-        await self._wait_with_interrupt(worker_tasks, stop_flag)
-
-        # Aggregate results
-        return self._aggregate_results(results)
-
-    def _should_stop(self, stop_flag: asyncio.Event | None) -> bool:
-        """Check if execution should stop (interrupt or exitfirst)."""
-        return self._interrupt_handler.soft_stop_event.is_set() or bool(
-            stop_flag and stop_flag.is_set()
-        )
-
-    async def _process_test_item(
-        self,
-        item: TestItem,
-        suite_semaphores: dict[str | None, asyncio.Semaphore],
-        tracker: SuiteTracker,
-        stop_flag: asyncio.Event | None,
-    ) -> TestOutcome | None:
-        """Process a single test item. Returns None if interrupted."""
-        # Re-check flags (another worker may have set them)
-        if self._should_stop(stop_flag):
-            return None
-
-        suite_path = item.suite.full_path if item.suite else None
-        suite_sem = suite_semaphores.get(suite_path)
-
-        # Ensure suite hierarchy is started (with autouse fixtures)
-        if suite_path:
-            await self._ensure_suite_hierarchy_started(suite_path)
-
-        # Emit TEST_START before execution (preserves current behavior)
-        test_name = get_callable_name(item.func)
-        node_id = item.node_id
-        start_info = TestStartInfo(name=test_name, node_id=node_id)
-        await self._session.events.emit(Event.TEST_START, start_info)
-
-        # Check flags again after potential await
-        if self._should_stop(stop_flag):
-            return None
-
-        # Execute with suite semaphore if applicable
-        if suite_sem:
-            async with suite_sem:
-                if self._should_stop(stop_flag):
-                    return None
-                outcome = await self._execute_test(item, start_info)
-        else:
-            outcome = await self._execute_test(item, start_info)
-
-        # Track suite completion and trigger teardown if last test
-        if suite_path and await tracker.mark_completed(suite_path):
-            await self._teardown_suite(suite_path)
-        elif suite_path is None:
-            await tracker.mark_completed(None)
-
-        return outcome
-
-    async def _wait_with_interrupt(
-        self,
-        worker_tasks: list[asyncio.Task[None]],
-        stop_flag: asyncio.Event | None = None,
-    ) -> None:
-        """Wait for workers to complete with interrupt and exitfirst support."""
-        handler = self._interrupt_handler
-
-        async def wait_workers() -> None:
-            await asyncio.gather(*worker_tasks, return_exceptions=True)
-
-        async def wait_force_teardown() -> bool:
-            await handler.force_teardown_event.wait()
-            return True
-
-        async def wait_stop_flag() -> bool:
-            if stop_flag:
-                await stop_flag.wait()
-            return True
-
-        workers_done = asyncio.create_task(wait_workers())
-        force_teardown = asyncio.create_task(wait_force_teardown())
-
-        wait_tasks: set[asyncio.Task[None] | asyncio.Task[bool]] = {
-            workers_done,
-            force_teardown,
-        }
-
-        # Add exitfirst monitor if enabled
-        exitfirst_task: asyncio.Task[bool] | None = None
-        if stop_flag:
-            exitfirst_task = asyncio.create_task(wait_stop_flag())
-            wait_tasks.add(exitfirst_task)
-
-        done, _ = await asyncio.wait(wait_tasks, return_when=asyncio.FIRST_COMPLETED)
-
-        if force_teardown in done:
-            # Force teardown triggered - cancel all workers
-            await self._session.events.emit(Event.SESSION_INTERRUPTED, True)
-            self._force_interrupt_emitted = True
-            for task in worker_tasks:
-                if not task.done():
-                    task.cancel()
-            await asyncio.gather(*worker_tasks, return_exceptions=True)
-            if exitfirst_task:
-                exitfirst_task.cancel()
-        elif exitfirst_task and exitfirst_task in done:
-            # Exitfirst triggered - cancel workers running slow tests
-            for task in worker_tasks:
-                if not task.done():
-                    task.cancel()
-            await asyncio.gather(*worker_tasks, return_exceptions=True)
-            force_teardown.cancel()
-        else:
-            # Workers completed normally
-            force_teardown.cancel()
-            if exitfirst_task:
-                exitfirst_task.cancel()
-            if handler.soft_stop_event.is_set():
-                await self._session.events.emit(Event.SESSION_INTERRUPTED, False)
-
-    def _aggregate_results(self, results: list[TestOutcome]) -> TestCounts:
-        """Aggregate test outcomes into total counts."""
-        total = TestCounts()
-        for outcome in results:
-            total = total + outcome.counts
-        return total
-
-    async def _execute_test(
-        self, item: TestItem, start_info: TestStartInfo
-    ) -> TestOutcome:
-        """Execute a single test with capture and context."""
-        await self._session.events.emit(Event.TEST_ACQUIRED, start_info)
-        node_id_token = set_current_node_id(start_info.node_id)
-        try:
-            async with TestExecutionContext(
-                self._session.resolver, item.suite_path
-            ) as ctx:
-                with CaptureCurrentTest() as buffer:
-                    outcome = await self._run_test(item, ctx, buffer, start_info)
-                # Emit result AFTER capture (so reporter output goes to stdout)
-                await self._session.events.emit(outcome.event, outcome.result)
-                # Then teardown fixtures (back inside capture for fixture prints)
-                with CaptureCurrentTest():
-                    teardown_info = TestTeardownInfo(
-                        name=start_info.name,
-                        node_id=start_info.node_id,
-                        outcome=outcome.event,
-                    )
-                    await self._session.events.emit(
-                        Event.TEST_TEARDOWN_START, teardown_info
-                    )
-                    await ctx.close()
-            return outcome  # pyright: ignore[reportPossiblyUnboundVariable]
-        finally:
-            reset_current_node_id(node_id_token)
-
-    async def _teardown_suite(self, suite_path: str) -> None:
-        """Teardown suite fixtures after all its tests complete."""
-        await self._session.events.emit(Event.SUITE_TEARDOWN_START, suite_path)
-        teardown_start = time.perf_counter()
-        set_session_teardown_capture(True)
-        try:
-            await self._session.resolver.teardown_suite(suite_path)
-        finally:
-            set_session_teardown_capture(False)
-            self._suite_teardown_durations[suite_path] = (
-                time.perf_counter() - teardown_start
-            )
-
-    async def _resolve_test_kwargs(
-        self,
-        item: TestItem,
-        ctx: TestExecutionContext,
-    ) -> dict[str, Any]:
-        """Resolve fixture dependencies for a test."""
-        func_signature = signature(item.func)
-        kwargs: dict[str, Any] = dict(item.case_kwargs)
-
-        try:
-            type_hints = get_type_hints(item.func, include_extras=True)
-        except Exception:
-            type_hints = {}
-
-        for param_name, param in func_signature.parameters.items():
-            if param_name in kwargs:
-                continue
-            resolved_annotation = type_hints.get(param_name, param.annotation)
-            if dependency := Resolver._extract_dependency_from_annotation(
-                resolved_annotation
-            ):
-                kwargs[param_name] = await ctx.resolve(dependency)
-
-        return kwargs
-
-    async def _run_test(
-        self,
-        item: TestItem,
-        ctx: TestExecutionContext,
-        buffer: io.StringIO,
-        start_info: TestStartInfo,
-    ) -> TestOutcome:
-        """Run a single test and return outcome (event emitted by caller)."""
-        test_name = start_info.name
-        node_id = start_info.node_id
-
-        if item.skip:
-            return self._outcome_builder.build(
-                TestExecutionResult(
-                    test_name=test_name,
-                    node_id=node_id,
-                    suite_path=item.suite_path,
-                    skip_reason=item.skip.reason,
-                )
-            )
-
-        start = time.perf_counter()
-
-        try:
-            kwargs = await self._resolve_test_kwargs(item, ctx)
-        except Exception as exc:
-            return self._outcome_builder.build(
-                TestExecutionResult(
-                    test_name=test_name,
-                    node_id=node_id,
-                    suite_path=item.suite_path,
-                    duration=time.perf_counter() - start,
-                    output=buffer.getvalue(),
-                    error=exc,
-                    is_fixture_error=True,
-                )
-            )
-
-        await self._session.events.emit(Event.TEST_SETUP_DONE, start_info)
-
-        max_attempts = 1 + (item.retry.times if item.retry else 0)
-        previous_errors: list[Exception] = []
-        error: Exception | None = None
-        is_fixture_error = False
-
-        for attempt in range(1, max_attempts + 1):
-            error = None
-            is_fixture_error = False
-
-            try:
-                if item.timeout is not None:
-                    try:
-                        await asyncio.wait_for(
-                            ensure_async(item.func, **kwargs),
-                            timeout=item.timeout,
-                        )
-                    except asyncio.TimeoutError:
-                        # Only wrap timeout from wait_for, not from test code
-                        raise asyncio.TimeoutError(
-                            f"Test exceeded timeout of {item.timeout}s"
-                        ) from None
-                else:
-                    await ensure_async(item.func, **kwargs)
-            except FixtureError as exc:
-                error = exc.original
-                is_fixture_error = True
-            except Exception as exc:
-                error = exc
-
-            retry_on = item.retry.on if item.retry else None
-            retry_delay = item.retry.delay if item.retry else 0
-            should_retry = (
-                error is not None
-                and not is_fixture_error
-                and attempt < max_attempts
-                and self._should_retry(error, retry_on)
-            )
-            if should_retry and error is not None:
-                previous_errors.append(error)
-                retry_info = TestRetryInfo(
-                    name=test_name,
-                    node_id=node_id,
-                    suite_path=item.suite_path,
-                    attempt=attempt,
-                    max_attempts=max_attempts,
-                    error=error,
-                    delay=retry_delay,
-                )
-                await self._session.events.emit(Event.TEST_RETRY, retry_info)
-                if retry_delay > 0:
-                    await asyncio.sleep(retry_delay)
-                continue
-            break
-
-        return self._outcome_builder.build(
-            TestExecutionResult(
-                test_name=test_name,
-                node_id=node_id,
-                suite_path=item.suite_path,
-                duration=time.perf_counter() - start,
-                output=buffer.getvalue(),
-                error=error,
-                is_fixture_error=is_fixture_error,
-                xfail_reason=item.xfail.reason
-                if item.xfail and not is_fixture_error
-                else None,
-                timeout=item.timeout,
-                attempt=attempt,
-                max_attempts=max_attempts,
-                previous_errors=tuple(previous_errors),
-            )
-        )
-
-    def _should_retry(
-        self,
-        error: Exception,
-        retry_on: type[Exception] | tuple[type[Exception], ...] | None,
-    ) -> bool:
-        return retry_on is None or isinstance(error, retry_on)

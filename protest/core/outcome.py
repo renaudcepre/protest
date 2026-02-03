@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from enum import Enum, auto
 
-from protest.entities import TestCounts, TestOutcome, TestResult
+from protest.entities import SuitePath, TestCounts, TestOutcome, TestResult
 from protest.events.types import Event
 
 
@@ -24,7 +24,7 @@ class TestExecutionResult:
 
     test_name: str
     node_id: str
-    suite_path: str | None = None
+    suite_path: SuitePath | None = None
     duration: float = 0
     output: str = ""
     error: Exception | None = None

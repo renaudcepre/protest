@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from protest.entities import FixtureScope
+    from protest.entities import FixtureScope, SuitePath
     from protest.events.types import Event
 
 
@@ -32,7 +32,7 @@ class TestCounts:
 class TestResult:
     name: str
     node_id: str = ""
-    suite_path: str | None = None
+    suite_path: SuitePath | None = None
     error: Exception | None = None
     duration: float = 0
     output: str = ""
@@ -61,7 +61,7 @@ class SessionResult:
 
 @dataclass(frozen=True, slots=True)
 class SuiteResult:
-    name: str
+    name: SuitePath
     duration: float = 0
     setup_duration: float = 0
     teardown_duration: float = 0
@@ -75,10 +75,17 @@ class SessionSetupInfo:
 
 
 @dataclass(frozen=True, slots=True)
+class SuiteStartInfo:
+    """Emitted when a suite begins (before fixture setup)."""
+
+    name: SuitePath
+
+
+@dataclass(frozen=True, slots=True)
 class SuiteSetupInfo:
     """Emitted after suite fixtures are resolved, before any test starts."""
 
-    name: str
+    name: SuitePath
     duration: float
 
 
@@ -107,7 +114,7 @@ class HandlerInfo:
 class FixtureInfo:
     name: str
     scope: FixtureScope
-    scope_path: str | None = None
+    scope_path: SuitePath | None = None
     duration: float = 0
     autouse: bool = False
 
@@ -116,7 +123,7 @@ class FixtureInfo:
 class TestRetryInfo:
     name: str
     node_id: str
-    suite_path: str | None
+    suite_path: SuitePath | None
     attempt: int
     max_attempts: int
     error: Exception

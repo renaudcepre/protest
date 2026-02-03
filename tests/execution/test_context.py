@@ -4,15 +4,15 @@ from typing import Annotated
 
 import pytest
 
+from protest.di.container import FixtureContainer
 from protest.di.markers import Use
-from protest.di.resolver import Resolver
 from protest.entities import FixtureScope
 from protest.execution.context import TestExecutionContext
 
 
 @pytest.fixture
-def resolver() -> Resolver:
-    return Resolver()
+def resolver() -> FixtureContainer:
+    return FixtureContainer()
 
 
 class TestFunctionScopeIsolation:
@@ -20,7 +20,7 @@ class TestFunctionScopeIsolation:
 
     @pytest.mark.asyncio
     async def test_function_fixture_isolated_between_contexts(
-        self, resolver: Resolver
+        self, resolver: FixtureContainer
     ) -> None:
         """Each context gets its own instance of FUNCTION-scoped fixtures."""
         call_count = 0
@@ -44,7 +44,7 @@ class TestFunctionScopeIsolation:
 
     @pytest.mark.asyncio
     async def test_function_fixture_cached_within_same_context(
-        self, resolver: Resolver
+        self, resolver: FixtureContainer
     ) -> None:
         """Same context returns cached value for repeated resolves."""
         call_count = 0
@@ -70,7 +70,7 @@ class TestSessionScopeDelegation:
 
     @pytest.mark.asyncio
     async def test_session_fixture_shared_across_contexts(
-        self, resolver: Resolver
+        self, resolver: FixtureContainer
     ) -> None:
         """SESSION fixtures are resolved by parent and shared."""
         call_count = 0
@@ -99,7 +99,7 @@ class TestTeardown:
 
     @pytest.mark.asyncio
     async def test_function_generator_teardown_on_context_exit(
-        self, resolver: Resolver
+        self, resolver: FixtureContainer
     ) -> None:
         """Generator fixtures teardown when context exits."""
         teardown_called = False
@@ -119,7 +119,7 @@ class TestTeardown:
         assert teardown_called
 
     @pytest.mark.asyncio
-    async def test_async_generator_teardown(self, resolver: Resolver) -> None:
+    async def test_async_generator_teardown(self, resolver: FixtureContainer) -> None:
         """Async generator fixtures teardown correctly."""
         teardown_called = False
 
@@ -139,7 +139,7 @@ class TestTeardown:
 
     @pytest.mark.asyncio
     async def test_multiple_fixtures_teardown_in_order(
-        self, resolver: Resolver
+        self, resolver: FixtureContainer
     ) -> None:
         """Multiple fixtures teardown in reverse order."""
         teardown_order: list[str] = []
@@ -167,7 +167,7 @@ class TestDependencyResolution:
 
     @pytest.mark.asyncio
     async def test_function_fixture_with_function_dependency(
-        self, resolver: Resolver
+        self, resolver: FixtureContainer
     ) -> None:
         """FUNCTION fixture can depend on another FUNCTION fixture."""
 
@@ -193,7 +193,7 @@ class TestDependencyResolution:
 
     @pytest.mark.asyncio
     async def test_function_fixture_with_session_dependency(
-        self, resolver: Resolver
+        self, resolver: FixtureContainer
     ) -> None:
         """FUNCTION fixture can depend on SESSION fixture."""
 
@@ -219,7 +219,9 @@ class TestSuiteScopeDelegation:
     """SUITE-scoped fixtures should delegate to parent resolver."""
 
     @pytest.mark.asyncio
-    async def test_suite_fixture_shared_within_suite(self, resolver: Resolver) -> None:
+    async def test_suite_fixture_shared_within_suite(
+        self, resolver: FixtureContainer
+    ) -> None:
         """SUITE fixtures are resolved by parent and shared within suite."""
         call_count = 0
 

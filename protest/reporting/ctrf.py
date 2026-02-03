@@ -151,8 +151,8 @@ class CTRFReporter(PluginBase):
         }
 
         if result.suite_path:
-            test["suite"] = result.suite_path.split("::")
-            self._suites.add(result.suite_path)
+            test["suite"] = list(result.suite_path.parts)
+            self._suites.add(str(result.suite_path))
 
         if result.error:
             test["message"] = str(result.error)

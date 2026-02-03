@@ -12,6 +12,7 @@ from protest.core.collector import (
 from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
 from protest.di.decorators import fixture
+from protest.entities import SuitePath
 
 
 class TestTestItemNodeId:
@@ -100,7 +101,7 @@ class TestCollector:
         assert len(items) == expected_count
         assert items[0].func == suite_test
         assert items[0].suite is suite
-        assert items[0].suite_path == "my_suite"
+        assert items[0].suite_path == SuitePath("my_suite")
 
     def test_collect_mixed_tests(self) -> None:
         """Collects both standalone and suite tests."""
@@ -122,7 +123,7 @@ class TestCollector:
         expected_count = 2
         assert len(items) == expected_count
         assert items[0].suite is None
-        assert items[1].suite_path == "my_suite"
+        assert items[1].suite_path == SuitePath("my_suite")
 
     def test_collect_generates_correct_node_ids(self) -> None:
         """Collected items have correct node_ids."""
@@ -222,9 +223,9 @@ class TestChunkBySuite:
 
         expected_chunk_count = 3
         assert len(chunks) == expected_chunk_count
-        assert chunks[0][0].suite_path == "A"
-        assert chunks[1][0].suite_path == "B"
-        assert chunks[2][0].suite_path == "A"
+        assert chunks[0][0].suite_path == SuitePath("A")
+        assert chunks[1][0].suite_path == SuitePath("B")
+        assert chunks[2][0].suite_path == SuitePath("A")
 
     def test_chunk_standalone_then_suite(self) -> None:
         """Standalone tests followed by suite tests create separate chunks."""
@@ -246,7 +247,7 @@ class TestChunkBySuite:
         expected_chunk_count = 2
         assert len(chunks) == expected_chunk_count
         assert chunks[0][0].suite is None
-        assert chunks[1][0].suite_path == "S"
+        assert chunks[1][0].suite_path == SuitePath("S")
 
 
 class TestGetLastChunkIndexPerSuite:
@@ -271,7 +272,7 @@ class TestGetLastChunkIndexPerSuite:
 
         result = get_last_chunk_index_per_suite(chunks)
 
-        assert result == {"S": 0}
+        assert result == {SuitePath("S"): 0}
 
     def test_suite_split_across_chunks(self) -> None:
         """Suite appearing in multiple chunks tracks last occurrence."""
@@ -295,7 +296,7 @@ class TestGetLastChunkIndexPerSuite:
 
         result = get_last_chunk_index_per_suite(chunks)
 
-        assert result == {"A": 2, "B": 1}
+        assert result == {SuitePath("A"): 2, SuitePath("B"): 1}
 
     def test_standalone_tests_not_tracked(self) -> None:
         """Standalone tests (suite=None) are not tracked."""
@@ -328,7 +329,7 @@ class TestGetLastChunkIndexPerSuite:
 
         result = get_last_chunk_index_per_suite(chunks)
 
-        assert result == {"S": 1}
+        assert result == {SuitePath("S"): 1}
 
     def test_nested_suites_updates_parent_indices(self) -> None:
         """Parent suite index is updated when child chunks appear."""
@@ -362,10 +363,10 @@ class TestGetLastChunkIndexPerSuite:
 
         result = get_last_chunk_index_per_suite(chunks)
 
-        assert result["API"] == 3
-        assert result["API::Users"] == 2
-        assert result["API::Users::Perms"] == 2
-        assert result["API::Orders"] == 3
+        assert result[SuitePath("API")] == 3
+        assert result[SuitePath("API::Users")] == 2
+        assert result[SuitePath("API::Users::Perms")] == 2
+        assert result[SuitePath("API::Orders")] == 3
 
 
 class TestTransitiveFixtureTags:

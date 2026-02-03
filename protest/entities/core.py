@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from protest.entities.xfail import Xfail
     from protest.events.types import Event
 
+from protest.entities.suite_path import SuitePath
 from protest.utils import get_callable_name
 
 FixtureCallable: TypeAlias = "Callable[..., Any]"
@@ -117,15 +118,16 @@ class TestItem:
         return getattr(self.func, "__module__", "<unknown>")
 
     @property
-    def suite_path(self) -> str | None:
+    def suite_path(self) -> SuitePath | None:
         return self.suite.full_path if self.suite else None
 
     @property
     def node_id(self) -> str:
+        sep = SuitePath.SEPARATOR
         if self.suite_path:
-            base = f"{self.module_path}::{self.suite_path}::{self.test_name}"
+            base = f"{self.module_path}{sep}{self.suite_path}{sep}{self.test_name}"
         else:
-            base = f"{self.module_path}::{self.test_name}"
+            base = f"{self.module_path}{sep}{self.test_name}"
         if self.case_ids:
             return f"{base}[{'-'.join(self.case_ids)}]"
         return base
