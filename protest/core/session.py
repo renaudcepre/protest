@@ -254,8 +254,7 @@ class ProTestSession:
         Use this to register a pre-configured plugin instance. For CLI usage,
         prefer `use(PluginClass)` which enables CLI option discovery.
         """
-        if hasattr(plugin, "setup") and callable(plugin.setup):
-            plugin.setup(self)
+        plugin.setup(self)
 
         for event in Event:
             method_name = f"on_{event.value}"

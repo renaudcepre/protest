@@ -6,6 +6,7 @@ from protest import ForEach, From, ProTestSession, ProTestSuite
 from protest.core.collector import Collector
 from protest.core.runner import TestRunner
 from protest.entities import SessionResult, TestResult
+from protest.plugin import PluginBase
 
 
 class TestSkipDecorator:
@@ -89,7 +90,7 @@ class TestSkipExecution:
         session = ProTestSession()
         results: dict[str, int] = {}
 
-        class CountingPlugin:
+        class CountingPlugin(PluginBase):
             def on_session_complete(self, result: SessionResult) -> None:
                 results["passed"] = result.passed
                 results["skipped"] = result.skipped
@@ -116,7 +117,7 @@ class TestSkipExecution:
         session = ProTestSession()
         skip_results: list[TestResult] = []
 
-        class SkipPlugin:
+        class SkipPlugin(PluginBase):
             def on_test_skip(self, result: TestResult) -> None:
                 skip_results.append(result)
 
@@ -154,7 +155,7 @@ class TestSkipWithParameterizedTests:
         session = ProTestSession()
         results: dict[str, int] = {}
 
-        class CountingPlugin:
+        class CountingPlugin(PluginBase):
             def on_session_complete(self, result: SessionResult) -> None:
                 results["skipped"] = result.skipped
 

@@ -239,8 +239,7 @@ def _handle_run_command() -> None:
     # Phase 3: Build full parser with plugin options
     full_parser = _create_run_parser()
     for plugin_class in session.plugin_classes:
-        if hasattr(plugin_class, "add_cli_options"):
-            plugin_class.add_cli_options(full_parser)
+        plugin_class.add_cli_options(full_parser)
 
     # Phase 4: Full parse
     args = full_parser.parse_args(argv)

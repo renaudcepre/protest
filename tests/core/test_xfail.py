@@ -6,6 +6,7 @@ from protest import ForEach, From, ProTestSession, ProTestSuite
 from protest.core.collector import Collector
 from protest.core.runner import TestRunner
 from protest.entities import SessionResult, TestResult
+from protest.plugin import PluginBase
 
 
 class TestXfailDecorator:
@@ -77,7 +78,7 @@ class TestXfailExecution:
         executed = []
         results: dict[str, int] = {}
 
-        class CountingPlugin:
+        class CountingPlugin(PluginBase):
             def on_session_complete(self, result: SessionResult) -> None:
                 results["xfailed"] = result.xfailed
                 results["xpassed"] = result.xpassed
@@ -103,7 +104,7 @@ class TestXfailExecution:
         executed = []
         results: dict[str, int] = {}
 
-        class CountingPlugin:
+        class CountingPlugin(PluginBase):
             def on_session_complete(self, result: SessionResult) -> None:
                 results["xfailed"] = result.xfailed
                 results["xpassed"] = result.xpassed
@@ -128,7 +129,7 @@ class TestXfailExecution:
         session = ProTestSession()
         xfail_results: list[TestResult] = []
 
-        class XfailPlugin:
+        class XfailPlugin(PluginBase):
             def on_test_xfail(self, result: TestResult) -> None:
                 xfail_results.append(result)
 
@@ -149,7 +150,7 @@ class TestXfailExecution:
         session = ProTestSession()
         xpass_results: list[TestResult] = []
 
-        class XpassPlugin:
+        class XpassPlugin(PluginBase):
             def on_test_xpass(self, result: TestResult) -> None:
                 xpass_results.append(result)
 
@@ -205,7 +206,7 @@ class TestXfailWithParameterizedTests:
         executed = []
         results: dict[str, int] = {}
 
-        class CountingPlugin:
+        class CountingPlugin(PluginBase):
             def on_session_complete(self, result: SessionResult) -> None:
                 results["xfailed"] = result.xfailed
 
@@ -233,7 +234,7 @@ class TestXfailWithSkip:
         executed = []
         results: dict[str, int] = {}
 
-        class CountingPlugin:
+        class CountingPlugin(PluginBase):
             def on_session_complete(self, result: SessionResult) -> None:
                 results["skipped"] = result.skipped
                 results["xfailed"] = result.xfailed

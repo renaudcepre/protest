@@ -116,11 +116,11 @@ class TestPluginWiring:
         session = ProTestSession()
         received: list[str] = []
 
-        class AsyncPlugin:
+        class AsyncPlugin(PluginBase):
             async def on_test_pass(self, result: TestResult) -> None:
                 received.append(result.name)
 
-        session.register_plugin(AsyncPlugin())  # type: ignore[arg-type]
+        session.register_plugin(AsyncPlugin())
         await session.events.emit(Event.TEST_PASS, TestResult(name="async_test"))
         await session.events.wait_pending()
 
