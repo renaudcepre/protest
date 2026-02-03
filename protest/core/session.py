@@ -286,18 +286,18 @@ class ProTestSession:
     def _register_fixtures(self) -> None:
         """Register all fixtures from session and suites into resolver."""
         self._autouse_fixtures.clear()
-        for reg in self._fixtures:
+        for fixture_reg in self._fixtures:
             self._resolver.register(
-                reg.func,
+                fixture_reg.func,
                 scope=FixtureScope.SESSION,
-                is_factory=reg.is_factory,
-                cache=reg.cache,
-                managed=reg.managed,
-                tags=reg.tags,
-                autouse=reg.autouse,
+                is_factory=fixture_reg.is_factory,
+                cache=fixture_reg.cache,
+                managed=fixture_reg.managed,
+                tags=fixture_reg.tags,
+                autouse=fixture_reg.autouse,
             )
-            if reg.autouse:
-                self._autouse_fixtures.append(reg.func)
+            if fixture_reg.autouse:
+                self._autouse_fixtures.append(fixture_reg.func)
         self._register_suite_fixtures(self._suites)
 
     def _register_suite_fixtures(self, suites: list[ProTestSuite]) -> None:
@@ -308,15 +308,15 @@ class ProTestSession:
         - Access control (only tests in this suite or child suites can access)
         """
         for suite in suites:
-            for reg in suite.fixtures:
+            for fixture_reg in suite.fixtures:
                 self._resolver.register(
-                    reg.func,
+                    fixture_reg.func,
                     scope=FixtureScope.SUITE,
-                    is_factory=reg.is_factory,
-                    cache=reg.cache,
-                    managed=reg.managed,
-                    tags=reg.tags,
-                    autouse=reg.autouse,
+                    is_factory=fixture_reg.is_factory,
+                    cache=fixture_reg.cache,
+                    managed=fixture_reg.managed,
+                    tags=fixture_reg.tags,
+                    autouse=fixture_reg.autouse,
                     suite_path=suite.full_path,
                 )
             self._register_suite_fixtures(suite.suites)

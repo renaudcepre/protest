@@ -221,7 +221,7 @@ class TestFactoryDecorator:
     def test_factory_managed_false(
         self, event_collector: tuple[PluginBase, CollectedEvents]
     ) -> None:
-        """@factory(managed=False) returns custom factory class with SafeProxy."""
+        """@factory(managed=False) returns custom factory class with FixtureErrorWrapper."""
         plugin, _collected = event_collector
         session = ProTestSession()
         session.register_plugin(plugin)

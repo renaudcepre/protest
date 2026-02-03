@@ -12,8 +12,8 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-class SafeProxy(Generic[T]):
-    """Proxy that wraps all method calls to convert exceptions to FixtureError.
+class FixtureErrorWrapper(Generic[T]):
+    """Wrapper that converts exceptions to FixtureError for proper error attribution.
 
     Used for non-managed factory fixtures (factory=True, managed=False) to ensure
     that errors in factory class methods are reported as SETUP ERROR, not TEST FAIL.
@@ -78,4 +78,4 @@ class SafeProxy(Generic[T]):
     def __repr__(self) -> str:
         target = object.__getattribute__(self, "_target")
         fixture_name = object.__getattribute__(self, "_fixture_name")
-        return f"SafeProxy({fixture_name!r}, {target!r})"
+        return f"FixtureErrorWrapper({fixture_name!r}, {target!r})"

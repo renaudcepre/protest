@@ -13,7 +13,7 @@ from protest.di.container import FixtureContainer
 from protest.di.decorators import fixture
 from protest.di.factory import FixtureFactory
 from protest.di.hashable import make_hashable
-from protest.di.proxy import SafeProxy
+from protest.di.proxy import FixtureErrorWrapper
 from protest.entities import Fixture, FixtureScope
 from protest.events.bus import EventBus
 from protest.exceptions import (
@@ -41,18 +41,18 @@ class TestHashableEdgeCases:
         assert len(result) == 2
 
 
-class TestSafeProxyEdgeCases:
-    """Edge cases for SafeProxy."""
+class TestFixtureErrorWrapperEdgeCases:
+    """Edge cases for FixtureErrorWrapper."""
 
     @pytest.mark.asyncio
     async def test_proxy_with_async_call(self) -> None:
-        """SafeProxy handles target with async __call__."""
+        """FixtureErrorWrapper handles target with async __call__."""
 
         class AsyncCallable:
             async def __call__(self, x: int) -> int:
                 return x * 2
 
-        proxy = SafeProxy(AsyncCallable(), "async_factory")
+        proxy = FixtureErrorWrapper(AsyncCallable(), "async_factory")
         result = await proxy(5)
         assert result == 10
 
