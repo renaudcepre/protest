@@ -120,7 +120,7 @@ class Shell:
     ) -> CommandResult: ...
 
     @staticmethod
-    async def run(  # noqa: PLR0913
+    async def run(  # noqa: PLR0913 - subprocess.run() passthrough API
         command: str | list[str],
         *,
         timeout: float | None = None,
@@ -188,9 +188,9 @@ class Shell:
         # Print output so it gets captured by ProTest's TaskAwareStream
         if print_output:
             if stdout:
-                print(stdout, end="")  # noqa: T201
+                print(stdout, end="")  # noqa: T201 - intentional test output
             if stderr:
-                print(stderr, end="", file=sys.stderr)  # noqa: T201
+                print(stderr, end="", file=sys.stderr)  # noqa: T201 - intentional test output
 
         return CommandResult(
             stdout=stdout,

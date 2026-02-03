@@ -14,6 +14,11 @@ Example:
         assert True
 
     success = run_session(session)
+
+Note:
+    This module uses lazy imports (PLC0415) to optimize startup time.
+    Users importing `from protest.api import run_session` shouldn't pay
+    the cost of loading the entire framework until they actually call it.
 """
 
 from __future__ import annotations
@@ -26,7 +31,7 @@ if TYPE_CHECKING:
     from protest.plugin import PluginContext
 
 
-def run_session(  # noqa: PLR0913
+def run_session(  # noqa: PLR0913 - public API with many optional params
     session: ProTestSession,
     concurrency: int | None = None,
     exitfirst: bool = False,
@@ -64,7 +69,9 @@ def run_session(  # noqa: PLR0913
     Returns:
         RunResult with success status and interrupted flag.
     """
-    from protest.core.runner import TestRunner  # noqa: PLC0415
+    from protest.core.runner import (  # noqa: PLC0415 - lazy import for startup perf
+        TestRunner,
+    )
 
     # Apply session-level settings from ctx or params
     if ctx is not None:
@@ -84,7 +91,9 @@ def run_session(  # noqa: PLR0913
 
     # Build context from parameters if not provided
     if ctx is None:
-        from protest.plugin import PluginContext  # noqa: PLC0415
+        from protest.plugin import (  # noqa: PLC0415 - lazy import for startup perf
+            PluginContext,
+        )
 
         ctx = PluginContext(
             args={
@@ -105,7 +114,7 @@ def run_session(  # noqa: PLR0913
     return runner.run()
 
 
-def collect_tests(  # noqa: PLR0913
+def collect_tests(  # noqa: PLR0913 - public API with many optional params
     session: ProTestSession,
     include_tags: set[str] | None = None,
     exclude_tags: set[str] | None = None,
@@ -127,6 +136,7 @@ def collect_tests(  # noqa: PLR0913
     Returns:
         List of collected TestItem objects.
     """
+    # Lazy imports for startup performance - only load when function is called
     import asyncio  # noqa: PLC0415
 
     from protest.core.collector import Collector  # noqa: PLC0415
@@ -172,7 +182,9 @@ def list_tags(session: ProTestSession) -> set[str]:
     Returns:
         Set of all tag names declared on fixtures, suites, and tests.
     """
-    from protest.core.suite import ProTestSuite  # noqa: PLC0415, TC001
+    from protest.core.suite import (  # noqa: PLC0415, TC001 - lazy import for startup perf
+        ProTestSuite,
+    )
 
     all_tags: set[str] = set()
 

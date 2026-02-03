@@ -83,7 +83,7 @@ class FixtureContainer:
     def event_bus(self) -> EventBus | None:
         return self._event_bus
 
-    def register(  # noqa: PLR0913
+    def register(  # noqa: PLR0913 - fixture registration requires many params
         self,
         func: FixtureCallable,
         scope: FixtureScope = FixtureScope.TEST,

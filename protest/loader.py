@@ -65,6 +65,7 @@ def load_session(target: str, app_dir: str = ".") -> ProTestSession:
         LoadError: If the target format is invalid, module not found,
                    session not found, or session is not a ProTestSession.
     """
+    # Lazy import: loader may be imported before full framework is needed
     from protest.core.session import ProTestSession  # noqa: PLC0415
 
     if ":" not in target:

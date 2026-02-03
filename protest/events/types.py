@@ -21,7 +21,7 @@ class Event(Enum):
     TEST_SETUP_DONE = "test_setup_done"
     TEST_TEARDOWN_START = "test_teardown_start"
     TEST_RETRY = "test_retry"
-    TEST_PASS = "test_pass"  # noqa: S105
+    TEST_PASS = "test_pass"  # noqa: S105 - false positive, not a password
     TEST_FAIL = "test_fail"
     TEST_SKIP = "test_skip"
     TEST_XFAIL = "test_xfail"
