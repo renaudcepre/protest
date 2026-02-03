@@ -35,7 +35,9 @@ class _ParallelExecutionState:
     fixture_semaphores: dict[FixtureCallable, asyncio.Semaphore]
     tracker: SuiteTracker
     exitfirst_flag: asyncio.Event | None
-    results: list[TestOutcome] = field(default_factory=list)
+    # Incremental counter instead of storing all outcomes (memory optimization)
+    counts: TestCounts = field(default_factory=TestCounts)
+    counts_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
 class ParallelExecutor:
@@ -125,7 +127,7 @@ class ParallelExecutor:
         ]
 
         await self._wait_with_interrupt(worker_tasks, ctx.exitfirst_flag)
-        return _aggregate_results(ctx.results)
+        return ctx.counts
 
     async def _create_context(
         self,
@@ -162,7 +164,9 @@ class ParallelExecutor:
 
             try:
                 if outcome := await self._process_test_item(test_item, ctx):
-                    ctx.results.append(outcome)
+                    # Atomic increment - don't store full outcome (memory optimization)
+                    async with ctx.counts_lock:
+                        ctx.counts = ctx.counts + outcome.counts
                     if ctx.exitfirst_flag and (
                         outcome.counts.failed or outcome.counts.errored
                     ):
@@ -300,9 +304,3 @@ def _cancel_tasks(tasks: list[asyncio.Task[None]]) -> None:
             task.cancel()
 
 
-def _aggregate_results(results: list[TestOutcome]) -> TestCounts:
-    """Aggregate test outcomes into total counts."""
-    total = TestCounts()
-    for outcome in results:
-        total = total + outcome.counts
-    return total
