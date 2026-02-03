@@ -96,7 +96,12 @@ class EventBus:
         ]
 
     async def emit(self, event: Event, data: Any = None) -> None:
-        """Emit event. Sync handlers block, async handlers run fire-and-forget."""
+        """Emit event. Sync handlers block, async handlers run fire-and-forget.
+
+        Note: `data` is typed as Any because each Event carries a different payload
+        (TestResult, str, HandlerInfo, None, etc.). Type safety is enforced at the
+        plugin level via strongly-typed on_* methods in PluginBase.
+        """
         for registered in self._handlers[event]:
             handler = registered.func
             handler_name = registered.name

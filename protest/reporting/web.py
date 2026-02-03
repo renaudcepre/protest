@@ -248,7 +248,7 @@ class WebReporter(PluginBase):
     def on_suite_end(self, result: SuiteResult) -> None:
         self._send(
             "SUITE_END",
-            {"name": result.name, "duration": result.duration},
+            {"name": str(result.name), "duration": result.duration},
         )
 
     def on_session_end(self, result: SessionResult) -> None:

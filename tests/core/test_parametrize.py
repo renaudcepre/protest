@@ -7,6 +7,7 @@ import pytest
 
 from protest import ForEach, From, ProTestSession, ProTestSuite, Use
 from protest.core.collector import Collector
+from protest.entities import SuitePath
 from protest.core.runner import TestRunner
 from protest.di.decorators import fixture
 
@@ -202,7 +203,7 @@ class TestParameterizedCollection:
 
         item = items[0]
         assert item.test_name == "test_user"
-        assert item.suite_path == "API"
+        assert item.suite_path == SuitePath("API")
         assert item.case_ids == ["alice"]
         assert item.case_kwargs == {"user": "alice"}
         assert "API" in item.node_id

@@ -13,7 +13,6 @@ from protest.entities import (
     SessionResult,
     SessionSetupInfo,
     TestCounts,
-    TestItem,
 )
 from protest.events.types import Event
 from protest.execution.capture import (
@@ -108,7 +107,9 @@ class TestRunner:
                     )
 
                     # Emit suite results in reverse order (LIFO)
-                    for suite_path in reversed(list(self._suite_manager.started_suites)):
+                    for suite_path in reversed(
+                        list(self._suite_manager.started_suites)
+                    ):
                         suite_result = self._suite_manager.build_result(suite_path)
                         await self._session.events.emit(Event.SUITE_END, suite_result)
 

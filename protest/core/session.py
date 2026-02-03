@@ -320,7 +320,7 @@ class ProTestSession:
                     managed=reg.managed,
                     tags=reg.tags,
                     autouse=reg.autouse,
-                    suite_path=suite.full_path,  # Owner suite's path
+                    suite_path=suite.full_path,
                 )
             self._register_suite_fixtures(suite.suites)
 

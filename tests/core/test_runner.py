@@ -4,7 +4,7 @@ from typing import Annotated
 from protest import ProTestSession, ProTestSuite, Use
 from protest.core.runner import TestRunner
 from protest.di.decorators import fixture
-from protest.entities import TestItem, TestRegistration
+from protest.entities import SuitePath, TestItem, TestRegistration
 from protest.plugin import PluginBase
 from tests.conftest import (
     CollectedEvents,
@@ -214,11 +214,11 @@ class TestRunnerWithSuites:
         runner = TestRunner(session)
         runner.run()
 
-        assert ("start", "my_suite") in collected.suite_events
+        assert ("start", SuitePath("my_suite")) in collected.suite_events
         # Check that SUITE_END was emitted with a SuiteResult
         suite_end_events = [e for e in collected.suite_events if e[0] == "end"]
         assert len(suite_end_events) == 1
-        assert suite_end_events[0][1].name == "my_suite"
+        assert suite_end_events[0][1].name == SuitePath("my_suite")
 
     def test_runner_uses_suite_max_concurrency(self) -> None:
         """Suite max_concurrency caps effective concurrency."""

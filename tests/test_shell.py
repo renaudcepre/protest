@@ -21,9 +21,7 @@ class TestCommandResult:
         assert result.success is False
 
     def test_output_combines_stdout_and_stderr(self) -> None:
-        result = CommandResult(
-            stdout="out", stderr="err", exit_code=0, command="test"
-        )
+        result = CommandResult(stdout="out", stderr="err", exit_code=0, command="test")
         assert result.output == "out\nerr"
 
     def test_output_only_stdout(self) -> None:
@@ -65,9 +63,7 @@ class TestShellRun:
 
     @pytest.mark.asyncio
     async def test_captures_stderr(self) -> None:
-        result = await Shell.run(
-            "echo stderr_test >&2", shell=True, print_output=False
-        )
+        result = await Shell.run("echo stderr_test >&2", shell=True, print_output=False)
 
         assert "stderr_test" in result.stderr
 
@@ -90,9 +86,7 @@ class TestShellMode:
 
     @pytest.mark.asyncio
     async def test_shell_true_enables_pipes(self) -> None:
-        result = await Shell.run(
-            "echo hello | cat", shell=True, print_output=False
-        )
+        result = await Shell.run("echo hello | cat", shell=True, print_output=False)
 
         assert result.success
         assert "hello" in result.stdout
@@ -240,16 +234,12 @@ class TestShellEdgeCases:
 
     @pytest.mark.asyncio
     async def test_quotes_in_args(self) -> None:
-        result = await Shell.run(
-            ["echo", "hello 'world'"], print_output=False
-        )
+        result = await Shell.run(["echo", "hello 'world'"], print_output=False)
 
         assert "'world'" in result.stdout
 
     @pytest.mark.asyncio
     async def test_spaces_in_args(self) -> None:
-        result = await Shell.run(
-            ["echo", "hello   world"], print_output=False
-        )
+        result = await Shell.run(["echo", "hello   world"], print_output=False)
 
         assert "hello   world" in result.stdout

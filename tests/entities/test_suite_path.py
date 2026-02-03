@@ -137,3 +137,17 @@ class TestSuitePathImmutable:
         path = SuitePath("A::B")
         with pytest.raises(AttributeError):
             path._path = "C::D"  # type: ignore[misc]
+
+
+class TestSuitePathLower:
+    def test_lower_returns_lowercase_string(self) -> None:
+        path = SuitePath("Parent::Child")
+        assert path.lower() == "parent::child"
+
+    def test_lower_already_lowercase(self) -> None:
+        path = SuitePath("parent::child")
+        assert path.lower() == "parent::child"
+
+    def test_lower_mixed_case(self) -> None:
+        path = SuitePath("API::Auth::Login")
+        assert path.lower() == "api::auth::login"

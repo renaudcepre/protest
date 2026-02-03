@@ -10,7 +10,13 @@ from typing import TYPE_CHECKING, Any, get_type_hints
 
 from protest.core.outcome import OutcomeBuilder, TestExecutionResult
 from protest.di.resolver import Resolver
-from protest.entities import TestItem, TestOutcome, TestRetryInfo, TestStartInfo, TestTeardownInfo
+from protest.entities import (
+    TestItem,
+    TestOutcome,
+    TestRetryInfo,
+    TestStartInfo,
+    TestTeardownInfo,
+)
 from protest.events.types import Event
 from protest.exceptions import FixtureError
 from protest.execution.async_bridge import ensure_async
@@ -29,7 +35,9 @@ if TYPE_CHECKING:
 class TestExecutor:
     """Executes a single test with capture and context."""
 
-    def __init__(self, session: ProTestSession, outcome_builder: OutcomeBuilder) -> None:
+    def __init__(
+        self, session: ProTestSession, outcome_builder: OutcomeBuilder
+    ) -> None:
         self._session = session
         self._outcome_builder = outcome_builder
 

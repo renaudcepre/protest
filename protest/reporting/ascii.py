@@ -88,8 +88,8 @@ class AsciiReporter(PluginBase):
     def on_session_teardown_start(self) -> None:
         print("  session teardown...")
 
-    def on_suite_teardown_start(self, name: str) -> None:
-        print(f"  suite '{name}' teardown...")
+    def on_suite_teardown_start(self, path: SuitePath) -> None:
+        print(f"  suite '{path}' teardown...")
 
     def on_suite_end(self, result: SuiteResult) -> None:
         if result.teardown_duration > 0:
@@ -103,9 +103,9 @@ class AsciiReporter(PluginBase):
                 f"  session teardown done ({_format_duration(result.teardown_duration)})"
             )
 
-    def on_suite_start(self, name: str) -> None:
+    def on_suite_start(self, path: SuitePath) -> None:
         if not self._is_parallel:
-            print(f"[] {name}")
+            print(f"[] {path}")
 
     def on_test_retry(self, info: TestRetryInfo) -> None:
         delay_msg = f", retrying in {info.delay}s" if info.delay > 0 else ""

@@ -22,16 +22,16 @@ class SuiteManager:
 
     def __init__(self, session: ProTestSession) -> None:
         self._session = session
-        self._started_suites: set[str] = set()
-        self._suite_start_times: dict[str, float] = {}
-        self._suite_setup_durations: dict[str, float] = {}
-        self._suite_teardown_durations: dict[str, float] = {}
+        self._started_suites: set[SuitePath] = set()
+        self._suite_start_times: dict[SuitePath, float] = {}
+        self._suite_setup_durations: dict[SuitePath, float] = {}
+        self._suite_teardown_durations: dict[SuitePath, float] = {}
         self._lock = asyncio.Lock()
 
     @property
-    def started_suites(self) -> set[str]:
+    def started_suites(self) -> set[SuitePath]:
         """Return the set of started suite paths."""
-        return self._started_suites
+        return self._started_suites.copy()
 
     def reset(self) -> None:
         """Reset state for a new run."""
@@ -40,32 +40,31 @@ class SuiteManager:
         self._suite_setup_durations = {}
         self._suite_teardown_durations = {}
 
-    async def ensure_hierarchy_started(self, suite_path: str) -> None:
+    async def ensure_hierarchy_started(self, suite_path: SuitePath) -> None:
         """Ensure suite and all parent suites are started with autouse resolved."""
-        for ancestor in SuitePath(suite_path).ancestors():
-            ancestor_str = str(ancestor)
-            if ancestor_str in self._started_suites:
+        for ancestor in suite_path.ancestors():
+            if ancestor in self._started_suites:
                 continue
             async with self._lock:
-                if ancestor_str in self._started_suites:
+                if ancestor in self._started_suites:
                     continue
-                self._suite_start_times[ancestor_str] = time.perf_counter()
-                await self._session.events.emit(Event.SUITE_START, ancestor_str)
+                self._suite_start_times[ancestor] = time.perf_counter()
+                await self._session.events.emit(Event.SUITE_START, ancestor)
                 suite_setup_start = time.perf_counter()
                 set_session_setup_capture(True)
                 try:
-                    await self._session.resolver.resolve_suite_autouse(ancestor_str)
+                    await self._session.resolver.resolve_suite_autouse(ancestor)
                 finally:
                     set_session_setup_capture(False)
                 suite_setup_duration = time.perf_counter() - suite_setup_start
-                self._suite_setup_durations[ancestor_str] = suite_setup_duration
+                self._suite_setup_durations[ancestor] = suite_setup_duration
                 await self._session.events.emit(
                     Event.SUITE_SETUP_DONE,
-                    SuiteSetupInfo(name=ancestor_str, duration=suite_setup_duration),
+                    SuiteSetupInfo(name=ancestor, duration=suite_setup_duration),
                 )
-                self._started_suites.add(ancestor_str)
+                self._started_suites.add(ancestor)
 
-    async def teardown(self, suite_path: str) -> None:
+    async def teardown(self, suite_path: SuitePath) -> None:
         """Teardown suite fixtures after all its tests complete."""
         await self._session.events.emit(Event.SUITE_TEARDOWN_START, suite_path)
         teardown_start = time.perf_counter()
@@ -78,7 +77,7 @@ class SuiteManager:
                 time.perf_counter() - teardown_start
             )
 
-    def build_result(self, suite_path: str) -> SuiteResult:
+    def build_result(self, suite_path: SuitePath) -> SuiteResult:
         """Build SuiteResult with recorded durations."""
         suite_start = self._suite_start_times.get(suite_path, 0)
         suite_duration = time.perf_counter() - suite_start if suite_start else 0

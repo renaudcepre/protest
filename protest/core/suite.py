@@ -68,11 +68,11 @@ class ProTestSuite:
         return self._description
 
     @property
-    def full_path(self) -> str:
+    def full_path(self) -> SuitePath:
         """Return hierarchical path: Parent::Child::GrandChild."""
         if self._parent_suite:
-            return f"{self._parent_suite.full_path}{SuitePath.SEPARATOR}{self._name}"
-        return self._name
+            return self._parent_suite.full_path.child(self._name)
+        return SuitePath(self._name)
 
     @property
     def max_concurrency(self) -> int | None:

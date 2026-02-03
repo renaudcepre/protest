@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 from jsonschema import validate
 
-from protest.entities import SessionResult, TestResult
+from protest.entities import SessionResult, SuitePath, TestResult
 from protest.reporting.ctrf import CTRFReporter
 
 if TYPE_CHECKING:
@@ -220,7 +220,7 @@ class TestCTRFSuiteHandling:
             TestResult(
                 name="test_login",
                 node_id="mod::API::Auth::test_login",
-                suite_path="API::Auth",
+                suite_path=SuitePath("API::Auth"),
                 duration=0.100,
             )
         )
@@ -242,7 +242,7 @@ class TestCTRFSuiteHandling:
             TestResult(
                 name="test_a",
                 node_id="mod::Suite1::test_a",
-                suite_path="Suite1",
+                suite_path=SuitePath("Suite1"),
                 duration=0.010,
             )
         )
@@ -250,7 +250,7 @@ class TestCTRFSuiteHandling:
             TestResult(
                 name="test_b",
                 node_id="mod::Suite2::test_b",
-                suite_path="Suite2",
+                suite_path=SuitePath("Suite2"),
                 duration=0.010,
             )
         )
@@ -258,7 +258,7 @@ class TestCTRFSuiteHandling:
             TestResult(
                 name="test_c",
                 node_id="mod::Suite1::test_c",
-                suite_path="Suite1",
+                suite_path=SuitePath("Suite1"),
                 duration=0.010,
             )
         )
@@ -465,7 +465,7 @@ class TestCTRFSchemaValidation:
             TestResult(
                 name="test_passed",
                 node_id="mod::Suite::test_passed",
-                suite_path="Suite",
+                suite_path=SuitePath("Suite"),
                 duration=0.150,
             )
         )

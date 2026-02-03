@@ -13,6 +13,7 @@ if TYPE_CHECKING:
         HandlerInfo,
         SessionResult,
         SessionSetupInfo,
+        SuitePath,
         SuiteResult,
         SuiteSetupInfo,
         TestItem,
@@ -128,13 +129,13 @@ class PluginBase:
     # Suite lifecycle
     # ─────────────────────────────────────────────────────────────────────
 
-    def on_suite_start(self, name: str) -> None | Awaitable[None]:
+    def on_suite_start(self, path: SuitePath) -> None | Awaitable[None]:
         """Suite begins (before fixture setup)."""
 
     def on_suite_setup_done(self, info: SuiteSetupInfo) -> None | Awaitable[None]:
         """Suite fixtures resolved, ready to run tests."""
 
-    def on_suite_teardown_start(self, name: str) -> None | Awaitable[None]:
+    def on_suite_teardown_start(self, path: SuitePath) -> None | Awaitable[None]:
         """All tests complete, starting suite fixture teardown."""
 
     def on_suite_end(self, result: SuiteResult) -> None | Awaitable[None]:

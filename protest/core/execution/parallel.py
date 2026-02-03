@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from protest.core.execution.suite_manager import SuiteManager
 from protest.core.execution.test_executor import TestExecutor
 from protest.core.tracker import SuiteTracker
-from protest.entities import TestCounts, TestItem, TestOutcome, TestStartInfo
+from protest.entities import SuitePath, TestCounts, TestItem, TestOutcome, TestStartInfo
 from protest.events.types import Event
 from protest.execution.interrupt import InterruptHandler
 from protest.utils import get_callable_name
@@ -23,7 +23,7 @@ class _WorkerContext:
     """Shared state for worker coroutines during a single run."""
 
     queue: asyncio.Queue[TestItem | None]
-    semaphores: dict[str | None, asyncio.Semaphore]
+    semaphores: dict[SuitePath | None, asyncio.Semaphore]
     tracker: SuiteTracker
     stop_flag: asyncio.Event | None
     results: list[TestOutcome] = field(default_factory=list)
@@ -53,10 +53,10 @@ class ParallelExecutor:
 
     def build_suite_semaphores(
         self, items: list[TestItem]
-    ) -> dict[str | None, asyncio.Semaphore]:
+    ) -> dict[SuitePath | None, asyncio.Semaphore]:
         """Build per-suite semaphores for max_concurrency."""
-        semaphores: dict[str | None, asyncio.Semaphore] = {}
-        seen_suites: set[str | None] = set()
+        semaphores: dict[SuitePath | None, asyncio.Semaphore] = {}
+        seen_suites: set[SuitePath | None] = set()
 
         for item in items:
             suite_path = item.suite.full_path if item.suite else None
@@ -75,7 +75,7 @@ class ParallelExecutor:
     async def run(
         self,
         items: list[TestItem],
-        suite_semaphores: dict[str | None, asyncio.Semaphore],
+        suite_semaphores: dict[SuitePath | None, asyncio.Semaphore],
         tracker: SuiteTracker,
     ) -> TestCounts:
         """Run all tests in parallel using a worker pool (FIFO order)."""
@@ -94,7 +94,7 @@ class ParallelExecutor:
     async def _create_context(
         self,
         items: list[TestItem],
-        suite_semaphores: dict[str | None, asyncio.Semaphore],
+        suite_semaphores: dict[SuitePath | None, asyncio.Semaphore],
         tracker: SuiteTracker,
     ) -> _WorkerContext:
         """Create and populate worker context with work queue."""
