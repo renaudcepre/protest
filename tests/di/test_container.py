@@ -9,7 +9,7 @@ from protest.core.fixture import is_generator_like
 from protest.di.container import FixtureContainer
 from protest.di.decorators import FixtureWrapper, fixture
 from protest.di.markers import Use
-from protest.entities import FixtureScope
+from protest.entities import FixtureScope, SuitePath
 from protest.exceptions import (
     AlreadyRegisteredError,
     CircularDependencyError,
@@ -998,3 +998,125 @@ class TestSameScopeDependency:
             result = await resolver.resolve(dependent_fixture, current_path="MySuite")
             assert result == "dependent_base_value"
             assert call_counts["same_suite_base"] == 1
+
+
+class TestGetSuitePath:
+    """Tests for get_suite_path()."""
+
+    def test_returns_path_for_suite_fixture(self, resolver: FixtureContainer) -> None:
+        """get_suite_path returns the owner path for SUITE fixtures."""
+
+        def suite_fixture() -> str:
+            return "suite_data"
+
+        suite_path = SuitePath("MySuite")
+        resolver.register(
+            suite_fixture, scope=FixtureScope.SUITE, suite_path=suite_path
+        )
+
+        assert resolver.get_suite_path(suite_fixture) == suite_path
+
+    def test_returns_none_for_session_fixture(self, resolver: FixtureContainer) -> None:
+        """get_suite_path returns None for SESSION fixtures (no owner path)."""
+
+        def session_fixture() -> str:
+            return "session_data"
+
+        resolver.register(session_fixture, scope=FixtureScope.SESSION)
+
+        assert resolver.get_suite_path(session_fixture) is None
+
+
+class TestAutouseResolvers:
+    """Tests for resolve_suite_autouse and resolve_session_autouse."""
+
+    @pytest.mark.asyncio
+    async def test_resolve_suite_autouse_skips_non_suite_fixtures(
+        self, resolver: FixtureContainer
+    ) -> None:
+        """resolve_suite_autouse only resolves SUITE-scoped autouse fixtures."""
+        session_calls = 0
+        suite_calls = 0
+        test_calls = 0
+
+        def session_autouse() -> str:
+            nonlocal session_calls
+            session_calls += 1
+            return "session"
+
+        def suite_autouse() -> str:
+            nonlocal suite_calls
+            suite_calls += 1
+            return "suite"
+
+        def test_autouse() -> str:
+            nonlocal test_calls
+            test_calls += 1
+            return "test"
+
+        suite_path = SuitePath("MySuite")
+        resolver.register(session_autouse, scope=FixtureScope.SESSION, autouse=True)
+        resolver.register(
+            suite_autouse, scope=FixtureScope.SUITE, autouse=True, suite_path=suite_path
+        )
+        resolver.register(test_autouse, scope=FixtureScope.TEST, autouse=True)
+
+        async with resolver:
+            await resolver.resolve_suite_autouse(suite_path)
+
+        # Only SUITE fixture should be called
+        assert session_calls == 0
+        assert suite_calls == 1
+        assert test_calls == 0
+
+    @pytest.mark.asyncio
+    async def test_resolve_suite_autouse_skips_fixtures_without_path(
+        self, resolver: FixtureContainer
+    ) -> None:
+        """resolve_suite_autouse skips SUITE fixtures without an owner path."""
+        calls = 0
+
+        def orphan_suite_fixture() -> str:
+            nonlocal calls
+            calls += 1
+            return "orphan"
+
+        # Register as SUITE but without suite_path
+        resolver.register(orphan_suite_fixture, scope=FixtureScope.SUITE, autouse=True)
+
+        async with resolver:
+            await resolver.resolve_suite_autouse(SuitePath("AnySuite"))
+
+        # Should not be called (no owner path)
+        assert calls == 0
+
+    @pytest.mark.asyncio
+    async def test_resolve_session_autouse(self, resolver: FixtureContainer) -> None:
+        """resolve_session_autouse resolves SESSION-scoped autouse fixtures."""
+        session_calls = 0
+        suite_calls = 0
+
+        def session_autouse() -> str:
+            nonlocal session_calls
+            session_calls += 1
+            return "session"
+
+        def suite_autouse() -> str:
+            nonlocal suite_calls
+            suite_calls += 1
+            return "suite"
+
+        resolver.register(session_autouse, scope=FixtureScope.SESSION, autouse=True)
+        resolver.register(
+            suite_autouse,
+            scope=FixtureScope.SUITE,
+            autouse=True,
+            suite_path=SuitePath("MySuite"),
+        )
+
+        async with resolver:
+            await resolver.resolve_session_autouse()
+
+        # Only SESSION fixture should be called
+        assert session_calls == 1
+        assert suite_calls == 0
