@@ -57,7 +57,8 @@ def test_caplog_basic(logs: Annotated[LogCapture, Use(caplog)]) -> None:
     logging.warning("Something suspicious")
     logging.error("Operation failed")
 
-    assert len(logs.records) == 3
+    expected_count = 3
+    assert len(logs.records) == expected_count
     assert "suspicious" in logs.text
 
 
@@ -70,7 +71,8 @@ def test_caplog_filter_level(logs: Annotated[LogCapture, Use(caplog)]) -> None:
     logging.error("Error message")
 
     warnings_and_above = logs.at_level("WARNING")
-    assert len(warnings_and_above) == 2
+    expected_warnings = 2
+    assert len(warnings_and_above) == expected_warnings
 
 
 # =============================================================================
@@ -114,10 +116,12 @@ def test_mocker_spy(m: Annotated[Mocker, Use(mocker)]) -> None:
     calc = Calculator()
     spy = m.spy(calc, "add")
 
-    result = calc.add(2, 3)
+    a, b = 2, 3
+    result = calc.add(a, b)
 
-    assert result == 5  # Real method was called
-    spy.assert_called_once_with(2, 3)
+    expected = 5
+    assert result == expected  # Real method was called
+    spy.assert_called_once_with(a, b)
 
 
 @suite.test()
@@ -159,5 +163,6 @@ def test_combined_builtins(
     logging.info("Processing complete")
 
     assert result is True
-    assert len(logs.records) == 2
+    expected_logs = 2
+    assert len(logs.records) == expected_logs
     mock_process.assert_called_once_with(data_file)
