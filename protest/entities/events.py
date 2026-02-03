@@ -75,6 +75,13 @@ class SessionSetupInfo:
 
 
 @dataclass(frozen=True, slots=True)
+class SuiteStartInfo:
+    """Emitted when a suite begins (before fixture setup)."""
+
+    name: SuitePath
+
+
+@dataclass(frozen=True, slots=True)
 class SuiteSetupInfo:
     """Emitted after suite fixtures are resolved, before any test starts."""
 

@@ -36,8 +36,8 @@ class SuitePath:
         Example: 'A::B::C' yields SuitePath('A'), SuitePath('A::B'), SuitePath('A::B::C')
         """
         parts = self.parts
-        for i in range(1, len(parts) + 1):
-            yield SuitePath.from_parts(parts[:i])
+        for depth in range(1, len(parts) + 1):
+            yield SuitePath.from_parts(parts[:depth])
 
     def is_ancestor_of(self, other: SuitePath) -> bool:
         """Check if self is ancestor of other (or equal).
