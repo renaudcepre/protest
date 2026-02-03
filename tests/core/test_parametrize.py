@@ -7,9 +7,9 @@ import pytest
 
 from protest import ForEach, From, ProTestSession, ProTestSuite, Use
 from protest.core.collector import Collector
-from protest.entities import SuitePath
 from protest.core.runner import TestRunner
 from protest.di.decorators import fixture
+from protest.entities import SuitePath
 
 
 @dataclass

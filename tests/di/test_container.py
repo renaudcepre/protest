@@ -6,15 +6,16 @@ from typing import Annotated, Any
 import pytest
 
 from protest.core.fixture import is_generator_like
+from protest.di.container import FixtureContainer
 from protest.di.decorators import FixtureWrapper, fixture
 from protest.di.markers import Use
-from protest.di.resolver import (
+from protest.entities import FixtureScope
+from protest.exceptions import (
     AlreadyRegisteredError,
-    Resolver,
+    CircularDependencyError,
+    PlainFunctionError,
     ScopeMismatchError,
 )
-from protest.entities import FixtureScope
-from protest.exceptions import CircularDependencyError, PlainFunctionError
 from tests.di.dependencies import (
     function_dependency,
     generator_function_fixture,
@@ -26,9 +27,9 @@ from tests.di.utils import call_counts, reset_call_counts, teardown_counts
 
 
 @pytest.fixture
-def resolver() -> Resolver:
+def resolver() -> FixtureContainer:
     reset_call_counts()
-    return Resolver()
+    return FixtureContainer()
 
 
 # --- Scoping and Caching Tests ---
@@ -43,7 +44,7 @@ def resolver() -> Resolver:
     ],
 )
 async def test_session_dependency_is_cached(
-    resolver: Resolver, target_scope: FixtureScope
+    resolver: FixtureContainer, target_scope: FixtureScope
 ) -> None:
     """Given a session dependency, when resolved twice from any scope, then only called once."""
     resolver.register(session_dependency, scope=FixtureScope.SESSION)
@@ -61,7 +62,7 @@ async def test_session_dependency_is_cached(
 
 
 @pytest.mark.asyncio
-async def test_test_scope_is_not_cached_across_runs(resolver: Resolver) -> None:
+async def test_test_scope_is_not_cached_across_runs(resolver: FixtureContainer) -> None:
     """Given a test-scoped fixture, when resolved twice, then called each time."""
     resolver.register(function_dependency, scope=FixtureScope.TEST)
 
@@ -82,7 +83,7 @@ async def test_test_scope_is_not_cached_across_runs(resolver: Resolver) -> None:
 # --- Invalid Scope Dependency Test ---
 
 
-def test_session_scope_cannot_depend_on_test_scope(resolver: Resolver) -> None:
+def test_session_scope_cannot_depend_on_test_scope(resolver: FixtureContainer) -> None:
     resolver.register(function_dependency, scope=FixtureScope.TEST)
 
     def invalid_session_fixture(
@@ -97,7 +98,7 @@ def test_session_scope_cannot_depend_on_test_scope(resolver: Resolver) -> None:
 # --- Already Registered Error Test ---
 
 
-def test_cannot_register_same_function_twice(resolver: Resolver) -> None:
+def test_cannot_register_same_function_twice(resolver: FixtureContainer) -> None:
     def my_fixture() -> str:
         return "test"
 
@@ -113,7 +114,7 @@ def test_cannot_register_same_function_twice(resolver: Resolver) -> None:
 
 
 def test_undecorated_dependency_raises_plain_function_error(
-    resolver: Resolver,
+    resolver: FixtureContainer,
 ) -> None:
     """Plain functions without @fixture()/@factory() raise PlainFunctionError."""
 
@@ -135,7 +136,7 @@ def test_undecorated_dependency_raises_plain_function_error(
 
 
 def test_extract_dependency_returns_none_for_regular_annotation() -> None:
-    result = Resolver._extract_dependency_from_annotation(str)
+    result = FixtureContainer._extract_dependency_from_annotation(str)
 
     assert result is None
 
@@ -144,7 +145,7 @@ def test_extract_dependency_returns_none_for_regular_annotation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_generator_fixture_yields_value(resolver: Resolver) -> None:
+async def test_generator_fixture_yields_value(resolver: FixtureContainer) -> None:
     resolver.register(generator_session_fixture, scope=FixtureScope.SESSION)
 
     async with resolver:
@@ -154,7 +155,7 @@ async def test_generator_fixture_yields_value(resolver: Resolver) -> None:
 
 
 @pytest.mark.asyncio
-async def test_generator_fixture_teardown_on_exit(resolver: Resolver) -> None:
+async def test_generator_fixture_teardown_on_exit(resolver: FixtureContainer) -> None:
     resolver.register(generator_session_fixture, scope=FixtureScope.SESSION)
 
     async with resolver:
@@ -165,7 +166,7 @@ async def test_generator_fixture_teardown_on_exit(resolver: Resolver) -> None:
 
 
 @pytest.mark.asyncio
-async def test_generator_fixture_is_cached(resolver: Resolver) -> None:
+async def test_generator_fixture_is_cached(resolver: FixtureContainer) -> None:
     resolver.register(generator_session_fixture, scope=FixtureScope.SESSION)
 
     async with resolver:
@@ -176,7 +177,7 @@ async def test_generator_fixture_is_cached(resolver: Resolver) -> None:
 
 
 @pytest.mark.asyncio
-async def test_generator_fixture_with_dependency(resolver: Resolver) -> None:
+async def test_generator_fixture_with_dependency(resolver: FixtureContainer) -> None:
     resolver.register(session_dependency, scope=FixtureScope.SESSION)
 
     def generator_with_dep(
@@ -199,7 +200,7 @@ async def test_generator_fixture_with_dependency(resolver: Resolver) -> None:
 
 @pytest.mark.asyncio
 async def test_multiple_generator_fixtures_teardown_in_reverse_order(
-    resolver: Resolver,
+    resolver: FixtureContainer,
 ) -> None:
     """Generators with dependencies should teardown in LIFO order."""
     teardown_order: list[str] = []
@@ -230,7 +231,7 @@ async def test_multiple_generator_fixtures_teardown_in_reverse_order(
 
 
 @pytest.mark.asyncio
-async def test_generator_fixture_teardown_on_exception(resolver: Resolver) -> None:
+async def test_generator_fixture_teardown_on_exception(resolver: FixtureContainer) -> None:
     resolver.register(generator_session_fixture, scope=FixtureScope.SESSION)
 
     with pytest.raises(ValueError, match="test exception"):
@@ -243,7 +244,7 @@ async def test_generator_fixture_teardown_on_exception(resolver: Resolver) -> No
 
 @pytest.mark.asyncio
 async def test_generator_teardown_without_try_finally_on_exception(
-    resolver: Resolver,
+    resolver: FixtureContainer,
 ) -> None:
     """Proves that AsyncExitStack pattern guarantees teardown even without try/finally.
 
@@ -269,7 +270,7 @@ async def test_generator_teardown_without_try_finally_on_exception(
 
 
 @pytest.mark.asyncio
-async def test_mixed_regular_and_generator_fixtures(resolver: Resolver) -> None:
+async def test_mixed_regular_and_generator_fixtures(resolver: FixtureContainer) -> None:
     resolver.register(session_dependency, scope=FixtureScope.SESSION)
     resolver.register(generator_function_fixture, scope=FixtureScope.TEST)
 
@@ -341,7 +342,7 @@ class TestIsGeneratorLike:
 
 @pytest.mark.asyncio
 async def test_decorated_function_auto_registered_and_resolved(
-    resolver: Resolver,
+    resolver: FixtureContainer,
 ) -> None:
     """@fixture() decorated functions are auto-registered with FUNCTION scope."""
 
@@ -358,7 +359,7 @@ async def test_decorated_function_auto_registered_and_resolved(
 
 
 @pytest.mark.asyncio
-async def test_fixture_error_during_setup_propagates(resolver: Resolver) -> None:
+async def test_fixture_error_during_setup_propagates(resolver: FixtureContainer) -> None:
     """Test that errors during fixture setup are propagated correctly."""
 
     @fixture()
@@ -373,7 +374,7 @@ async def test_fixture_error_during_setup_propagates(resolver: Resolver) -> None
 
 @pytest.mark.asyncio
 async def test_concurrent_resolution_only_executes_fixture_once(
-    resolver: Resolver,
+    resolver: FixtureContainer,
 ) -> None:
     """Test that concurrent resolution of the same fixture only executes it once."""
     execution_count = 0
@@ -405,7 +406,7 @@ async def test_concurrent_resolution_only_executes_fixture_once(
 
 
 @pytest.mark.asyncio
-async def test_suite_scope_is_cached_within_suite(resolver: Resolver) -> None:
+async def test_suite_scope_is_cached_within_suite(resolver: FixtureContainer) -> None:
     """Suite-scoped fixtures are cached within the same suite path (current_path)."""
 
     def suite_fixture() -> str:
@@ -423,7 +424,7 @@ async def test_suite_scope_is_cached_within_suite(resolver: Resolver) -> None:
 
 
 @pytest.mark.asyncio
-async def test_suite_scope_not_cached_across_suites(resolver: Resolver) -> None:
+async def test_suite_scope_not_cached_across_suites(resolver: FixtureContainer) -> None:
     """Suite-scoped fixtures have separate instances per suite (current_path)."""
 
     def suite_fixture() -> str:
@@ -442,7 +443,7 @@ async def test_suite_scope_not_cached_across_suites(resolver: Resolver) -> None:
 
 
 @pytest.mark.asyncio
-async def test_suite_fixture_can_depend_on_session_fixture(resolver: Resolver) -> None:
+async def test_suite_fixture_can_depend_on_session_fixture(resolver: FixtureContainer) -> None:
     """Suite-scoped fixture can depend on session-scoped fixture."""
 
     def session_fixture() -> str:
@@ -465,7 +466,7 @@ async def test_suite_fixture_can_depend_on_session_fixture(resolver: Resolver) -
         assert call_counts["suite_dep"] == 1
 
 
-def test_suite_scope_cannot_depend_on_test_scope(resolver: Resolver) -> None:
+def test_suite_scope_cannot_depend_on_test_scope(resolver: FixtureContainer) -> None:
     """Suite-scoped fixture cannot depend on test-scoped fixture."""
 
     def test_fixture() -> str:
@@ -483,7 +484,7 @@ def test_suite_scope_cannot_depend_on_test_scope(resolver: Resolver) -> None:
 
 
 @pytest.mark.asyncio
-async def test_suite_teardown(resolver: Resolver) -> None:
+async def test_suite_teardown(resolver: FixtureContainer) -> None:
     """Suite fixtures are torn down when teardown_path is called."""
 
     def suite_gen() -> Generator[str, None, None]:
@@ -502,7 +503,7 @@ async def test_suite_teardown(resolver: Resolver) -> None:
 
 
 @pytest.mark.asyncio
-async def test_teardown_order_is_lifo_across_paths(resolver: Resolver) -> None:
+async def test_teardown_order_is_lifo_across_paths(resolver: FixtureContainer) -> None:
     """Teardown happens in LIFO order based on resolution order."""
     teardown_order: list[str] = []
 
@@ -531,8 +532,8 @@ async def test_teardown_order_is_lifo_across_paths(resolver: Resolver) -> None:
     assert teardown_order == ["c", "b", "a"]
 
 
-class TestResolverWithFixtureWrapper:
-    def test_has_fixture_with_wrapper(self, resolver: Resolver) -> None:
+class TestFixtureContainerWithFixtureWrapper:
+    def test_has_fixture_with_wrapper(self, resolver: FixtureContainer) -> None:
         @fixture()
         def my_fixture() -> str:
             return "data"
@@ -542,7 +543,7 @@ class TestResolverWithFixtureWrapper:
         assert resolver.has_fixture(my_fixture) is True
         assert isinstance(my_fixture, FixtureWrapper)
 
-    def test_get_fixture_with_wrapper(self, resolver: Resolver) -> None:
+    def test_get_fixture_with_wrapper(self, resolver: FixtureContainer) -> None:
         @fixture()
         def my_fixture() -> str:
             return "data"
@@ -553,7 +554,7 @@ class TestResolverWithFixtureWrapper:
         assert result is not None
         assert result.func is my_fixture.func
 
-    def test_get_scope_with_wrapper(self, resolver: Resolver) -> None:
+    def test_get_scope_with_wrapper(self, resolver: FixtureContainer) -> None:
         @fixture()
         def my_fixture() -> str:
             return "data"
@@ -565,7 +566,7 @@ class TestResolverWithFixtureWrapper:
 
 
 class TestTransitiveTags:
-    def test_get_transitive_tags_single_level(self, resolver: Resolver) -> None:
+    def test_get_transitive_tags_single_level(self, resolver: FixtureContainer) -> None:
         @fixture()
         def db_fixture() -> str:
             return "db"
@@ -582,7 +583,7 @@ class TestTransitiveTags:
         tags = resolver.get_transitive_tags(api_fixture)
         assert tags == {"api", "database"}
 
-    def test_get_transitive_tags_multi_level(self, resolver: Resolver) -> None:
+    def test_get_transitive_tags_multi_level(self, resolver: FixtureContainer) -> None:
         @fixture()
         def fixture_a() -> str:
             return "a"
@@ -602,7 +603,7 @@ class TestTransitiveTags:
         tags = resolver.get_transitive_tags(fixture_c)
         assert tags == {"level1", "level2", "level3"}
 
-    def test_get_transitive_tags_diamond_pattern(self, resolver: Resolver) -> None:
+    def test_get_transitive_tags_diamond_pattern(self, resolver: FixtureContainer) -> None:
         """Diamond dependency: A→B→D and A→C→D collects D's tags once.
 
         This test covers the `if actual_func in visited: return set()` branch
@@ -636,7 +637,7 @@ class TestTransitiveTags:
         tags = resolver.get_transitive_tags(fixture_a)
         assert tags == {"top", "branch_b", "branch_c", "shared"}
 
-    def test_get_fixture_tags_direct(self, resolver: Resolver) -> None:
+    def test_get_fixture_tags_direct(self, resolver: FixtureContainer) -> None:
         @fixture()
         def tagged_fixture() -> str:
             return "tagged"
@@ -654,7 +655,7 @@ class TestTransitiveTags:
 class TestAsyncGeneratorFixtures:
     @pytest.mark.asyncio
     async def test_async_generator_fixture_yields_value(
-        self, resolver: Resolver
+        self, resolver: FixtureContainer
     ) -> None:
         async def async_gen_fixture() -> AsyncGenerator[str, None]:
             call_counts["async_gen"] += 1
@@ -670,7 +671,7 @@ class TestAsyncGeneratorFixtures:
 
     @pytest.mark.asyncio
     async def test_async_generator_fixture_teardown_on_exit(
-        self, resolver: Resolver
+        self, resolver: FixtureContainer
     ) -> None:
         async def async_gen_fixture() -> AsyncGenerator[str, None]:
             call_counts["async_gen_teardown"] += 1
@@ -686,7 +687,7 @@ class TestAsyncGeneratorFixtures:
         assert teardown_counts["async_gen_teardown"] == 1
 
     @pytest.mark.asyncio
-    async def test_async_generator_with_dependency(self, resolver: Resolver) -> None:
+    async def test_async_generator_with_dependency(self, resolver: FixtureContainer) -> None:
         resolver.register(session_dependency, scope=FixtureScope.SESSION)
 
         async def async_gen_with_dep(
@@ -708,7 +709,7 @@ class TestAsyncGeneratorFixtures:
 class TestSuiteScopeConcurrency:
     @pytest.mark.asyncio
     async def test_concurrent_resolution_same_suite_fixture(
-        self, resolver: Resolver
+        self, resolver: FixtureContainer
     ) -> None:
         execution_count = 0
 
@@ -733,7 +734,7 @@ class TestSuiteScopeConcurrency:
 
 
 class TestAutouseWithWrapper:
-    def test_is_autouse_with_fixture_wrapper(self, resolver: Resolver) -> None:
+    def test_is_autouse_with_fixture_wrapper(self, resolver: FixtureContainer) -> None:
         @fixture()
         def autouse_fixture() -> str:
             return "autouse_data"
@@ -744,7 +745,7 @@ class TestAutouseWithWrapper:
 
         assert resolver.is_autouse(autouse_fixture) is True
 
-    def test_is_autouse_with_non_autouse(self, resolver: Resolver) -> None:
+    def test_is_autouse_with_non_autouse(self, resolver: FixtureContainer) -> None:
         @fixture()
         def regular_fixture() -> str:
             return "regular_data"
@@ -756,7 +757,7 @@ class TestAutouseWithWrapper:
         assert resolver.is_autouse(regular_fixture) is False
 
     @pytest.mark.asyncio
-    async def test_autouse_valid_for_test_scope(self, resolver: Resolver) -> None:
+    async def test_autouse_valid_for_test_scope(self, resolver: FixtureContainer) -> None:
         """TEST-scoped autouse fixtures are resolved via resolve_test_autouse."""
         call_count = 0
 
@@ -786,12 +787,12 @@ class TestAutouseWithWrapper:
 
 class TestTeardownEdgeCases:
     @pytest.mark.asyncio
-    async def test_teardown_nonexistent_path_is_safe(self, resolver: Resolver) -> None:
+    async def test_teardown_nonexistent_path_is_safe(self, resolver: FixtureContainer) -> None:
         async with resolver:
             await resolver.teardown_path("NonExistent")
 
     @pytest.mark.asyncio
-    async def test_teardown_path_clears_cache(self, resolver: Resolver) -> None:
+    async def test_teardown_path_clears_cache(self, resolver: FixtureContainer) -> None:
         def suite_fixture() -> str:
             call_counts["cache_test"] += 1
             return "cached_data"
@@ -811,7 +812,7 @@ class TestTeardownEdgeCases:
 
 class TestCircularDependencyDetection:
     @pytest.mark.asyncio
-    async def test_direct_cycle_a_depends_on_a(self, resolver: Resolver) -> None:
+    async def test_direct_cycle_a_depends_on_a(self, resolver: FixtureContainer) -> None:
         """Given A depends on itself, when resolving A, then CircularDependencyError is raised."""
 
         def fixture_a() -> str:
@@ -825,7 +826,7 @@ class TestCircularDependencyDetection:
                 await resolver.resolve(fixture_a)
 
     @pytest.mark.asyncio
-    async def test_two_fixture_cycle_a_b_a(self, resolver: Resolver) -> None:
+    async def test_two_fixture_cycle_a_b_a(self, resolver: FixtureContainer) -> None:
         """Given A → B → A cycle, when resolving A, then CircularDependencyError shows full path."""
 
         def fixture_a() -> str:
@@ -846,7 +847,7 @@ class TestCircularDependencyDetection:
                 await resolver.resolve(fixture_a)
 
     @pytest.mark.asyncio
-    async def test_three_fixture_cycle_a_b_c_a(self, resolver: Resolver) -> None:
+    async def test_three_fixture_cycle_a_b_c_a(self, resolver: FixtureContainer) -> None:
         """Given A → B → C → A cycle, when resolving A, then CircularDependencyError shows full chain."""
 
         def fixture_a() -> str:
@@ -873,7 +874,7 @@ class TestCircularDependencyDetection:
                 await resolver.resolve(fixture_a)
 
     @pytest.mark.asyncio
-    async def test_diamond_dependency_no_cycle(self, resolver: Resolver) -> None:
+    async def test_diamond_dependency_no_cycle(self, resolver: FixtureContainer) -> None:
         """Given a diamond (A→B, A→C, B→D, C→D), when resolving, then no cycle error."""
 
         def fixture_d() -> str:
@@ -908,7 +909,7 @@ class TestTypeHintEdgeCases:
     """Tests for edge cases in type hint resolution."""
 
     def test_fixture_with_failing_type_hints_still_works(
-        self, resolver: Resolver
+        self, resolver: FixtureContainer
     ) -> None:
         """When get_type_hints() fails, fixture registration proceeds without deps.
 
@@ -935,7 +936,7 @@ class TestSameScopeDependency:
     """Tests for fixtures depending on fixtures in the same scope."""
 
     def test_suite_fixture_can_depend_on_suite_fixture(
-        self, resolver: Resolver
+        self, resolver: FixtureContainer
     ) -> None:
         """Suite-scoped fixture can depend on another suite-scoped fixture."""
 
@@ -957,7 +958,7 @@ class TestSameScopeDependency:
 
     @pytest.mark.asyncio
     async def test_same_scope_fixtures_resolve_correctly(
-        self, resolver: Resolver
+        self, resolver: FixtureContainer
     ) -> None:
         """Suite-scoped fixtures resolve and cache correctly."""
 

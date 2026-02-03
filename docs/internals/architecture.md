@@ -22,7 +22,7 @@ ProTest follows a Ports & Adapters (hexagonal) architecture, separating the doma
                          ▼
 ┌─────────────────────────────────────────────────────────┐
 │                      Domain                             │
-│  ProTestSession  TestRunner  Collector  Resolver        │
+│  ProTestSession  TestRunner  Collector  FixtureContainer        │
 │  ProTestSuite    EventBus                               │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -37,7 +37,7 @@ The core test execution logic, independent of how tests are discovered or result
 | `ProTestSuite` | `core/suite.py` | Test grouping |
 | `TestRunner` | `core/runner.py` | Test execution |
 | `Collector` | `core/collector.py` | Test discovery |
-| `Resolver` | `di/resolver.py` | Fixture resolution |
+| `FixtureContainer` | `di/container.py` | Fixture resolution |
 | `EventBus` | `events/bus.py` | Event dispatching |
 
 ## Ports Layer (`protest/api.py`)
@@ -110,7 +110,7 @@ Custom extensions that hook into the event bus:
 ```
 protest/
 ├── core/           # Domain: Session, Suite, Runner, Collector
-├── di/             # Domain: Resolver, Markers (Use), Validation
+├── di/             # Domain: FixtureContainer, Markers (Use), Validation
 ├── entities/       # Domain: Dataclasses (Fixture, TestItem, TestResult)
 ├── events/         # Domain: Event bus
 ├── execution/      # Domain: AsyncBridge, Capture, Context

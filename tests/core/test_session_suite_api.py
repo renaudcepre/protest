@@ -6,9 +6,9 @@ from typing import Annotated
 import pytest
 
 from protest import ProTestSession, ProTestSuite, Use
-from protest.entities import SuitePath
 from protest.core.runner import TestRunner
 from protest.di.decorators import factory, fixture
+from protest.entities import SuitePath
 from protest.exceptions import PlainFunctionError
 from protest.execution.context import TestExecutionContext
 

@@ -8,7 +8,7 @@ from inspect import signature
 from typing import TYPE_CHECKING, Any, get_type_hints
 
 from protest.core.outcome import OutcomeBuilder, TestExecutionResult
-from protest.di.resolver import Resolver
+from protest.di.container import FixtureContainer
 from protest.entities import (
     TestItem,
     TestOutcome,
@@ -203,7 +203,7 @@ class TestExecutor:
             if param_name in kwargs:
                 continue
             resolved_annotation = type_hints.get(param_name, param.annotation)
-            if dependency := Resolver._extract_dependency_from_annotation(
+            if dependency := FixtureContainer._extract_dependency_from_annotation(
                 resolved_annotation
             ):
                 kwargs[param_name] = await ctx.resolve(dependency)
