@@ -25,7 +25,7 @@ class _WorkerContext:
     queue: asyncio.Queue[TestItem | None]
     semaphores: dict[SuitePath | None, asyncio.Semaphore]
     tracker: SuiteTracker
-    stop_flag: asyncio.Event | None
+    exitfirst_flag: asyncio.Event | None
     results: list[TestOutcome] = field(default_factory=list)
     results_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
@@ -88,7 +88,7 @@ class ParallelExecutor:
             for _ in range(self._session.concurrency)
         ]
 
-        await self._wait_with_interrupt(worker_tasks, ctx.stop_flag)
+        await self._wait_with_interrupt(worker_tasks, ctx.exitfirst_flag)
         return _aggregate_results(ctx.results)
 
     async def _create_context(
@@ -108,13 +108,13 @@ class ParallelExecutor:
             queue=queue,
             semaphores=suite_semaphores,
             tracker=tracker,
-            stop_flag=asyncio.Event() if self._session.exitfirst else None,
+            exitfirst_flag=asyncio.Event() if self._session.exitfirst else None,
         )
 
     async def _process_queue(self, ctx: _WorkerContext) -> None:
         """Process tests from the queue in FIFO order."""
         while True:
-            if self._should_stop(ctx.stop_flag):
+            if self._should_stop(ctx.exitfirst_flag):
                 return
 
             test_item = await ctx.queue.get()
@@ -123,28 +123,28 @@ class ParallelExecutor:
                 return
 
             try:
-                outcome = await self._process_test_item(test_item, ctx)
-                if outcome:
+                if outcome := await self._process_test_item(test_item, ctx):
                     async with ctx.results_lock:
                         ctx.results.append(outcome)
-                    if ctx.stop_flag and (
+                    if ctx.exitfirst_flag and (
                         outcome.counts.failed or outcome.counts.errored
                     ):
-                        ctx.stop_flag.set()
+                        ctx.exitfirst_flag.set()
             finally:
                 ctx.queue.task_done()
 
-    def _should_stop(self, stop_flag: asyncio.Event | None) -> bool:
+    def _should_stop(self, exitfirst_flag: asyncio.Event | None) -> bool:
         """Check if execution should stop (interrupt or exitfirst)."""
-        return self._interrupt_handler.soft_stop_event.is_set() or bool(
-            stop_flag and stop_flag.is_set()
+        return (
+            self._interrupt_handler.soft_stop_event.is_set()
+            or (exitfirst_flag is not None and exitfirst_flag.is_set())
         )
 
     async def _process_test_item(
         self, item: TestItem, ctx: _WorkerContext
     ) -> TestOutcome | None:
         """Process a single test item. Returns None if interrupted."""
-        if self._should_stop(ctx.stop_flag):
+        if self._should_stop(ctx.exitfirst_flag):
             return None
 
         suite_path = item.suite.full_path if item.suite else None
@@ -158,7 +158,7 @@ class ParallelExecutor:
         )
         await self._session.events.emit(Event.TEST_START, start_info)
 
-        if self._should_stop(ctx.stop_flag):
+        if self._should_stop(ctx.exitfirst_flag):
             return None
 
         outcome = await self._execute_with_semaphore(item, start_info, suite_sem, ctx)
@@ -180,7 +180,7 @@ class ParallelExecutor:
         """Execute test, optionally within suite semaphore."""
         if suite_sem:
             async with suite_sem:
-                if self._should_stop(ctx.stop_flag):
+                if self._should_stop(ctx.exitfirst_flag):
                     return TestOutcome(
                         event=Event.TEST_SKIP,
                         result=None,  # type: ignore[arg-type]
@@ -192,7 +192,7 @@ class ParallelExecutor:
     async def _wait_with_interrupt(
         self,
         worker_tasks: list[asyncio.Task[None]],
-        stop_flag: asyncio.Event | None = None,
+        exitfirst_flag: asyncio.Event | None = None,
     ) -> None:
         """Wait for workers to complete with interrupt and exitfirst support."""
 
@@ -207,8 +207,8 @@ class ParallelExecutor:
         wait_tasks: set[asyncio.Task[Any]] = {workers_done, force_teardown}
         exitfirst_task: asyncio.Task[Any] | None = None
 
-        if stop_flag:
-            exitfirst_task = asyncio.create_task(stop_flag.wait())
+        if exitfirst_flag:
+            exitfirst_task = asyncio.create_task(exitfirst_flag.wait())
             wait_tasks.add(exitfirst_task)
 
         done, _ = await asyncio.wait(wait_tasks, return_when=asyncio.FIRST_COMPLETED)
