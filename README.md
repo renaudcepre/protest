@@ -466,7 +466,7 @@ session.use(SlackNotifier())
 - `on_session_start()` - Before any test runs
 - `on_session_end(result)` - Tests done, async handlers can start
 - `on_session_complete(result)` - All async handlers finished
-- `on_suite_start(name)` / `on_suite_end(name)`
+- `on_suite_start(info)` / `on_suite_end(result)`
 - `on_test_pass(result)` / `on_test_fail(result)`
 
 ### Cache Plugin (Built-in)

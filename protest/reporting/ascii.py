@@ -10,6 +10,7 @@ from protest.entities import (
     SuitePath,
     SuiteResult,
     SuiteSetupInfo,
+    SuiteStartInfo,
     TestItem,
     TestResult,
     TestRetryInfo,
@@ -103,9 +104,9 @@ class AsciiReporter(PluginBase):
                 f"  session teardown done ({_format_duration(result.teardown_duration)})"
             )
 
-    def on_suite_start(self, path: SuitePath) -> None:
+    def on_suite_start(self, info: SuiteStartInfo) -> None:
         if not self._is_parallel:
-            print(f"[] {path}")
+            print(f"[] {info.name}")
 
     def on_test_retry(self, info: TestRetryInfo) -> None:
         delay_msg = f", retrying in {info.delay}s" if info.delay > 0 else ""

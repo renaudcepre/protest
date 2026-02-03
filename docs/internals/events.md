@@ -18,7 +18,7 @@ All events emitted during test execution. Events are defined in `protest/events/
 
 | Event                  | Data               | When                                   |
 |------------------------|--------------------|----------------------------------------|
-| `SUITE_START`          | `str` (suite_path) | Before suite's first test              |
+| `SUITE_START`          | `SuiteStartInfo`   | Before suite's first test              |
 | `SUITE_SETUP_DONE`     | `SuiteSetupInfo`   | After suite fixtures resolved          |
 | `SUITE_TEARDOWN_START` | `str` (suite_path) | Before suite fixture teardown          |
 | `SUITE_END`            | `SuiteResult`      | After teardown complete                |

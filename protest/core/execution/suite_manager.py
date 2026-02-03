@@ -6,7 +6,7 @@ import asyncio
 import time
 from typing import TYPE_CHECKING
 
-from protest.entities import SuitePath, SuiteResult, SuiteSetupInfo
+from protest.entities import SuitePath, SuiteResult, SuiteSetupInfo, SuiteStartInfo
 from protest.events.types import Event
 from protest.execution.capture import (
     set_session_setup_capture,
@@ -49,7 +49,9 @@ class SuiteManager:
                 if ancestor in self._started_suites:
                     continue
                 self._suite_start_times[ancestor] = time.perf_counter()
-                await self._session.events.emit(Event.SUITE_START, ancestor)
+                await self._session.events.emit(
+                    Event.SUITE_START, SuiteStartInfo(name=ancestor)
+                )
                 suite_setup_start = time.perf_counter()
                 set_session_setup_capture(True)
                 try:

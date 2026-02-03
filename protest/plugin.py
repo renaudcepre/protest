@@ -16,6 +16,7 @@ if TYPE_CHECKING:
         SuitePath,
         SuiteResult,
         SuiteSetupInfo,
+        SuiteStartInfo,
         TestItem,
         TestResult,
         TestRetryInfo,
@@ -129,7 +130,7 @@ class PluginBase:
     # Suite lifecycle
     # ─────────────────────────────────────────────────────────────────────
 
-    def on_suite_start(self, path: SuitePath) -> None | Awaitable[None]:
+    def on_suite_start(self, info: SuiteStartInfo) -> None | Awaitable[None]:
         """Suite begins (before fixture setup)."""
 
     def on_suite_setup_done(self, info: SuiteSetupInfo) -> None | Awaitable[None]:
