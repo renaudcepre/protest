@@ -6,7 +6,15 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from protest.entities import SuitePath, TestCounts, TestItem, TestOutcome, TestStartInfo
+from protest.core.collector import get_transitive_fixtures
+from protest.entities import (
+    FixtureCallable,
+    SuitePath,
+    TestCounts,
+    TestItem,
+    TestOutcome,
+    TestStartInfo,
+)
 from protest.events.types import Event
 from protest.utils import get_callable_name
 
@@ -23,7 +31,8 @@ class _ParallelExecutionState:
     """Shared state for worker coroutines during a single parallel run."""
 
     queue: asyncio.Queue[TestItem | None]
-    semaphores: dict[SuitePath | None, asyncio.Semaphore]
+    suite_semaphores: dict[SuitePath | None, asyncio.Semaphore]
+    fixture_semaphores: dict[FixtureCallable, asyncio.Semaphore]
     tracker: SuiteTracker
     exitfirst_flag: asyncio.Event | None
     results: list[TestOutcome] = field(default_factory=list)
@@ -71,6 +80,31 @@ class ParallelExecutor:
 
         return semaphores
 
+    def build_fixture_semaphores(
+        self, items: list[TestItem]
+    ) -> dict[FixtureCallable, asyncio.Semaphore]:
+        """Build per-fixture semaphores for max_concurrency.
+
+        Fixtures with max_concurrency limit how many tests can USE them
+        concurrently, regardless of scope (the fixture may have 1 instance
+        but only N tests can access it at once).
+        """
+        semaphores: dict[FixtureCallable, asyncio.Semaphore] = {}
+        seen_fixtures: set[FixtureCallable] = set()
+
+        for item in items:
+            for fixture_func in get_transitive_fixtures(item.func):
+                if fixture_func in seen_fixtures:
+                    continue
+                seen_fixtures.add(fixture_func)
+
+                max_conc = self._session.resolver.get_max_concurrency(fixture_func)
+                if max_conc:
+                    effective = min(max_conc, self._session.concurrency)
+                    semaphores[fixture_func] = asyncio.Semaphore(effective)
+
+        return semaphores
+
     async def run(
         self,
         items: list[TestItem],
@@ -81,7 +115,10 @@ class ParallelExecutor:
         if not items:
             return TestCounts()
 
-        ctx = await self._create_context(items, suite_semaphores, tracker)
+        fixture_semaphores = self.build_fixture_semaphores(items)
+        ctx = await self._create_context(
+            items, suite_semaphores, fixture_semaphores, tracker
+        )
         worker_tasks = [
             asyncio.create_task(self._process_queue(ctx))
             for _ in range(self._session.concurrency)
@@ -94,6 +131,7 @@ class ParallelExecutor:
         self,
         items: list[TestItem],
         suite_semaphores: dict[SuitePath | None, asyncio.Semaphore],
+        fixture_semaphores: dict[FixtureCallable, asyncio.Semaphore],
         tracker: SuiteTracker,
     ) -> _ParallelExecutionState:
         """Create and populate worker context with work queue."""
@@ -105,7 +143,8 @@ class ParallelExecutor:
 
         return _ParallelExecutionState(
             queue=queue,
-            semaphores=suite_semaphores,
+            suite_semaphores=suite_semaphores,
+            fixture_semaphores=fixture_semaphores,
             tracker=tracker,
             exitfirst_flag=asyncio.Event() if self._session.exitfirst else None,
         )
@@ -145,7 +184,7 @@ class ParallelExecutor:
             return None
 
         suite_path = item.suite.full_path if item.suite else None
-        suite_sem = ctx.semaphores.get(suite_path)
+        suite_sem = ctx.suite_semaphores.get(suite_path)
 
         if suite_path:
             await self._suite_manager.ensure_hierarchy_started(suite_path)
@@ -158,7 +197,9 @@ class ParallelExecutor:
         if self._should_stop(ctx.exitfirst_flag):
             return None
 
-        outcome = await self._execute_with_semaphore(item, start_info, suite_sem, ctx)
+        outcome = await self._execute_with_semaphore(
+            item, start_info, suite_sem, ctx.fixture_semaphores, ctx
+        )
 
         if suite_path and await ctx.tracker.mark_completed(suite_path):
             await self._suite_manager.teardown(suite_path)
@@ -172,6 +213,7 @@ class ParallelExecutor:
         item: TestItem,
         start_info: TestStartInfo,
         suite_sem: asyncio.Semaphore | None,
+        fixture_semaphores: dict[FixtureCallable, asyncio.Semaphore],
         ctx: _ParallelExecutionState,
     ) -> TestOutcome:
         """Execute test, optionally within suite semaphore."""
@@ -183,8 +225,10 @@ class ParallelExecutor:
                         result=None,  # type: ignore[arg-type]
                         counts=TestCounts(),
                     )
-                return await self._test_executor.execute(item, start_info)
-        return await self._test_executor.execute(item, start_info)
+                return await self._test_executor.execute(
+                    item, start_info, fixture_semaphores
+                )
+        return await self._test_executor.execute(item, start_info, fixture_semaphores)
 
     async def _wait_with_interrupt(
         self,

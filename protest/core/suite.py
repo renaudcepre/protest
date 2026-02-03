@@ -21,7 +21,7 @@ from protest.entities import (
     normalize_skip,
     normalize_xfail,
 )
-from protest.exceptions import ConcurrencyMismatchError
+from protest.exceptions import ConcurrencyMismatchError, InvalidMaxConcurrencyError
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
 
@@ -49,6 +49,9 @@ class ProTestSuite:
         tags: list[str] | None = None,
         description: str | None = None,
     ) -> None:
+        if max_concurrency is not None and max_concurrency < 1:
+            raise InvalidMaxConcurrencyError(max_concurrency)
+
         self._name = name
         self._description = description
         self._session: ProTestSession | None = None
@@ -207,6 +210,7 @@ class ProTestSuite:
             managed=marker.managed,
             tags=set(marker.tags),
             autouse=autouse,
+            max_concurrency=marker.max_concurrency,
         )
         self._fixtures.append(registration)
 

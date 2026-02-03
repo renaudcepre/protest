@@ -141,6 +141,100 @@ async def test_query(db: Annotated[Database, Use(db)]):
 
 This works transitively: if fixture A depends on fixture B with tag "x", tests using A also get tag "x".
 
+## Limiting Concurrent Access with max_concurrency
+
+Some fixtures wrap resources that have limited concurrent access:
+- Rate-limited APIs (e.g., max 2 requests/second)
+- Connection pools with fixed capacity
+- License-restricted resources
+
+Use `max_concurrency` to limit how many tests can **use** the fixture simultaneously:
+
+```python
+@fixture(max_concurrency=2)
+async def api_client():
+    """API allowing max 2 concurrent requests."""
+    client = await connect_to_api()
+    yield client
+    await client.close()
+
+session.bind(api_client)
+```
+
+With 10 parallel workers and 6 tests, normally all 6 might run at once. With `max_concurrency=2`, only 2 tests can access the fixture simultaneously - others wait for a slot.
+
+### Key Concept: Access vs. Instances
+
+`max_concurrency` limits **concurrent access**, not the number of instances:
+
+- A SESSION-scoped fixture with `max_concurrency=2` has **1 instance** but only **2 tests can use it at once**
+- Scope determines how many instances; `max_concurrency` determines concurrent usage
+
+### Interaction with Suite max_concurrency
+
+Both limits apply. The effective limit is the minimum:
+
+```python
+@fixture(max_concurrency=5)
+async def wide_api():
+    yield api
+
+# Suite limits to 2 concurrent tests
+suite = ProTestSuite("narrow", max_concurrency=2)
+suite.bind(wide_api)
+
+# Tests limited to 2 (suite limit), even though fixture allows 5
+```
+
+### Interaction with Session Concurrency
+
+Session concurrency also caps the effective limit:
+
+```python
+session = ProTestSession(concurrency=3)
+
+@fixture(max_concurrency=10)
+async def api():
+    yield client
+
+# Effective max_concurrency = min(10, 3) = 3
+```
+
+### Transitive Dependencies
+
+`max_concurrency` is respected **transitively**. If your test uses a service that depends on a rate-limited API, the limit applies even though you don't use the API directly:
+
+```python
+@fixture(max_concurrency=2)
+async def rate_limited_api():
+    """Only 2 concurrent requests allowed."""
+    yield ApiClient()
+
+@fixture()
+async def user_service(api: Annotated[ApiClient, Use(rate_limited_api)]):
+    """Service that uses the rate-limited API."""
+    yield UserService(api)
+
+# This test respects rate_limited_api's limit, even though it only
+# uses user_service directly. Max 2 tests can run concurrently.
+@suite.test()
+async def test_users(svc: Annotated[UserService, Use(user_service)]):
+    await svc.get_user(1)
+```
+
+This works for any depth of dependencies and handles diamond patterns (multiple paths to the same fixture).
+
+### When to Use
+
+Use `max_concurrency` when the fixture wraps a resource with inherent concurrency limits:
+
+- External APIs with rate limiting
+- Database connection pools
+- Shared test infrastructure with capacity limits
+- License-restricted services
+
+Don't use it for general test isolation - use suite `max_concurrency` for that.
+
 ## Autouse Fixtures
 
 Autouse fixtures are automatically resolved at their scope start, without being explicitly requested by tests. The `autouse=True` flag is passed to `bind()`.

@@ -29,6 +29,39 @@ def _extract_use_fixtures(func: Callable[..., Any]) -> list[FixtureCallable]:
     return fixtures
 
 
+def get_transitive_fixtures(
+    func: Callable[..., Any],
+    visited: set[FixtureCallable] | None = None,
+) -> set[FixtureCallable]:
+    """Get all fixtures (direct + transitive) used by a function.
+
+    Recursively follows Use() markers to collect all fixtures in the
+    dependency chain. Handles cycles via visited set.
+
+    Args:
+        func: The function to analyze (test or fixture).
+        visited: Set of already-visited fixtures (for cycle prevention).
+
+    Returns:
+        Set of all fixture functions used directly or transitively.
+    """
+    if visited is None:
+        visited = set()
+
+    result: set[FixtureCallable] = set()
+    direct = _extract_use_fixtures(func)
+
+    for fixture_func in direct:
+        if fixture_func in visited:
+            continue
+        visited.add(fixture_func)
+        result.add(fixture_func)
+        # Recursively get fixtures used by this fixture
+        result.update(get_transitive_fixtures(fixture_func, visited))
+
+    return result
+
+
 class Collector:
     """Collects tests from a session, recursively traversing nested suites."""
 
