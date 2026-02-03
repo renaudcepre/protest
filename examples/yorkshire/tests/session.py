@@ -9,6 +9,7 @@ Structure:
 - Legacy suite (sync-only, sequential)
 - Showcase suite (ForEach, mocker, caplog, raises, Retry)
 - RateLimited suite (fixture max_concurrency demo)
+- CustomFactory suite (@factory(managed=False) demo)
 """
 
 from examples.yorkshire.tests.fixtures import (
@@ -17,6 +18,7 @@ from examples.yorkshire.tests.fixtures import (
     yorkshire,
 )
 from examples.yorkshire.tests.suites.adults import adults_suite
+from examples.yorkshire.tests.suites.custom_factory import custom_factory_suite
 from examples.yorkshire.tests.suites.legacy.suite import legacy_suite
 from examples.yorkshire.tests.suites.puppies.suite import puppies_suite
 from examples.yorkshire.tests.suites.rate_limited import rate_limited_suite
@@ -38,3 +40,4 @@ session.add_suite(seniors_suite)
 session.add_suite(legacy_suite)
 session.add_suite(showcase_suite)
 session.add_suite(rate_limited_suite)  # Demonstrates fixture max_concurrency
+session.add_suite(custom_factory_suite)  # Demonstrates @factory(managed=False)
