@@ -27,7 +27,9 @@ class TestExecutionContext:
     all resolution logic.
     """
 
-    def __init__(self, parent: FixtureContainer, suite_path: SuitePath | None = None) -> None:
+    def __init__(
+        self, parent: FixtureContainer, suite_path: SuitePath | None = None
+    ) -> None:
         self._parent = parent
         self._suite_path = suite_path
         self._cache: dict[FixtureCallable, Any] = {}

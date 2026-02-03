@@ -133,9 +133,8 @@ class ParallelExecutor:
 
     def _should_stop(self, exitfirst_flag: asyncio.Event | None) -> bool:
         """Check if execution should stop (interrupt or exitfirst)."""
-        return (
-            self._interrupt_handler.soft_stop_event.is_set()
-            or (exitfirst_flag is not None and exitfirst_flag.is_set())
+        return self._interrupt_handler.soft_stop_event.is_set() or (
+            exitfirst_flag is not None and exitfirst_flag.is_set()
         )
 
     async def _process_test_item(

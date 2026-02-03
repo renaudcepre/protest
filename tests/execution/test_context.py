@@ -219,7 +219,9 @@ class TestSuiteScopeDelegation:
     """SUITE-scoped fixtures should delegate to parent resolver."""
 
     @pytest.mark.asyncio
-    async def test_suite_fixture_shared_within_suite(self, resolver: FixtureContainer) -> None:
+    async def test_suite_fixture_shared_within_suite(
+        self, resolver: FixtureContainer
+    ) -> None:
         """SUITE fixtures are resolved by parent and shared within suite."""
         call_count = 0
 

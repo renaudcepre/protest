@@ -231,7 +231,9 @@ async def test_multiple_generator_fixtures_teardown_in_reverse_order(
 
 
 @pytest.mark.asyncio
-async def test_generator_fixture_teardown_on_exception(resolver: FixtureContainer) -> None:
+async def test_generator_fixture_teardown_on_exception(
+    resolver: FixtureContainer,
+) -> None:
     resolver.register(generator_session_fixture, scope=FixtureScope.SESSION)
 
     with pytest.raises(ValueError, match="test exception"):
@@ -359,7 +361,9 @@ async def test_decorated_function_auto_registered_and_resolved(
 
 
 @pytest.mark.asyncio
-async def test_fixture_error_during_setup_propagates(resolver: FixtureContainer) -> None:
+async def test_fixture_error_during_setup_propagates(
+    resolver: FixtureContainer,
+) -> None:
     """Test that errors during fixture setup are propagated correctly."""
 
     @fixture()
@@ -443,7 +447,9 @@ async def test_suite_scope_not_cached_across_suites(resolver: FixtureContainer) 
 
 
 @pytest.mark.asyncio
-async def test_suite_fixture_can_depend_on_session_fixture(resolver: FixtureContainer) -> None:
+async def test_suite_fixture_can_depend_on_session_fixture(
+    resolver: FixtureContainer,
+) -> None:
     """Suite-scoped fixture can depend on session-scoped fixture."""
 
     def session_fixture() -> str:
@@ -603,7 +609,9 @@ class TestTransitiveTags:
         tags = resolver.get_transitive_tags(fixture_c)
         assert tags == {"level1", "level2", "level3"}
 
-    def test_get_transitive_tags_diamond_pattern(self, resolver: FixtureContainer) -> None:
+    def test_get_transitive_tags_diamond_pattern(
+        self, resolver: FixtureContainer
+    ) -> None:
         """Diamond dependency: A→B→D and A→C→D collects D's tags once.
 
         This test covers the `if actual_func in visited: return set()` branch
@@ -687,7 +695,9 @@ class TestAsyncGeneratorFixtures:
         assert teardown_counts["async_gen_teardown"] == 1
 
     @pytest.mark.asyncio
-    async def test_async_generator_with_dependency(self, resolver: FixtureContainer) -> None:
+    async def test_async_generator_with_dependency(
+        self, resolver: FixtureContainer
+    ) -> None:
         resolver.register(session_dependency, scope=FixtureScope.SESSION)
 
         async def async_gen_with_dep(
@@ -757,7 +767,9 @@ class TestAutouseWithWrapper:
         assert resolver.is_autouse(regular_fixture) is False
 
     @pytest.mark.asyncio
-    async def test_autouse_valid_for_test_scope(self, resolver: FixtureContainer) -> None:
+    async def test_autouse_valid_for_test_scope(
+        self, resolver: FixtureContainer
+    ) -> None:
         """TEST-scoped autouse fixtures are resolved via resolve_test_autouse."""
         call_count = 0
 
@@ -787,7 +799,9 @@ class TestAutouseWithWrapper:
 
 class TestTeardownEdgeCases:
     @pytest.mark.asyncio
-    async def test_teardown_nonexistent_path_is_safe(self, resolver: FixtureContainer) -> None:
+    async def test_teardown_nonexistent_path_is_safe(
+        self, resolver: FixtureContainer
+    ) -> None:
         async with resolver:
             await resolver.teardown_path("NonExistent")
 
@@ -812,7 +826,9 @@ class TestTeardownEdgeCases:
 
 class TestCircularDependencyDetection:
     @pytest.mark.asyncio
-    async def test_direct_cycle_a_depends_on_a(self, resolver: FixtureContainer) -> None:
+    async def test_direct_cycle_a_depends_on_a(
+        self, resolver: FixtureContainer
+    ) -> None:
         """Given A depends on itself, when resolving A, then CircularDependencyError is raised."""
 
         def fixture_a() -> str:
@@ -847,7 +863,9 @@ class TestCircularDependencyDetection:
                 await resolver.resolve(fixture_a)
 
     @pytest.mark.asyncio
-    async def test_three_fixture_cycle_a_b_c_a(self, resolver: FixtureContainer) -> None:
+    async def test_three_fixture_cycle_a_b_c_a(
+        self, resolver: FixtureContainer
+    ) -> None:
         """Given A → B → C → A cycle, when resolving A, then CircularDependencyError shows full chain."""
 
         def fixture_a() -> str:
@@ -874,7 +892,9 @@ class TestCircularDependencyDetection:
                 await resolver.resolve(fixture_a)
 
     @pytest.mark.asyncio
-    async def test_diamond_dependency_no_cycle(self, resolver: FixtureContainer) -> None:
+    async def test_diamond_dependency_no_cycle(
+        self, resolver: FixtureContainer
+    ) -> None:
         """Given a diamond (A→B, A→C, B→D, C→D), when resolving, then no cycle error."""
 
         def fixture_d() -> str:
