@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import time
+import warnings
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager, suppress
 from inspect import signature
 from typing import (
@@ -93,6 +94,7 @@ class FixtureContainer:
         tags: set[str] | None = None,
         autouse: bool = False,
         suite_path: SuitePath | None = None,
+        max_concurrency: int | None = None,
     ) -> None:
         """Register a fixture with a specific scope.
 
@@ -110,9 +112,20 @@ class FixtureContainer:
             autouse: Whether this fixture should be auto-resolved at scope start.
             suite_path: For SUITE scope, the path of the suite that owns this fixture.
                        Tests in this suite or child suites can access the fixture.
+            max_concurrency: Maximum number of tests that can use this fixture
+                            simultaneously. None means unlimited.
         """
         if func in self._registry:
             raise AlreadyRegisteredError(get_callable_name(func))
+
+        if max_concurrency is not None and scope == FixtureScope.TEST:
+            warnings.warn(
+                f"Fixture '{get_callable_name(func)}' has max_concurrency={max_concurrency} "
+                f"with TEST scope. This has no effect since TEST-scoped fixtures "
+                f"create a fresh instance per test. Consider using SESSION or SUITE scope.",
+                UserWarning,
+                stacklevel=3,
+            )
 
         fixture = Fixture(
             func,
@@ -120,6 +133,7 @@ class FixtureContainer:
             cache=cache,
             managed=managed,
             tags=tags or set(),
+            max_concurrency=max_concurrency,
         )
         self._scopes[func] = scope
         if scope == FixtureScope.SUITE and suite_path is not None:
@@ -161,6 +175,12 @@ class FixtureContainer:
         actual_func = unwrap_fixture(func)
         fixture = self._registry.get(actual_func)
         return fixture.tags.copy() if fixture else set()
+
+    def get_max_concurrency(self, func: FixtureCallable) -> int | None:
+        """Get max_concurrency for a fixture, or None if unlimited."""
+        actual_func = unwrap_fixture(func)
+        fixture = self._registry.get(actual_func)
+        return fixture.max_concurrency if fixture else None
 
     def get_transitive_tags(self, func: FixtureCallable) -> set[str]:
         """Get all tags from a fixture and its dependencies (transitive)."""
@@ -221,6 +241,7 @@ class FixtureContainer:
                         managed=marker.managed,
                         tags=set(marker.tags),
                         autouse=False,  # TEST scope can't have autouse at session/suite level
+                        max_concurrency=marker.max_concurrency,
                     )
                 else:
                     # Legacy: use FixtureRegistration
@@ -233,6 +254,7 @@ class FixtureContainer:
                         managed=reg.managed,
                         tags=reg.tags,
                         autouse=False,
+                        max_concurrency=reg.max_concurrency,
                     )
             return self._registry[actual_func]
 
@@ -249,6 +271,7 @@ class FixtureContainer:
                     managed=marker.managed,
                     tags=set(marker.tags),
                     autouse=False,
+                    max_concurrency=marker.max_concurrency,
                 )
             if func in self._registry:
                 return self._registry[func]

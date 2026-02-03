@@ -5,6 +5,7 @@ from protest.core.session import ProTestSession
 from protest.core.suite import ProTestSuite
 from protest.entities import SessionResult, TestResult
 from protest.events.types import Event
+from protest.exceptions import InvalidMaxConcurrencyError
 from protest.plugin import PluginBase, PluginContext
 
 
@@ -140,14 +141,29 @@ class TestSessionConcurrency:
         session = ProTestSession(concurrency=4)
         assert session.concurrency == 4
 
-    def test_concurrency_setter_enforces_minimum(self) -> None:
-        """Concurrency setter enforces minimum of 1."""
-        session = ProTestSession()
-        session.concurrency = 0
-        assert session.concurrency == 1
+    def test_constructor_rejects_zero_concurrency(self) -> None:
+        """ProTestSession(concurrency=0) raises InvalidMaxConcurrencyError."""
+        with pytest.raises(InvalidMaxConcurrencyError):
+            ProTestSession(concurrency=0)
 
-        session.concurrency = -5
-        assert session.concurrency == 1
+    def test_constructor_rejects_negative_concurrency(self) -> None:
+        """ProTestSession(concurrency=-1) raises InvalidMaxConcurrencyError."""
+        with pytest.raises(InvalidMaxConcurrencyError):
+            ProTestSession(concurrency=-1)
+
+    def test_concurrency_setter_rejects_invalid_values(self) -> None:
+        """Concurrency setter rejects values < 1."""
+        session = ProTestSession()
+
+        with pytest.raises(InvalidMaxConcurrencyError):
+            session.concurrency = 0
+
+        with pytest.raises(InvalidMaxConcurrencyError):
+            session.concurrency = -5
+
+        # Valid value works
+        session.concurrency = 2
+        assert session.concurrency == 2
 
 
 class TestSuiteMaxConcurrency:
@@ -164,6 +180,16 @@ class TestSuiteMaxConcurrency:
 
         suite = ProTestSuite("test_suite", max_concurrency=2)
         assert suite.max_concurrency == 2
+
+    def test_suite_rejects_zero_max_concurrency(self) -> None:
+        """ProTestSuite(max_concurrency=0) raises InvalidMaxConcurrencyError."""
+        with pytest.raises(InvalidMaxConcurrencyError):
+            ProTestSuite("invalid", max_concurrency=0)
+
+    def test_suite_rejects_negative_max_concurrency(self) -> None:
+        """ProTestSuite(max_concurrency=-1) raises InvalidMaxConcurrencyError."""
+        with pytest.raises(InvalidMaxConcurrencyError):
+            ProTestSuite("invalid", max_concurrency=-1)
 
     def test_suite_max_concurrency_one_means_sequential(self) -> None:
         """Suite with max_concurrency=1 forces sequential execution."""

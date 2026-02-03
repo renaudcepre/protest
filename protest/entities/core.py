@@ -56,14 +56,15 @@ class FixtureMarker:
     """Marker attached to decorated fixture functions (_protest_fixture attribute).
 
     This enables the "Scope at Binding" pattern: decorators mark functions with
-    intrinsic properties (is_factory, cache, managed, tags). Scope and autouse
-    are determined at binding time via session.bind() or suite.bind().
+    intrinsic properties (is_factory, cache, managed, tags, max_concurrency).
+    Scope and autouse are determined at binding time via session.bind() or suite.bind().
     """
 
     is_factory: bool = False
     cache: bool = True
     managed: bool = True
     tags: frozenset[str] = field(default_factory=frozenset)
+    max_concurrency: int | None = None
 
 
 @dataclass(slots=True)
@@ -80,6 +81,7 @@ class FixtureRegistration:
     managed: bool = True
     tags: set[str] = field(default_factory=set)
     autouse: bool = False
+    max_concurrency: int | None = None
 
 
 @dataclass(slots=True)
@@ -91,6 +93,7 @@ class Fixture:
     tags: set[str] = field(default_factory=set)
     cached_value: Any = field(default=None, repr=False)
     is_cached: bool = False
+    max_concurrency: int | None = None
 
     def clear_cache(self) -> None:
         self.cached_value = None

@@ -28,6 +28,7 @@ from protest.entities import (
 )
 from protest.events.bus import EventBus
 from protest.events.types import Event
+from protest.exceptions import InvalidMaxConcurrencyError
 from protest.execution.capture import set_session_teardown_capture
 from protest.filters.keyword import KeywordFilterPlugin
 from protest.filters.suite import SuiteFilterPlugin
@@ -53,12 +54,15 @@ class ProTestSession:
     """
 
     def __init__(self, concurrency: int = 1) -> None:
+        if concurrency < 1:
+            raise InvalidMaxConcurrencyError(concurrency)
+
         self._events = EventBus()
         self._resolver = FixtureContainer(event_bus=self._events)
         self._suites: list[ProTestSuite] = []
         self._tests: list[TestRegistration] = []
         self._fixtures: list[FixtureRegistration] = []
-        self._concurrency = max(1, concurrency)
+        self._concurrency = concurrency
         self._autouse_fixtures: list[FixtureCallable] = []
         self._cache_storage = CacheStorage()
         self._plugin_classes: list[type[PluginBase]] = []
@@ -79,7 +83,9 @@ class ProTestSession:
 
     @concurrency.setter
     def concurrency(self, value: int) -> None:
-        self._concurrency = max(1, value)
+        if value < 1:
+            raise InvalidMaxConcurrencyError(value)
+        self._concurrency = value
 
     @property
     def exitfirst(self) -> bool:
@@ -217,6 +223,7 @@ class ProTestSession:
             managed=marker.managed,
             tags=set(marker.tags),
             autouse=autouse,
+            max_concurrency=marker.max_concurrency,
         )
         self._fixtures.append(registration)
 
@@ -295,6 +302,7 @@ class ProTestSession:
                 managed=fixture_reg.managed,
                 tags=fixture_reg.tags,
                 autouse=fixture_reg.autouse,
+                max_concurrency=fixture_reg.max_concurrency,
             )
             if fixture_reg.autouse:
                 self._autouse_fixtures.append(fixture_reg.func)
@@ -318,6 +326,7 @@ class ProTestSession:
                     tags=fixture_reg.tags,
                     autouse=fixture_reg.autouse,
                     suite_path=suite.full_path,
+                    max_concurrency=fixture_reg.max_concurrency,
                 )
             self._register_suite_fixtures(suite.suites)
 

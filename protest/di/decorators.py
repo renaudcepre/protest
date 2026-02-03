@@ -11,6 +11,7 @@ from typing import Any, Generic, TypeVar
 
 from protest.di.validation import validate_no_from_params
 from protest.entities import FixtureMarker, FixtureRegistration
+from protest.exceptions import InvalidMaxConcurrencyError
 
 FuncT = TypeVar("FuncT", bound=Callable[..., object])
 
@@ -44,6 +45,7 @@ def unwrap_fixture(func: Callable[..., Any]) -> Callable[..., Any]:
 
 def fixture(
     tags: list[str] | None = None,
+    max_concurrency: int | None = None,
 ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
     """Decorator to mark a function as a fixture.
 
@@ -54,6 +56,9 @@ def fixture(
 
     Args:
         tags: Tags for filtering tests that use this fixture.
+        max_concurrency: Maximum number of tests that can use this fixture
+            simultaneously. None means unlimited. Useful for rate-limited
+            resources like API clients or connection pools.
 
     Example:
         @fixture(tags=["database"])
@@ -64,14 +69,17 @@ def fixture(
 
         session.bind(database)  # SESSION scope
 
-        @fixture()
-        def request_id():
-            return str(uuid4())
-        # No binding → TEST scope (fresh per test)
+        @fixture(max_concurrency=2)
+        async def api_client():
+            # Only 2 tests can use this fixture at once
+            yield ApiClient()
     """
 
     def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
         validate_no_from_params(func)
+
+        if max_concurrency is not None and max_concurrency < 1:
+            raise InvalidMaxConcurrencyError(max_concurrency)
 
         # Create marker with intrinsic properties only
         marker = FixtureMarker(
@@ -79,6 +87,7 @@ def fixture(
             cache=True,
             managed=True,
             tags=frozenset(tags) if tags else frozenset(),
+            max_concurrency=max_concurrency,
         )
         # Attach marker to original function for discovery
         setattr(func, FIXTURE_MARKER_ATTR, marker)
@@ -90,6 +99,7 @@ def fixture(
             cache=True,
             managed=True,
             tags=set(tags) if tags else set(),
+            max_concurrency=max_concurrency,
         )
         return FixtureWrapper(func, registration)
 
@@ -100,6 +110,7 @@ def factory(
     cache: bool = False,
     managed: bool = True,
     tags: list[str] | None = None,
+    max_concurrency: int | None = None,
 ) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
     """Decorator to mark a function as a factory fixture.
 
@@ -113,6 +124,8 @@ def factory(
         managed: If True (default), wrap in FixtureFactory. If False, return as-is
                  (for custom factory classes).
         tags: Tags for filtering tests that use this factory.
+        max_concurrency: Maximum number of tests that can use this factory
+            simultaneously. None means unlimited.
 
     Example:
         @factory()
@@ -123,19 +136,17 @@ def factory(
 
         session.bind(user)  # SESSION scope
 
-        @factory(cache=True)
-        def payload(data: dict | None = None) -> dict:
-            return {"default": True, **(data or {})}
-        # No binding → TEST scope
-
-        # Non-managed factory class
-        @factory(managed=False)
-        def user_factory(db: Annotated[Session, Use(db_session)]) -> UserFactory:
-            return UserFactory(db=db)
+        @factory(cache=True, max_concurrency=5)
+        async def api_client(endpoint: str) -> ApiClient:
+            # Max 5 tests can use this factory at once
+            yield await ApiClient.connect(endpoint)
     """
 
     def decorator(func: FuncT) -> FixtureWrapper[FuncT]:
         validate_no_from_params(func)
+
+        if max_concurrency is not None and max_concurrency < 1:
+            raise InvalidMaxConcurrencyError(max_concurrency)
 
         # Create marker with intrinsic properties only
         marker = FixtureMarker(
@@ -143,6 +154,7 @@ def factory(
             cache=cache,
             managed=managed,
             tags=frozenset(tags) if tags else frozenset(),
+            max_concurrency=max_concurrency,
         )
         # Attach marker to original function for discovery
         setattr(func, FIXTURE_MARKER_ATTR, marker)
@@ -154,6 +166,7 @@ def factory(
             cache=cache,
             managed=managed,
             tags=set(tags) if tags else set(),
+            max_concurrency=max_concurrency,
         )
         return FixtureWrapper(func, registration)
 

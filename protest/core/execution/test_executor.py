@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import time
+from contextlib import AsyncExitStack, asynccontextmanager
 from inspect import signature
 from typing import TYPE_CHECKING, Any, get_type_hints
 
+from protest.core.collector import get_transitive_fixtures
 from protest.core.outcome import OutcomeBuilder, TestExecutionResult
 from protest.di.container import FixtureContainer
 from protest.entities import (
+    FixtureCallable,
     TestItem,
     TestOutcome,
     TestRetryInfo,
@@ -28,9 +31,17 @@ from protest.execution.context import TestExecutionContext
 
 if TYPE_CHECKING:
     import io
+    from collections.abc import AsyncIterator
 
     from protest.core.session import ProTestSession
     from protest.events.bus import EventBus
+
+
+@asynccontextmanager
+async def _semaphore_context(sem: asyncio.Semaphore) -> AsyncIterator[None]:
+    """Wrap a semaphore for use with AsyncExitStack.enter_async_context()."""
+    async with sem:
+        yield
 
 
 class TestExecutor:
@@ -46,14 +57,20 @@ class TestExecutor:
     def _events(self) -> EventBus:
         return self._session.events
 
-    async def execute(self, item: TestItem, start_info: TestStartInfo) -> TestOutcome:
+    async def execute(
+        self,
+        item: TestItem,
+        start_info: TestStartInfo,
+        fixture_semaphores: dict[FixtureCallable, asyncio.Semaphore] | None = None,
+    ) -> TestOutcome:
         """Execute a single test with capture and context."""
         await self._events.emit(Event.TEST_ACQUIRED, start_info)
         node_id_token = set_current_node_id(start_info.node_id)
         try:
-            async with TestExecutionContext(
-                self._session.resolver, item.suite_path
-            ) as ctx:
+            async with (
+                self._acquire_fixture_semaphores(item, fixture_semaphores),
+                TestExecutionContext(self._session.resolver, item.suite_path) as ctx,
+            ):
                 with CaptureCurrentTest() as buffer:
                     outcome = await self._run_test(item, ctx, buffer, start_info)
                 # Emit result AFTER capture (so reporter output goes to stdout)
@@ -216,3 +233,40 @@ class TestExecutor:
         retry_on: type[Exception] | tuple[type[Exception], ...] | None,
     ) -> bool:
         return retry_on is None or isinstance(error, retry_on)
+
+    @asynccontextmanager
+    async def _acquire_fixture_semaphores(
+        self,
+        item: TestItem,
+        fixture_semaphores: dict[FixtureCallable, asyncio.Semaphore] | None,
+    ) -> AsyncIterator[None]:
+        """Acquire fixture semaphores for rate-limited fixtures.
+
+        Semaphores are acquired in a deterministic order (sorted by id)
+        to prevent deadlocks when multiple tests compete for the same fixtures.
+        """
+        if not fixture_semaphores:
+            yield
+            return
+
+        # Get fixtures used by this test (including transitive dependencies)
+        test_fixtures = get_transitive_fixtures(item.func)
+
+        # Find which fixtures have semaphores (max_concurrency)
+        sems_to_acquire = [
+            (func, fixture_semaphores[func])
+            for func in test_fixtures
+            if func in fixture_semaphores
+        ]
+
+        if not sems_to_acquire:
+            yield
+            return
+
+        # Sort by id(func) to prevent deadlocks
+        sems_sorted = sorted(sems_to_acquire, key=lambda x: id(x[0]))
+
+        async with AsyncExitStack() as stack:
+            for _, sem in sems_sorted:
+                await stack.enter_async_context(_semaphore_context(sem))
+            yield

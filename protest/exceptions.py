@@ -83,3 +83,13 @@ class ConcurrencyMismatchError(ProTestError):
             f"which exceeds parent '{parent_name}' "
             f"(effective max_concurrency={parent_effective_concurrency})."
         )
+
+
+class InvalidMaxConcurrencyError(ProTestError):
+    """Raised when max_concurrency has an invalid value."""
+
+    def __init__(self, value: int):
+        super().__init__(
+            f"max_concurrency must be >= 1, got {value}. "
+            f"Use None for unlimited concurrency."
+        )
