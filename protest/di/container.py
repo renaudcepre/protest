@@ -9,10 +9,10 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    cast,
     get_args,
     get_origin,
     get_type_hints,
+    overload,
 )
 
 from protest.core.fixture import is_generator_like
@@ -186,7 +186,14 @@ class FixtureContainer:
 
         return tags
 
-    def _ensure_registered(self, func: FixtureCallable) -> Fixture:
+    @overload
+    def _ensure_registered(self, func: FixtureWrapper[FixtureCallable]) -> Fixture: ...
+    @overload
+    def _ensure_registered(self, func: FixtureCallable) -> Fixture: ...
+
+    def _ensure_registered(
+        self, func: FixtureCallable | FixtureWrapper[FixtureCallable]
+    ) -> Fixture:
         """Ensure a fixture is registered and return it.
 
         In the "Scope at Binding" pattern:
@@ -200,7 +207,7 @@ class FixtureContainer:
         - Unregistered plain functions: raises PlainFunctionError
         """
         if isinstance(func, FixtureWrapper):
-            actual_func = cast("FixtureCallable", func.func)
+            actual_func: FixtureCallable = func.func
 
             if actual_func not in self._registry:
                 # Unbound fixture → TEST scope by default
