@@ -188,7 +188,7 @@ def test_user(user: Annotated[User, Use(get_test_user)]):
 - **Explicit DI** - No guessing which fixture you're using
 - **Async native** - No plugin needed, just `async def`
 - **Parallel execution** - Built-in with `-n 4`
-- **Scoped fixtures** - `SESSION`, `SUITE`, `FUNCTION`
+- **Scoped fixtures** - `SESSION`, `SUITE`, `TEST`
 - **Mix sync/async** - They just work together
 - **Factory fixtures** - Return callables to create instances on-demand in tests
 - **Plugin system** - Extend with custom reporters, filters
@@ -456,7 +456,7 @@ class SlackNotifier(PluginBase):
             await send_slack_message(f"Failed: {self.failures}")
 
 
-session.use(SlackNotifier())
+session.use(SlackNotifier)  # Pass the class, not an instance
 ```
 
 **Available hooks:**
@@ -467,7 +467,7 @@ session.use(SlackNotifier())
 - `on_session_end(result)` - Tests done, async handlers can start
 - `on_session_complete(result)` - All async handlers finished
 - `on_suite_start(info)` / `on_suite_end(result)`
-- `on_test_pass(result)` / `on_test_fail(result)`
+- `on_test_pass(result)` / `on_test_fail(result)` / `on_test_skip(result)`
 
 ### Cache Plugin (Built-in)
 

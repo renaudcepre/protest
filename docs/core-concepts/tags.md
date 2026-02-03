@@ -176,11 +176,10 @@ protest tags list tests:session
 
 Output:
 ```
-Tags in tests:session:
-  api (3 tests)
-  database (12 tests)
-  integration (5 tests)
-  slow (2 tests)
+api
+database
+integration
+slow
 ```
 
 Show effective tags per test (including inherited):

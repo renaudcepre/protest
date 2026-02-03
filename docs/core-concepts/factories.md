@@ -57,18 +57,36 @@ api_suite.bind(user)
 # TEST scope (no binding) - fresh factory per test
 ```
 
-## Automatic Caching
+## Caching
 
-Same arguments return the same instance:
+By default, factories do **not** cache instances (`cache=False`). Each call creates a new instance:
 
 ```python
+@factory()  # cache=False by default
+def user(name: str):
+    yield User(name)
+
 @session.test()
-async def test_caching(user_factory: Annotated[FixtureFactory[dict], Use(user)]):
+async def test_no_cache(user_factory: Annotated[FixtureFactory, Use(user)]):
+    alice1 = await user_factory(name="alice")
+    alice2 = await user_factory(name="alice")
+    assert alice1 is not alice2  # Different instances!
+```
+
+To enable caching (same arguments return same instance), use `cache=True`:
+
+```python
+@factory(cache=True)
+def user(name: str):
+    yield User(name)
+
+@session.test()
+async def test_with_cache(user_factory: Annotated[FixtureFactory, Use(user)]):
     alice1 = await user_factory(name="alice")
     alice2 = await user_factory(name="alice")
     bob = await user_factory(name="bob")
 
-    assert alice1 is alice2  # Same instance (cached)
+    assert alice1 is alice2  # Same instance (cached by args)
     assert alice1 is not bob  # Different args = different instance
 ```
 

@@ -16,9 +16,7 @@ session = ProTestSession()
 
 ```python
 session = ProTestSession(
-    concurrency=4,              # Default parallelism (overridden by -n)
-    default_reporter=True,      # Use built-in Rich/ASCII reporter
-    default_cache=True,         # Enable --lf support
+    concurrency=4,  # Default parallelism (overridden by -n)
 )
 ```
 
