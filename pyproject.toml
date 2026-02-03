@@ -115,6 +115,9 @@ filterwarnings = [
     "ignore:cannot collect test class 'TestCacheEntry':pytest.PytestCollectionWarning",
     "ignore:cannot collect test class 'TestExecutionContext':pytest.PytestCollectionWarning",
     "ignore:cannot collect test class 'TestPhase':pytest.PytestCollectionWarning",
+    "ignore:cannot collect test class 'TestRegistration':pytest.PytestCollectionWarning",
+    "ignore:cannot collect test class 'TestRetryInfo':pytest.PytestCollectionWarning",
+    "ignore:cannot collect test class 'TestTeardownInfo':pytest.PytestCollectionWarning",
 ]
 
 [project.scripts]
