@@ -302,5 +302,3 @@ def _cancel_tasks(tasks: list[asyncio.Task[None]]) -> None:
     for task in tasks:
         if not task.done():
             task.cancel()
-
-
