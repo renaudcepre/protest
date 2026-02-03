@@ -13,6 +13,7 @@ protest <command> [options] <target>
 | Command | Description |
 |---------|-------------|
 | `run` | Run tests |
+| `live` | Start live reporter server |
 | `tags list` | List tags in a session |
 
 ---
@@ -272,6 +273,36 @@ protest run tests:session -k user -x
 # Check everything still works
 protest run tests:session
 ```
+
+---
+
+## protest live
+
+Start a persistent live reporter server for real-time test visualization.
+
+### Syntax
+
+```bash
+protest live [options]
+```
+
+### Options
+
+| Option | Short | Description | Default |
+|--------|-------|-------------|---------|
+| `--port` | `-p` | Port to listen on | 8765 |
+
+### Example
+
+```bash
+# Start the live server
+protest live
+
+# Start on a custom port
+protest live -p 9000
+```
+
+The live server stays running and displays test results in real-time as you run tests in another terminal.
 
 ---
 
