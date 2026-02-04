@@ -231,8 +231,10 @@ class ProTestSession:
         """Register a plugin class for CLI discovery.
 
         The plugin will be instantiated via from_cli() after CLI parsing.
+        Ignores duplicates.
         """
-        self._plugin_classes.append(plugin_class)
+        if plugin_class not in self._plugin_classes:
+            self._plugin_classes.append(plugin_class)
 
     def register_default_plugins(self) -> None:
         """Register all standard ProTest plugins for CLI discovery.

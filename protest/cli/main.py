@@ -228,13 +228,15 @@ def _handle_run_command() -> None:
         _create_run_parser().print_help()
         sys.exit(1)
 
-    # Phase 2: Load session to discover plugin classes
+    # Phase 2: Load session and register default plugins
     session_target, suite_filter = parse_target(base_args.target)
     try:
         session = load_session(session_target, base_args.app_dir)
     except LoadError as exc:
         print(f"Error: {exc}")
         sys.exit(1)
+
+    session.register_default_plugins()
 
     # Phase 3: Build full parser with plugin options
     full_parser = _create_run_parser()

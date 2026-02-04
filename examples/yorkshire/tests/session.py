@@ -17,6 +17,7 @@ from examples.yorkshire.tests.fixtures import (
     kennel,
     yorkshire,
 )
+from examples.yorkshire.tests.plugins import BarkPlugin
 from examples.yorkshire.tests.suites.adults import adults_suite
 from examples.yorkshire.tests.suites.custom_factory import custom_factory_suite
 from examples.yorkshire.tests.suites.legacy.suite import legacy_suite
@@ -27,6 +28,7 @@ from examples.yorkshire.tests.suites.showcase.suite import showcase_suite
 from protest import ProTestSession
 
 session = ProTestSession(concurrency=4)
+session.use(BarkPlugin)
 
 # Bind session fixtures
 session.bind(configure_kennel_logging, autouse=True)
