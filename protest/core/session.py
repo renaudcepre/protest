@@ -242,13 +242,15 @@ class ProTestSession:
         This includes: RichReporter, AsciiReporter, CachePlugin, LogFilePlugin,
         TagFilterPlugin, SuiteFilterPlugin, KeywordFilterPlugin.
         """
-        self.use(RichReporter)
-        self.use(AsciiReporter)
+        # Filters first (they modify the items list in on_collection_finish)
         self.use(CachePlugin)
-        self.use(LogFilePlugin)
         self.use(TagFilterPlugin)
         self.use(SuiteFilterPlugin)
         self.use(KeywordFilterPlugin)
+        # Reporters last (they receive the filtered items count)
+        self.use(RichReporter)
+        self.use(AsciiReporter)
+        self.use(LogFilePlugin)
 
     @property
     def plugin_classes(self) -> list[type[PluginBase]]:
