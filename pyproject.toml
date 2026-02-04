@@ -68,9 +68,11 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = [
-    "PLR2004", # Magic value used in comparison
-    "PLR0913", # parametrized tests often need many arguments
-    "S604",    # shell=True is intentional in Shell tests
+    "PLR2004",  # Magic value used in comparison
+    "PLR0913",  # parametrized tests often need many arguments
+    "S604",     # shell=True is intentional in Shell tests
+    "PLW0108",  # Lambdas required: EventBus uses weakrefs, can't ref list.append directly
+    "ASYNC240", # os.path in async tests is fine (no real I/O concerns in tests)
 ]
 "protest/cli/**" = [
     "T201",    # print allowed in CLI

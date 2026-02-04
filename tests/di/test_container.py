@@ -296,12 +296,12 @@ class TestIsGeneratorLike:
         "func_factory,expected",
         [
             pytest.param(
-                lambda: (lambda: (yield "value")),
+                lambda: lambda: (yield "value"),
                 True,
                 id="sync_generator_with_yield",
             ),
             pytest.param(
-                lambda: (lambda: "value"),
+                lambda: lambda: "value",
                 False,
                 id="regular_function",
             ),

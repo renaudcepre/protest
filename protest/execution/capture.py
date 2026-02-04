@@ -2,6 +2,7 @@ import io
 import logging
 import sys
 from collections.abc import Callable
+from contextlib import suppress
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from logging import LogRecord
@@ -69,7 +70,10 @@ def set_current_node_id(node_id: str | None) -> Token[str | None]:
 
 def reset_current_node_id(token: Token[str | None]) -> None:
     """Reset the current test's node_id using the token."""
-    _current_node_id.reset(token)
+    # Token may be from different context (task cancellation during threadpool).
+    # Safe: value is overwritten by next set() at test start anyway.
+    with suppress(ValueError):
+        _current_node_id.reset(token)
 
 
 def set_session_setup_capture(enabled: bool) -> None:
@@ -210,7 +214,11 @@ class CaptureCurrentTest:
         return self._buffer
 
     def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+        # Token may be from different context (task cancellation during threadpool).
+        # Safe: each context has its own ContextVar copy, next set() overwrites anyway.
         if self._token is not None:
-            _capture_buffer.reset(self._token)
+            with suppress(ValueError):
+                _capture_buffer.reset(self._token)
         if self._log_token is not None:
-            _log_records.reset(self._log_token)
+            with suppress(ValueError):
+                _log_records.reset(self._log_token)

@@ -41,4 +41,4 @@ class BarkPlugin(PluginBase):
 
     def on_test_fail(self, result: TestResult) -> None:
         if self._enabled:
-            print(f"WOOF! WOOF! Bad test! ({result.node_id})")
+            print(f"WOOF! WOOF! Bad test! ({result.node_id})")  # noqa: T201
