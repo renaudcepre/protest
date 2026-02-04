@@ -26,7 +26,7 @@ class TestTimeoutBasic:
     def test_async_timeout_exceeded(self, session: ProTestSession) -> None:
         """Async test exceeding timeout fails with TimeoutError."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_FAIL, results.append)
+        session.events.on(Event.TEST_FAIL, lambda result: results.append(result))
 
         @session.test(timeout=0.1)
         async def test_slow() -> None:
@@ -43,7 +43,7 @@ class TestTimeoutBasic:
     def test_async_within_timeout_passes(self, session: ProTestSession) -> None:
         """Async test completing within timeout passes."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_PASS, results.append)
+        session.events.on(Event.TEST_PASS, lambda result: results.append(result))
 
         @session.test(timeout=1.0)
         async def test_fast() -> None:
@@ -59,7 +59,7 @@ class TestTimeoutBasic:
     def test_sync_timeout_exceeded(self, session: ProTestSession) -> None:
         """Sync test in executor exceeding timeout fails."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_FAIL, results.append)
+        session.events.on(Event.TEST_FAIL, lambda result: results.append(result))
 
         @session.test(timeout=0.1)
         def test_slow_sync() -> None:
@@ -75,7 +75,7 @@ class TestTimeoutBasic:
     def test_no_timeout_runs_long(self, session: ProTestSession) -> None:
         """Test without timeout runs without limit."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_PASS, results.append)
+        session.events.on(Event.TEST_PASS, lambda result: results.append(result))
 
         @session.test()
         async def test_long() -> None:
@@ -99,7 +99,7 @@ class TestTimeoutWithXfail:
     def test_xfail_timeout_is_xfail(self, session: ProTestSession) -> None:
         """xfail=True + timeout → XFAIL."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_XFAIL, results.append)
+        session.events.on(Event.TEST_XFAIL, lambda result: results.append(result))
 
         @session.test(xfail="Known slow", timeout=0.1)
         async def test_expected_timeout() -> None:
@@ -115,7 +115,7 @@ class TestTimeoutWithXfail:
     def test_xfail_within_timeout_is_xpass(self, session: ProTestSession) -> None:
         """xfail=True + passes within timeout → XPASS."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_XPASS, results.append)
+        session.events.on(Event.TEST_XPASS, lambda result: results.append(result))
 
         @session.test(xfail="Expected to fail", timeout=1.0)
         async def test_unexpected_pass() -> None:
@@ -138,7 +138,7 @@ class TestTimeoutWithSkip:
     def test_skip_ignores_timeout(self, session: ProTestSession) -> None:
         """Skipped test does not run, timeout never applies."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_SKIP, results.append)
+        session.events.on(Event.TEST_SKIP, lambda result: results.append(result))
 
         @session.test(skip="Not ready", timeout=0.001)
         async def test_skipped() -> None:
@@ -186,7 +186,7 @@ class TestTimeoutWithSuite:
     def test_suite_test_timeout(self, session: ProTestSession) -> None:
         """Suite test can have timeout."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_FAIL, results.append)
+        session.events.on(Event.TEST_FAIL, lambda result: results.append(result))
 
         suite = ProTestSuite("API")
         session.add_suite(suite)
@@ -223,7 +223,7 @@ class TestTimeoutResult:
     def test_result_contains_timeout_value(self, session: ProTestSession) -> None:
         """TestResult.timeout contains configured value."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_PASS, results.append)
+        session.events.on(Event.TEST_PASS, lambda result: results.append(result))
 
         timeout_value = 5.0
 
@@ -240,7 +240,7 @@ class TestTimeoutResult:
     def test_result_error_is_timeout_error(self, session: ProTestSession) -> None:
         """TestResult.error is TimeoutError on timeout."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_FAIL, results.append)
+        session.events.on(Event.TEST_FAIL, lambda result: results.append(result))
 
         @session.test(timeout=0.05)
         async def test_timeout() -> None:
