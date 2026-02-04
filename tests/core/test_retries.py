@@ -33,8 +33,8 @@ class TestRetriesBasic:
         """Test passes after initial failure with retry."""
         results: list[TestResult] = []
         retry_events: list[TestRetryInfo] = []
-        session.events.on(Event.TEST_PASS, results.append)
-        session.events.on(Event.TEST_RETRY, retry_events.append)
+        session.events.on(Event.TEST_PASS, lambda result: results.append(result))
+        session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
         call_count = 0
 
@@ -60,8 +60,8 @@ class TestRetriesBasic:
         """Test fails after exhausting all retries."""
         results: list[TestResult] = []
         retry_events: list[TestRetryInfo] = []
-        session.events.on(Event.TEST_FAIL, results.append)
-        session.events.on(Event.TEST_RETRY, retry_events.append)
+        session.events.on(Event.TEST_FAIL, lambda result: results.append(result))
+        session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
         call_count = 0
 
@@ -86,8 +86,8 @@ class TestRetriesBasic:
         """Test that passes on first try doesn't trigger retry."""
         results: list[TestResult] = []
         retry_events: list[TestRetryInfo] = []
-        session.events.on(Event.TEST_PASS, results.append)
-        session.events.on(Event.TEST_RETRY, retry_events.append)
+        session.events.on(Event.TEST_PASS, lambda result: results.append(result))
+        session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
         @session.test(retry=3)
         def test_stable() -> None:
@@ -107,8 +107,8 @@ class TestRetriesBasic:
         """Test with retry=0 fails immediately without retry."""
         results: list[TestResult] = []
         retry_events: list[TestRetryInfo] = []
-        session.events.on(Event.TEST_FAIL, results.append)
-        session.events.on(Event.TEST_RETRY, retry_events.append)
+        session.events.on(Event.TEST_FAIL, lambda result: results.append(result))
+        session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
         @session.test(retry=0)
         def test_no_retry() -> None:
@@ -134,7 +134,7 @@ class TestRetryOn:
     def test_retry_on_matching_exception(self, session: ProTestSession) -> None:
         """Retry triggers when exception matches retry_on."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_PASS, results.append)
+        session.events.on(Event.TEST_PASS, lambda result: results.append(result))
 
         call_count = 0
 
@@ -156,8 +156,8 @@ class TestRetryOn:
         """No retry when exception doesn't match retry_on."""
         results: list[TestResult] = []
         retry_events: list[TestRetryInfo] = []
-        session.events.on(Event.TEST_FAIL, results.append)
-        session.events.on(Event.TEST_RETRY, retry_events.append)
+        session.events.on(Event.TEST_FAIL, lambda result: results.append(result))
+        session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
         call_count = 0
 
@@ -178,7 +178,7 @@ class TestRetryOn:
     def test_retry_on_tuple_of_exceptions(self, session: ProTestSession) -> None:
         """Retry triggers for any exception in tuple."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_PASS, results.append)
+        session.events.on(Event.TEST_PASS, lambda result: results.append(result))
 
         call_count = 0
 
@@ -201,7 +201,7 @@ class TestRetryOn:
     def test_retry_on_subclass(self, session: ProTestSession) -> None:
         """Retry triggers for subclass of retry_on exception."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_PASS, results.append)
+        session.events.on(Event.TEST_PASS, lambda result: results.append(result))
 
         call_count = 0
 
@@ -221,7 +221,7 @@ class TestRetryOn:
     def test_retry_on_none_retries_all(self, session: ProTestSession) -> None:
         """retry_on=None (default) retries on any exception."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_PASS, results.append)
+        session.events.on(Event.TEST_PASS, lambda result: results.append(result))
 
         call_count = 0
 
@@ -287,7 +287,7 @@ class TestRetryDelay:
     def test_retry_info_contains_delay(self, session: ProTestSession) -> None:
         """TestRetryInfo contains configured delay."""
         retry_events: list[TestRetryInfo] = []
-        session.events.on(Event.TEST_RETRY, retry_events.append)
+        session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
         delay_value = 0.5
 
@@ -313,8 +313,8 @@ class TestRetriesWithSkip:
         """Skipped test does not run, retries never apply."""
         results: list[TestResult] = []
         retry_events: list[TestRetryInfo] = []
-        session.events.on(Event.TEST_SKIP, results.append)
-        session.events.on(Event.TEST_RETRY, retry_events.append)
+        session.events.on(Event.TEST_SKIP, lambda result: results.append(result))
+        session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
         call_count = 0
 
@@ -346,7 +346,7 @@ class TestRetriesWithXfail:
     ) -> None:
         """xfail + retries exhausted → XFAIL."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_XFAIL, results.append)
+        session.events.on(Event.TEST_XFAIL, lambda result: results.append(result))
 
         @session.test(xfail="Known flaky", retry=2)
         def test_expected_failure() -> None:
@@ -363,7 +363,7 @@ class TestRetriesWithXfail:
     def test_xfail_with_retry_success_is_xpass(self, session: ProTestSession) -> None:
         """xfail + passes after retry → XPASS."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_XPASS, results.append)
+        session.events.on(Event.TEST_XPASS, lambda result: results.append(result))
 
         call_count = 0
 
@@ -393,7 +393,7 @@ class TestRetriesWithTimeout:
     def test_timeout_triggers_retry(self, session: ProTestSession) -> None:
         """Timeout on first attempt triggers retry."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_PASS, results.append)
+        session.events.on(Event.TEST_PASS, lambda result: results.append(result))
 
         call_count = 0
 
@@ -415,8 +415,8 @@ class TestRetriesWithTimeout:
         """Timeout on all attempts exhausts retries."""
         results: list[TestResult] = []
         retry_events: list[TestRetryInfo] = []
-        session.events.on(Event.TEST_FAIL, results.append)
-        session.events.on(Event.TEST_RETRY, retry_events.append)
+        session.events.on(Event.TEST_FAIL, lambda result: results.append(result))
+        session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
         @session.test(timeout=0.05, retry=1)
         async def test_always_slow() -> None:
@@ -435,8 +435,8 @@ class TestRetriesWithTimeout:
         """retry_on can filter TimeoutError."""
         results: list[TestResult] = []
         retry_events: list[TestRetryInfo] = []
-        session.events.on(Event.TEST_FAIL, results.append)
-        session.events.on(Event.TEST_RETRY, retry_events.append)
+        session.events.on(Event.TEST_FAIL, lambda result: results.append(result))
+        session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
         @session.test(timeout=0.05, retry=Retry(times=2, on=ValueError))
         async def test_timeout_not_retried() -> None:
@@ -453,8 +453,8 @@ class TestRetriesWithTimeout:
         """Integration test: timeout triggers retry, tracks events and previous errors."""
         pass_results: list[TestResult] = []
         retry_events: list[TestRetryInfo] = []
-        session.events.on(Event.TEST_PASS, pass_results.append)
-        session.events.on(Event.TEST_RETRY, retry_events.append)
+        session.events.on(Event.TEST_PASS, lambda result: pass_results.append(result))
+        session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
         call_count = 0
         timestamps: list[float] = []
@@ -508,8 +508,8 @@ class TestRetriesWithFixtureErrors:
         """Fixture error does not trigger retry."""
         results: list[TestResult] = []
         retry_events: list[TestRetryInfo] = []
-        session.events.on(Event.TEST_FAIL, results.append)
-        session.events.on(Event.TEST_RETRY, retry_events.append)
+        session.events.on(Event.TEST_FAIL, lambda result: results.append(result))
+        session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
         @fixture()
         def broken_fixture() -> str:
@@ -594,7 +594,7 @@ class TestRetriesWithSuite:
     def test_suite_test_retries(self, session: ProTestSession) -> None:
         """Suite test can have retries."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_PASS, results.append)
+        session.events.on(Event.TEST_PASS, lambda result: results.append(result))
 
         suite = ProTestSuite("API")
         session.add_suite(suite)
@@ -631,7 +631,7 @@ class TestRetryEvent:
     def test_retry_event_emitted(self, session: ProTestSession) -> None:
         """TEST_RETRY event is emitted on each retry."""
         retry_events: list[TestRetryInfo] = []
-        session.events.on(Event.TEST_RETRY, retry_events.append)
+        session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
         @session.test(retry=3)
         def test_multiple_retries() -> None:
@@ -649,7 +649,7 @@ class TestRetryEvent:
     def test_retry_event_contains_correct_info(self, session: ProTestSession) -> None:
         """TestRetryInfo contains all expected fields."""
         retry_events: list[TestRetryInfo] = []
-        session.events.on(Event.TEST_RETRY, retry_events.append)
+        session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
         suite = ProTestSuite("MySuite")
         session.add_suite(suite)
@@ -674,7 +674,7 @@ class TestRetryEvent:
     def test_no_retry_event_on_success(self, session: ProTestSession) -> None:
         """No TEST_RETRY event when test passes first time."""
         retry_events: list[TestRetryInfo] = []
-        session.events.on(Event.TEST_RETRY, retry_events.append)
+        session.events.on(Event.TEST_RETRY, lambda info: retry_events.append(info))
 
         @session.test(retry=3)
         def test_passes() -> None:
@@ -696,7 +696,7 @@ class TestRetriesAsync:
     def test_async_retry_succeeds(self, session: ProTestSession) -> None:
         """Async test retries work correctly."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_PASS, results.append)
+        session.events.on(Event.TEST_PASS, lambda result: results.append(result))
 
         call_count = 0
 
