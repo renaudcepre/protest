@@ -61,7 +61,7 @@ class TestPEP563Annotations:
     ) -> None:
         """Fixture errors are properly detected with stringified annotations."""
         results: list[TestResult] = []
-        session.events.on(Event.TEST_FAIL, lambda r: results.append(r))
+        session.events.on(Event.TEST_FAIL, results.append)
 
         @session.test()
         def test_with_broken_fixture(
