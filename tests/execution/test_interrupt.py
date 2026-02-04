@@ -53,19 +53,29 @@ class TestInterruptStateTransitions:
 
         assert handler.state == InterruptState.FORCE_TEARDOWN
 
-    def test_third_signal_raises_keyboard_interrupt(
-        self,
-        interrupt_handler_with_loop: tuple[InterruptHandler, asyncio.AbstractEventLoop],
-    ) -> None:
-        """Given FORCE_TEARDOWN state, when signal received, then KeyboardInterrupt raised."""
-        handler, _ = interrupt_handler_with_loop
-        handler._handle_signal(signal.SIGINT, None)
-        handler._handle_signal(signal.SIGINT, None)
+    def test_third_signal_sets_exit_flag_for_watchdog(self) -> None:
+        """Given FORCE_TEARDOWN state, when signal received, then exit flag is set for watchdog."""
+        from unittest.mock import patch
 
-        with pytest.raises(KeyboardInterrupt):
+        handler = InterruptHandler()
+        loop = asyncio.new_event_loop()
+
+        # Mock os._exit for the entire test to prevent watchdog from exiting
+        with patch("protest.execution.interrupt.os._exit"):
+            handler.install(loop)
+
+            handler._handle_signal(signal.SIGINT, None)
+            handler._handle_signal(signal.SIGINT, None)
             handler._handle_signal(signal.SIGINT, None)
 
-        assert handler.state == InterruptState.HARD_EXIT
+            assert handler.state == InterruptState.HARD_EXIT
+            assert handler._exit_flag.is_set()
+
+            # Stop watchdog before uninstalling to prevent os._exit after mock ends
+            handler._stop_watchdog.set()
+            handler._watchdog.join(timeout=0.5)
+            handler.uninstall()
+            loop.close()
 
 
 class TestInterruptEvents:
@@ -167,17 +177,27 @@ class TestInterruptInstallUninstall:
             handler.uninstall()
             loop.close()
 
-    def test_uninstall_restores_original_handler(self) -> None:
-        """Given installed handler, when uninstalled, then original signal handler restored."""
-        original = signal.getsignal(signal.SIGINT)
+    def test_uninstall_keeps_signal_handler_for_emergency_exit(self) -> None:
+        """Given installed handler, when uninstalled, then signal handler stays active.
+
+        This is intentional: we keep the handler active to catch 3rd SIGINT during
+        threading._shutdown() and trigger the watchdog's os._exit().
+        """
         handler = InterruptHandler()
         loop = asyncio.new_event_loop()
         try:
             handler.install(loop)
+            our_handler = signal.getsignal(signal.SIGINT)
             handler.uninstall()
 
-            assert signal.getsignal(signal.SIGINT) == original
+            # Handler should still be ours (not restored to original)
+            assert signal.getsignal(signal.SIGINT) == our_handler
         finally:
+            # Cleanup: stop watchdog and restore default handler
+            handler._stop_watchdog.set()
+            if handler._watchdog:
+                handler._watchdog.join(timeout=0.5)
+            signal.signal(signal.SIGINT, signal.default_int_handler)
             loop.close()
 
     def test_uninstall_clears_events(self) -> None:
