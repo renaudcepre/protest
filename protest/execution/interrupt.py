@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import signal
+import threading
 from collections.abc import Callable
 from enum import Enum
 from typing import Any
@@ -24,7 +26,10 @@ class InterruptHandler:
 
     - 1st Ctrl+C (SOFT_STOP): Stop launching new tests, wait for running tests + teardowns
     - 2nd Ctrl+C (FORCE_TEARDOWN): Cancel running tests, execute teardowns, skip wait_pending
-    - 3rd Ctrl+C (HARD_EXIT): Immediate shutdown
+    - 3rd Ctrl+C (HARD_EXIT): Immediate shutdown via watchdog thread
+
+    A watchdog thread monitors for exit requests and calls os._exit() to ensure
+    clean termination even when worker threads are blocked in C code.
     """
 
     def __init__(self) -> None:
@@ -33,6 +38,9 @@ class InterruptHandler:
         self._force_teardown_event: asyncio.Event | None = None
         self._original_handler: SignalHandler = None
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._exit_flag = threading.Event()
+        self._stop_watchdog = threading.Event()
+        self._watchdog: threading.Thread | None = None
 
     @property
     def state(self) -> InterruptState:
@@ -69,10 +77,17 @@ class InterruptHandler:
         self._original_handler = signal.getsignal(signal.SIGINT)
         signal.signal(signal.SIGINT, self._handle_signal)
 
+        # Start watchdog thread
+        self._stop_watchdog = threading.Event()
+        self._watchdog = threading.Thread(target=self._watchdog_loop, daemon=True)
+        self._watchdog.start()
+
     def uninstall(self) -> None:
-        if self._original_handler is not None:
-            signal.signal(signal.SIGINT, self._original_handler)
-            self._original_handler = None
+        # Don't stop watchdog - it's a daemon thread and will die with the process.
+        # Keep our signal handler active so we can catch 3rd SIGINT during
+        # threading._shutdown() and trigger watchdog's os._exit().
+
+        # Don't restore original handler - keep ours active for emergency exit
         self._loop = None
         self._soft_stop_event = None
         self._force_teardown_event = None
@@ -90,6 +105,14 @@ class InterruptHandler:
 
         else:
             self._state = InterruptState.HARD_EXIT
-            if self._original_handler is not None:
-                signal.signal(signal.SIGINT, self._original_handler)
-            raise KeyboardInterrupt
+            self._exit_flag.set()  # Watchdog will os._exit()
+
+    def _watchdog_loop(self) -> None:
+        """Watch for exit flag and call os._exit() for clean termination.
+
+        This ensures the process exits even when worker threads are blocked
+        in C code that doesn't release the GIL.
+        """
+        while not self._stop_watchdog.is_set():
+            if self._exit_flag.wait(timeout=0.1):
+                os._exit(130)  # 128 + SIGINT(2)
