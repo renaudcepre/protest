@@ -137,8 +137,8 @@ class TestShellOptions:
 
             # Resolve symlinks for macOS /var -> /private/var
             # and normalize case for Windows
-            expected = os.path.normcase(os.path.realpath(tmpdir))  # noqa: ASYNC240
-            actual = os.path.normcase(os.path.realpath(result.stdout.strip()))  # noqa: ASYNC240
+            expected = os.path.normcase(os.path.realpath(tmpdir))
+            actual = os.path.normcase(os.path.realpath(result.stdout.strip()))
             assert actual == expected
 
     @pytest.mark.asyncio
