@@ -3,6 +3,7 @@
 import asyncio
 import signal
 from typing import Annotated
+from unittest.mock import patch
 
 import pytest
 
@@ -55,8 +56,6 @@ class TestInterruptStateTransitions:
 
     def test_third_signal_sets_exit_flag_for_watchdog(self) -> None:
         """Given FORCE_TEARDOWN state, when signal received, then exit flag is set for watchdog."""
-        from unittest.mock import patch
-
         handler = InterruptHandler()
         loop = asyncio.new_event_loop()
 
