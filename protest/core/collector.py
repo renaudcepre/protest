@@ -4,7 +4,7 @@ from inspect import signature
 from itertools import groupby, product
 from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
-from protest.di.decorators import unwrap_fixture
+from protest.di.decorators import get_fixture_marker, unwrap_fixture
 from protest.di.markers import Use
 from protest.di.validation import _extract_from_params
 from protest.entities import FixtureCallable, SuitePath, TestItem, TestRegistration
@@ -113,8 +113,16 @@ class Collector:
             return set()
         visited.add(func)
 
-        tags = self._fixture_tags.get(func, set()).copy()
-        for dep_func in self._fixture_deps.get(func, []):
+        # Try indexed tags first, fallback to marker for unbound fixtures
+        if func in self._fixture_tags:
+            tags = self._fixture_tags[func].copy()
+        else:
+            marker = get_fixture_marker(func)
+            tags = set(marker.tags) if marker else set()
+
+        # Get dependencies: indexed or extract from signature for unbound
+        deps = self._fixture_deps.get(func) or _extract_use_fixtures(func)
+        for dep_func in deps:
             tags.update(self._get_transitive_fixture_tags(dep_func, visited))
 
         return tags

@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import inspect
 import time
-import warnings
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager, suppress
 from inspect import signature
 from typing import (
@@ -118,15 +117,6 @@ class FixtureContainer:
         if func in self._registry:
             raise AlreadyRegisteredError(get_callable_name(func))
 
-        if max_concurrency is not None and scope == FixtureScope.TEST:
-            warnings.warn(
-                f"Fixture '{get_callable_name(func)}' has max_concurrency={max_concurrency} "
-                f"with TEST scope. This has no effect since TEST-scoped fixtures "
-                f"create a fresh instance per test. Consider using SESSION or SUITE scope.",
-                UserWarning,
-                stacklevel=3,
-            )
-
         fixture = Fixture(
             func,
             is_factory=is_factory,
@@ -177,10 +167,19 @@ class FixtureContainer:
         return fixture.tags.copy() if fixture else set()
 
     def get_max_concurrency(self, func: FixtureCallable) -> int | None:
-        """Get max_concurrency for a fixture, or None if unlimited."""
+        """Get max_concurrency for a fixture, or None if unlimited.
+
+        First checks the registry for registered fixtures, then falls back
+        to checking the marker on decorated (but not yet registered) fixtures.
+        This handles fixtures used via Use() that aren't explicitly bound.
+        """
         actual_func = unwrap_fixture(func)
         fixture = self._registry.get(actual_func)
-        return fixture.max_concurrency if fixture else None
+        if fixture:
+            return fixture.max_concurrency
+        # Fallback: check marker on decorated function (issue #73)
+        marker = get_fixture_marker(func)
+        return marker.max_concurrency if marker else None
 
     def get_transitive_tags(self, func: FixtureCallable) -> set[str]:
         """Get all tags from a fixture and its dependencies (transitive)."""
