@@ -310,5 +310,3 @@ def test_skip_object_form(
     This test will be SKIPPED because premium_treats is False.
     """
     assert feature_flags["premium_treats"]
-
-

@@ -8,9 +8,9 @@ version = "0.1.0"
 description = "Async-first Python testing framework"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = { text = "MIT" }
 authors = [
-    {name = "Renaud Cepre"}
+    { name = "Renaud Cepre" }
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -47,24 +47,24 @@ extend-exclude = [
 
 [tool.ruff.lint]
 select = [
-    "F",      # Pyflakes
+    "F", # Pyflakes
     "E", "W", # pycodestyle
-    "I",      # isort
-    "UP",     # pyupgrade
-    "B",      # flake8-bugbear
-    "PL",     # Pylint
-    "RUF",    # Ruff-specific
-    "SIM",    # flake8-simplify
-    "C4",     # flake8-comprehensions
-    "RET",    # flake8-return
-    "S",      # flake8-bandit
-    "ASYNC",  # flake8-async
-    "TCH",    # flake8-type-checking
-    "PYI",    # flake8-pyi
-    "N",      # pep8-naming
-    "T20",    # flake8-print
-    "PIE",    # flake8-pie
-    "D212",   # pydocstyle (multiline docstring)
+    "I", # isort
+    "UP", # pyupgrade
+    "B", # flake8-bugbear
+    "PL", # Pylint
+    "RUF", # Ruff-specific
+    "SIM", # flake8-simplify
+    "C4", # flake8-comprehensions
+    "RET", # flake8-return
+    "S", # flake8-bandit
+    "ASYNC", # flake8-async
+    "TCH", # flake8-type-checking
+    "PYI", # flake8-pyi
+    "N", # pep8-naming
+    "T20", # flake8-print
+    "PIE", # flake8-pie
+    "D212", # pydocstyle (multiline docstring)
 ]
 ignore = [
     "E501", # Line length handled by formatter
@@ -74,14 +74,14 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 
 "tests/**" = [
-    "PLR2004",  # Magic value used in comparison
-    "PLR0913",  # parametrized tests often need many arguments
-    "S604",     # shell=True is intentional in Shell tests
-    "PLW0108",  # Lambdas required: EventBus uses weakrefs, can't ref list.append directly
+    "PLR2004", # Magic value used in comparison
+    "PLR0913", # parametrized tests often need many arguments
+    "S604", # shell=True is intentional in Shell tests
+    "PLW0108", # Lambdas required: EventBus uses weakrefs, can't ref list.append directly
     "ASYNC240", # os.path in async tests is fine (no real I/O concerns in tests)
 ]
 "protest/cli/**" = [
-    "T201",    # print allowed in CLI
+    "T201", # print allowed in CLI
     "PLC0415", # lazy imports for fast --help
     "PLR2004", # magic values for arg parsing
 ]
@@ -98,13 +98,13 @@ ignore = [
 ]
 "tests/reporting/test_factory.py" = [
     "PLC0415", # imports after patch context
-    "SIM117",  # nested with for patch clarity
+    "SIM117", # nested with for patch clarity
 ]
 
 
 [tool.coverage.run]
 omit = [
-    "protest/compat.py",  # Version-specific imports, impossible to cover without multi-version CI
+    "protest/compat.py", # Version-specific imports, impossible to cover without multi-version CI
 ]
 
 [tool.pytest.ini_options]

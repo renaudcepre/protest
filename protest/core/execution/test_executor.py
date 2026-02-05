@@ -295,9 +295,7 @@ class TestExecutor:
             cond_params = set()
 
         # Filter kwargs to only those the condition accepts
-        filtered_kwargs = {
-            k: v for k, v in resolved_kwargs.items() if k in cond_params
-        }
+        filtered_kwargs = {k: v for k, v in resolved_kwargs.items() if k in cond_params}
 
         try:
             result = condition(**filtered_kwargs)
