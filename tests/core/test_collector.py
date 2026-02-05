@@ -465,3 +465,166 @@ class TestTransitiveFixtureTags:
 
         assert len(items) == 1
         assert items[0].tags == {"level1", "level2", "level3"}
+
+
+class TestUnboundFixtureTags:
+    """Tests for tags on unbound fixtures (not explicitly bound)."""
+
+    def test_unbound_fixture_tags_are_collected(self) -> None:
+        """Tags on unbound fixtures should be propagated to tests.
+
+        This is similar to issue #73 for max_concurrency: fixtures used
+        via Use() but not explicitly bound should still have their tags
+        propagated to tests using them.
+        """
+        session = ProTestSession()
+
+        @fixture(tags=["database"])
+        def unbound_fixture() -> str:
+            """This fixture has tags but will NOT be bound."""
+            return "value"
+
+        # DO NOT bind unbound_fixture - test uses it directly via Use()
+
+        @session.test()
+        def test_uses_unbound(
+            val: Annotated[str, Use(unbound_fixture)],
+        ) -> None:
+            pass
+
+        collector = Collector()
+        items = collector.collect(session)
+
+        assert len(items) == 1
+        assert "database" in items[0].tags, (
+            f"Expected 'database' tag from unbound fixture, got {items[0].tags}. "
+            "Tags on unbound fixtures are being ignored."
+        )
+
+    def test_transitive_unbound_fixture_tags(self) -> None:
+        """Tags propagate through chain of unbound fixtures.
+
+        unbound_a (tags=["db"]) ← unbound_b (tags=["api"]) ← test
+        Expected: test has both "db" and "api" tags.
+        """
+        session = ProTestSession()
+
+        @fixture(tags=["db"])
+        def unbound_a() -> str:
+            return "a"
+
+        @fixture(tags=["api"])
+        def unbound_b(a: Annotated[str, Use(unbound_a)]) -> str:
+            return f"b_{a}"
+
+        # NO fixtures are bound
+
+        @session.test()
+        def test_transitive(
+            b: Annotated[str, Use(unbound_b)],
+        ) -> None:
+            pass
+
+        collector = Collector()
+        items = collector.collect(session)
+
+        assert len(items) == 1
+        assert "db" in items[0].tags, "Missing 'db' tag from unbound_a"
+        assert "api" in items[0].tags, "Missing 'api' tag from unbound_b"
+
+    def test_mixed_bound_and_unbound_fixture_tags(self) -> None:
+        """Tags from both bound and unbound fixtures are collected.
+
+        bound_fixture (tags=["bound"], bound) ← unbound_fixture (tags=["unbound"]) ← test
+        """
+        session = ProTestSession()
+
+        @fixture(tags=["bound"])
+        def bound_fixture() -> str:
+            return "bound"
+
+        @fixture(tags=["unbound"])
+        def unbound_fixture(b: Annotated[str, Use(bound_fixture)]) -> str:
+            return f"unbound_{b}"
+
+        session.bind(bound_fixture)  # Only bind bound_fixture
+
+        @session.test()
+        def test_mixed(
+            val: Annotated[str, Use(unbound_fixture)],
+        ) -> None:
+            pass
+
+        collector = Collector()
+        items = collector.collect(session)
+
+        assert len(items) == 1
+        assert "bound" in items[0].tags, "Missing 'bound' tag from bound fixture"
+        assert "unbound" in items[0].tags, "Missing 'unbound' tag from unbound fixture"
+
+    def test_mixed_scopes_session_suite_unbound(self) -> None:
+        """Tags propagate through SESSION → SUITE → TEST(unbound) chain."""
+        session = ProTestSession()
+        suite = ProTestSuite("MySuite")
+        session.add_suite(suite)
+
+        @fixture(tags=["session"])
+        def session_fix() -> str:
+            return "session"
+
+        @fixture(tags=["suite"])
+        def suite_fix(s: Annotated[str, Use(session_fix)]) -> str:
+            return f"suite_{s}"
+
+        @fixture(tags=["test"])
+        def test_fix(su: Annotated[str, Use(suite_fix)]) -> str:
+            return f"test_{su}"
+
+        session.bind(session_fix)  # SESSION scope
+        suite.bind(suite_fix)  # SUITE scope
+        # test_fix is unbound (TEST scope)
+
+        @suite.test()
+        def test_mixed_scopes(
+            t: Annotated[str, Use(test_fix)],
+        ) -> None:
+            pass
+
+        collector = Collector()
+        items = collector.collect(session)
+
+        assert len(items) == 1
+        assert "session" in items[0].tags, "Missing 'session' tag"
+        assert "suite" in items[0].tags, "Missing 'suite' tag"
+        assert "test" in items[0].tags, "Missing 'test' tag from unbound fixture"
+
+    def test_diamond_with_unbound_fixtures(self) -> None:
+        """Diamond pattern with unbound fixtures: tags from all branches collected."""
+        session = ProTestSession()
+
+        @fixture(tags=["shared"])
+        def shared() -> str:
+            return "shared"
+
+        @fixture(tags=["a"])
+        def branch_a(s: Annotated[str, Use(shared)]) -> str:
+            return f"a_{s}"
+
+        @fixture(tags=["b"])
+        def branch_b(s: Annotated[str, Use(shared)]) -> str:
+            return f"b_{s}"
+
+        # All fixtures are unbound
+
+        @session.test()
+        def test_diamond(
+            a: Annotated[str, Use(branch_a)],
+            b: Annotated[str, Use(branch_b)],
+        ) -> None:
+            pass
+
+        collector = Collector()
+        items = collector.collect(session)
+
+        assert len(items) == 1
+        assert items[0].tags == {"shared", "a", "b"}
