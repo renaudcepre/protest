@@ -121,6 +121,25 @@ async def test_users(user_factory: Annotated[FixtureFactory[User], Use(user)]):
     # Both cleaned up automatically (LIFO)
 ```
 
+### Conditional Skip with Fixtures
+
+**Skip tests based on runtime fixture values.** Impossible in pytest.
+
+```python
+# pytest - IMPOSSIBLE: fixtures not available in skipif
+@pytest.mark.skipif(config["ci"], ...)  # ❌ NameError
+
+# ProTest - skip callable receives resolved fixtures
+@session.test(
+    skip=lambda config: config["ci"],
+    skip_reason="Skip in CI",
+)
+def test_local_only(config: Annotated[Config, Use(config_fixture)]):
+    ...  # Clean test body, no skip logic
+```
+
+*Declarative. Explicit. With full fixture access.*
+
 ---
 
 ## Quick Start

@@ -39,6 +39,11 @@ web = [
 [tool.ruff]
 output-format = "concise"
 line-length = 88
+extend-exclude = [
+    "examples/dogfood/httpx/httpx_src",
+    "examples/dogfood/starlette/starlette_src",
+    "examples/dogfood/pydantic/pydantic_src",
+]
 
 [tool.ruff.lint]
 select = [
@@ -67,6 +72,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+
 "tests/**" = [
     "PLR2004",  # Magic value used in comparison
     "PLR0913",  # parametrized tests often need many arguments

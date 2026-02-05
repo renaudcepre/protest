@@ -259,17 +259,42 @@ def test_todo():
 def test_unix_only():
     pass
 
+@pytest.mark.skipif(
+    not HAS_REDIS,
+    reason="Redis not available"
+)
+def test_with_redis(redis_client):
+    pass
+
 @pytest.mark.slow
 def test_slow_operation():
     pass
 ```
 
 ```python
-# ProTest - use tags
+# ProTest
 @suite.test(skip="not implemented")
 def test_todo():
     pass
 
+# Runtime skip condition with fixtures
+@fixture()
+def has_redis():
+    return shutil.which("redis-server") is not None
+
+suite.bind(has_redis)
+
+@suite.test(
+    skip=lambda has_redis: not has_redis,
+    skip_reason="Redis not available",
+)
+def test_with_redis(
+    available: Annotated[bool, Use(has_redis)],
+    client: Annotated[RedisClient, Use(redis_client)],
+):
+    pass
+
+# Tags for filtering
 @suite.test(tags=["slow"])
 def test_slow_operation():
     pass

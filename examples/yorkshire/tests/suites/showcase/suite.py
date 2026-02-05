@@ -16,8 +16,10 @@ from protest import (
     Mocker,
     ProTestSuite,
     Retry,
+    Skip,
     Use,
     caplog,
+    fixture,
     mocker,
     raises,
 )
@@ -261,3 +263,52 @@ async def test_yorkshire_math_skills(
     assert treats_actual == treats_expected, (
         f"{fifi.name} counted {treats_actual} treats but expected {treats_expected}"
     )
+
+
+# =============================================================================
+# CONDITIONAL SKIP (skip with callable condition)
+# =============================================================================
+
+
+@fixture()
+def feature_flags() -> dict[str, bool]:
+    """Feature flags from environment/config."""
+    return {
+        "new_grooming_algorithm": True,  # Would be from env/config in real code
+        "premium_treats": False,
+    }
+
+
+showcase_suite.bind(feature_flags)
+
+
+@showcase_suite.test(
+    skip=lambda feature_flags: not feature_flags["new_grooming_algorithm"],
+    skip_reason="Feature flag 'new_grooming_algorithm' not enabled",
+)
+def test_runtime_conditional_skip_with_fixture(
+    feature_flags: Annotated[dict[str, bool], Use(feature_flags)],
+) -> None:
+    """Runtime conditional skip: condition callable receives fixture values.
+
+    Note: The parameter name must match what the skip callable expects.
+    """
+    assert feature_flags["new_grooming_algorithm"]
+
+
+@showcase_suite.test(
+    skip=Skip(
+        condition=lambda feature_flags: not feature_flags["premium_treats"],
+        reason="Premium treats feature disabled",
+    ),
+)
+def test_skip_object_form(
+    feature_flags: Annotated[dict[str, bool], Use(feature_flags)],
+) -> None:
+    """Skip object with condition: explicit condition + reason.
+
+    This test will be SKIPPED because premium_treats is False.
+    """
+    assert feature_flags["premium_treats"]
+
+

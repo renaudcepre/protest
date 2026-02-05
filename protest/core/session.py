@@ -146,7 +146,8 @@ class ProTestSession:
         self,
         tags: list[str] | None = None,
         timeout: float | None = None,
-        skip: bool | str | Skip | None = None,
+        skip: bool | str | Callable[..., bool] | Skip | None = None,
+        skip_reason: str = "Skipped",
         xfail: bool | str | Xfail | None = None,
         retry: int | Retry | None = None,
     ) -> Callable[[FuncT], FuncT]:
@@ -154,7 +155,7 @@ class ProTestSession:
             if timeout is not None and timeout < 0:
                 raise ValueError(f"timeout must be non-negative, got {timeout}")
 
-            norm_skip = normalize_skip(skip)
+            norm_skip = normalize_skip(skip, reason=skip_reason)
             norm_xfail = normalize_xfail(xfail)
             norm_retry = normalize_retry(retry)
 
