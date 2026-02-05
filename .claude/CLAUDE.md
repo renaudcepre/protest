@@ -109,6 +109,26 @@ ProTestError (base)
 └── FixtureNotFoundError
 ```
 
+### Convention `# noqa`
+
+Chaque `# noqa` DOIT avoir une explication :
+
+```python
+# Format: # noqa: CODE - explication courte
+from module import func  # noqa: PLC0415 - lazy import for startup perf
+```
+
+Codes courants :
+- `PLR0913` - Too many arguments (acceptable pour API publiques)
+- `PLC0415` - Import outside top-level (lazy imports pour perf)
+- `PLR2004` - Magic value in comparison (acceptable dans tests/exemples)
+- `T201` - print() usage (acceptable pour CLI output intentionnel)
+- `S604/S607` - Shell/subprocess (expliquer pourquoi c'est safe)
+- `N806` - Variable in function should be lowercase (acceptable pour constantes de test)
+- `SIM117` - Nested with statements (parfois requis pour testing)
+- `PLW0603` - Global statement (acceptable pour compteurs de retry dans démos)
+- `PLR0912` - Too many branches (acceptable si refactoring réduirait la lisibilité)
+
 ---
 
 ## Points d'Implémentation Internes

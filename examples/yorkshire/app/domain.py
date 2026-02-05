@@ -27,6 +27,12 @@ class Job(Enum):
 
 @dataclass
 class Yorkshire:
+    """Yorkshire terrier with age in months."""
+
+    PUPPY_MAX_AGE = 12  # months
+    SENIOR_MIN_AGE = 96  # months (8 years)
+    GROOMING_AGE_THRESHOLD = 72  # months (6 years)
+
     name: str
     size: Size
     job: Job
@@ -35,11 +41,11 @@ class Yorkshire:
 
     @property
     def is_puppy(self) -> bool:
-        return self.age < 12  # noqa
+        return self.age < self.PUPPY_MAX_AGE
 
     @property
     def is_senior(self) -> bool:
-        return self.age > 96  # noqa
+        return self.age > self.SENIOR_MIN_AGE
 
     @property
     def can_work(self) -> bool:
@@ -47,7 +53,7 @@ class Yorkshire:
 
     @property
     def needs_grooming(self) -> bool:
-        return self.coat == Coat.LONG or self.age > 72  # noqa
+        return self.coat == Coat.LONG or self.age > self.GROOMING_AGE_THRESHOLD
 
     async def nap(self) -> float:
         duration = self.age * 0.002

@@ -212,7 +212,7 @@ class TestXfailWithParameterizedTests:
 
         session.register_plugin(CountingPlugin())
 
-        VALUES = ForEach([1, 2, 3])  # noqa
+        VALUES = ForEach([1, 2, 3])  # noqa: N806 - test constant for parametrization
 
         @session.test(xfail="All variations xfail")
         def test_parameterized(val: Annotated[int, From(VALUES)]) -> None:

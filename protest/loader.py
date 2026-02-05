@@ -8,12 +8,9 @@ from __future__ import annotations
 
 import importlib
 import sys
-from typing import TYPE_CHECKING
 
+from protest.core.session import ProTestSession
 from protest.entities import SuitePath
-
-if TYPE_CHECKING:
-    from protest.core.session import ProTestSession
 
 
 class LoadError(Exception):
@@ -65,9 +62,6 @@ def load_session(target: str, app_dir: str = ".") -> ProTestSession:
         LoadError: If the target format is invalid, module not found,
                    session not found, or session is not a ProTestSession.
     """
-    # Lazy import: loader may be imported before full framework is needed
-    from protest.core.session import ProTestSession  # noqa: PLC0415
-
     if ":" not in target:
         raise LoadError(f"Invalid format '{target}'. Use 'module:session'")
 

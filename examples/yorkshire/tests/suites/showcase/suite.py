@@ -170,8 +170,10 @@ def test_yorkshire_refuses_bath() -> None:
 def test_raises_with_match_pattern() -> None:
     """Raises with regex match."""
 
+    max_treats_for_teacup = 3
+
     def feed_treats(dog: Yorkshire, count: int) -> None:
-        if dog.size == Size.TEACUP and count > 3:  # noqa: PLR2004
+        if dog.size == Size.TEACUP and count > max_treats_for_teacup:
             raise ValueError(f"Too many treats! {dog.name} now spherical")
 
     tiny = Yorkshire(name="Gizmo", size=Size.TEACUP, job=Job.THERAPIST, age=36)
@@ -288,9 +290,10 @@ recall_attempts = 0
 @showcase_suite.test(retry=3)
 def test_recall_command_with_retry() -> None:
     """Simple retry: retries up to 3 times on any exception."""
-    global recall_attempts  # noqa: PLW0603
+    global recall_attempts  # noqa: PLW0603 - demo requires global state for retry counter
     recall_attempts += 1
-    if recall_attempts < 3:  # noqa: PLR2004
+    required_attempts = 3
+    if recall_attempts < required_attempts:
         raise TimeoutError("Yorkshire pretending to be deaf, investigating squirrel")
 
 
@@ -302,10 +305,11 @@ async def test_retry_with_specific_exception(
     factory: Annotated[FixtureFactory[Yorkshire], Use(yorkshire)],
 ) -> None:
     """Retry only on ConnectionError, with delay between attempts."""
-    global wifi_attempts  # noqa: PLW0603
+    global wifi_attempts  # noqa: PLW0603 - demo requires global state for retry counter
     wifi_attempts += 1
     fifi = await factory(name="Fifi", job=Job.INFLUENCER)
-    if wifi_attempts < 2:  # noqa: PLR2004
+    required_attempts = 2
+    if wifi_attempts < required_attempts:
         raise ConnectionError(f"{fifi.name} lost WiFi mid-selfie upload!")
 
 

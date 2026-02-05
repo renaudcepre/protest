@@ -98,7 +98,6 @@ ignore = [
 ]
 "tests/reporting/test_factory.py" = [
     "PLC0415", # imports after patch context
-    "SIM117", # nested with for patch clarity
 ]
 
 

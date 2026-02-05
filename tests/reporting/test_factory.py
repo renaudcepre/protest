@@ -33,11 +33,10 @@ class TestGetReporter:
         assert isinstance(reporter, RichReporter)
 
     def test_no_rich_returns_ascii(self) -> None:
-        with patch.dict(os.environ, {}, clear=False):
-            with patch(
-                "rich.console.Console",
-                side_effect=ImportError("No rich"),
-            ):
-                reporter = get_reporter()
+        with (
+            patch.dict(os.environ, {}, clear=False),
+            patch("rich.console.Console", side_effect=ImportError("No rich")),
+        ):
+            reporter = get_reporter()
 
         assert isinstance(reporter, AsciiReporter)

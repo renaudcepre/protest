@@ -41,7 +41,7 @@ async def test_shell_with_args_list() -> None:
 @suite.test()
 async def test_shell_with_timeout() -> None:
     """Shell supports timeout for long-running commands."""
-    result = await Shell.run(  # noqa: S604
+    result = await Shell.run(  # noqa: S604 - shell=True required for demo
         "sleep 0.1 && echo done", timeout=5.0, shell=True
     )
 
@@ -52,7 +52,7 @@ async def test_shell_with_timeout() -> None:
 @suite.test()
 async def test_shell_failure() -> None:
     """Shell captures failures cleanly (shell=True for builtins like exit)."""
-    result = await Shell.run("exit 1", shell=True)  # noqa: S604
+    result = await Shell.run("exit 1", shell=True)  # noqa: S604 - shell=True required for demo
 
     assert not result.success
     assert result.exit_code == 1
@@ -61,7 +61,7 @@ async def test_shell_failure() -> None:
 @suite.test()
 async def test_shell_stderr() -> None:
     """Shell captures both stdout and stderr."""
-    result = await Shell.run("echo 'out' && echo 'err' >&2", shell=True)  # noqa: S604
+    result = await Shell.run("echo 'out' && echo 'err' >&2", shell=True)  # noqa: S604 - shell=True required for demo
 
     assert "out" in result.stdout
     assert "err" in result.stderr
@@ -84,7 +84,7 @@ async def test_failing_to_show_capture() -> None:
 def test_sync_subprocess() -> None:
     """Sync subprocess with capture_output=True."""
     result = subprocess.run(
-        ["echo", "Sync subprocess"],  # noqa: S607
+        ["echo", "Sync subprocess"],  # noqa: S607 - echo is safe
         check=False,
         capture_output=True,
         text=True,
@@ -92,7 +92,7 @@ def test_sync_subprocess() -> None:
 
     # Print captured output so ProTest can capture it
     if result.stdout:
-        print(result.stdout, end="")  # noqa: T201
+        print(result.stdout, end="")  # noqa: T201 - demo output
 
     assert result.returncode == 0
     assert "Sync" in result.stdout

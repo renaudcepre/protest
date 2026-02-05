@@ -426,7 +426,7 @@ class TestCTRFGitErrors:
 
 
 class TestCTRFVersionError:
-    @patch("importlib.metadata.version")
+    @patch("protest.reporting.ctrf.get_version")
     def test_version_returns_unknown_on_error(
         self,
         mock_version: Any,

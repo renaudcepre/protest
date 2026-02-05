@@ -25,7 +25,8 @@ async def test_senior_nap_time(
 ) -> None:
     senior = await factory(name="Sleepy", age=100)
     nap_duration = await senior.nap()
-    assert nap_duration > 0.15  # noqa
+    min_expected_nap = 0.15
+    assert nap_duration > min_expected_nap
 
 
 @seniors_suite.test(timeout=1.0)

@@ -9,6 +9,7 @@ import time
 import traceback
 import uuid
 from datetime import datetime, timezone
+from importlib.metadata import version as get_version
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 
@@ -242,10 +243,7 @@ class CTRFReporter(PluginBase):
 
     def _get_version(self) -> str:
         try:
-            # Lazy import: only needed when generating report
-            from importlib.metadata import version  # noqa: PLC0415
-
-            return version("protest")
+            return get_version("protest")
         except Exception:
             return "unknown"
 
