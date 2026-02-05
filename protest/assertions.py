@@ -1,7 +1,12 @@
 import re
+import warnings
+from contextlib import contextmanager
 from re import Pattern
 from types import TracebackType
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 E = TypeVar("E", bound=BaseException)
 
@@ -92,3 +97,56 @@ def raises(
     match: str | Pattern[str] | None = None,
 ) -> RaisesContext[E]:
     return RaisesContext(expected_exception, match=match)
+
+
+@contextmanager
+def warns(
+    expected_warning: type[Warning] | tuple[type[Warning], ...] | None = None,
+    match: str | Pattern[str] | None = None,
+) -> "Generator[list[warnings.WarningMessage], None, None]":
+    """Context manager for capturing and validating warnings.
+
+    Args:
+        expected_warning: Warning type(s) expected. If None, captures all warnings.
+        match: Optional regex pattern to match against warning messages.
+
+    Yields:
+        List of captured warnings (stdlib warnings.WarningMessage objects).
+
+    Raises:
+        AssertionError: If expected warning not raised or pattern not matched.
+
+    Examples:
+        with warns(DeprecationWarning):
+            warnings.warn("deprecated", DeprecationWarning)
+
+        with warns(UserWarning, match=r"value.*\\d+"):
+            warnings.warn("value is 42", UserWarning)
+
+        with warns() as record:
+            warnings.warn("hello", UserWarning)
+        assert record[0].category is UserWarning
+    """
+    with warnings.catch_warnings(record=True) as record:
+        warnings.simplefilter("always")
+        yield record
+
+        if expected_warning is None:
+            return
+
+        matching = [w for w in record if issubclass(w.category, expected_warning)]
+
+        if not matching:
+            if isinstance(expected_warning, tuple):
+                names = ", ".join(e.__name__ for e in expected_warning)
+            else:
+                names = expected_warning.__name__
+            raise AssertionError(f"DID NOT WARN with {names}")
+
+        if match is not None:
+            pattern = re.compile(match) if isinstance(match, str) else match
+            if not any(pattern.search(str(w.message)) for w in matching):
+                messages = [str(w.message) for w in matching]
+                raise AssertionError(
+                    f"Pattern '{pattern.pattern}' not found in: {messages}"
+                )

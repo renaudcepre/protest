@@ -1,14 +1,24 @@
-"""Example: Built-in fixtures (tmp_path, caplog, mocker).
+"""Example: Built-in fixtures (tmp_path, caplog, mocker, warns).
 
 ProTest provides ready-to-use fixtures for common testing needs.
 No setup required - just import and use with Annotated[Type, Use(fixture)].
 """
 
 import logging
+import warnings
 from pathlib import Path
 from typing import Annotated
 
-from protest import Mocker, ProTestSession, ProTestSuite, Use, caplog, mocker, tmp_path
+from protest import (
+    Mocker,
+    ProTestSession,
+    ProTestSuite,
+    Use,
+    caplog,
+    mocker,
+    tmp_path,
+    warns,
+)
 from protest.entities import LogCapture
 
 session = ProTestSession()
@@ -135,6 +145,61 @@ def test_mocker_stub(m: Annotated[Mocker, Use(mocker)]) -> None:
 
     assert result == "done"
     callback.assert_called_once_with("arg1", key="value")
+
+
+# =============================================================================
+# warns - Capture and validate warnings
+# =============================================================================
+
+
+def old_function() -> str:
+    """A deprecated function that emits a warning."""
+    warnings.warn(
+        "old_function is deprecated, use new_function instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return "old result"
+
+
+@suite.test()
+def test_warns_basic() -> None:
+    """warns captures and validates expected warnings."""
+    with warns(DeprecationWarning):
+        old_function()
+
+
+@suite.test()
+def test_warns_with_match() -> None:
+    """warns can match warning message with regex."""
+    with warns(DeprecationWarning, match=r"old_function.*deprecated"):
+        old_function()
+
+
+@suite.test()
+def test_warns_capture_all() -> None:
+    """Capture all warnings for inspection without validation."""
+    with warns() as record:
+        warnings.warn("first warning", UserWarning, stacklevel=1)
+        warnings.warn("second warning", RuntimeWarning, stacklevel=1)
+
+    expected_count = 2
+    assert len(record) == expected_count
+    assert record[0].category is UserWarning
+    assert record[1].category is RuntimeWarning
+
+
+@suite.test()
+def test_warns_filter_by_category() -> None:
+    """Filter captured warnings by category."""
+    with warns() as record:
+        warnings.warn("user", UserWarning, stacklevel=1)
+        warnings.warn("deprecation", DeprecationWarning, stacklevel=1)
+        warnings.warn("runtime", RuntimeWarning, stacklevel=1)
+
+    user_warnings = [w for w in record if w.category is UserWarning]
+    assert len(user_warnings) == 1
+    assert str(user_warnings[0].message) == "user"
 
 
 # =============================================================================

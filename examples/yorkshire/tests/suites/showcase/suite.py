@@ -1,9 +1,10 @@
-"""Feature showcase - ForEach, mocker, caplog, raises, Retry.
+"""Feature showcase - ForEach, mocker, caplog, raises, warns, Retry.
 
 This module demonstrates advanced ProTest features in one place.
 """
 
 import asyncio
+import warnings
 from typing import Annotated
 
 from examples.yorkshire.app.domain import Coat, Job, Size, Yorkshire
@@ -22,13 +23,14 @@ from protest import (
     fixture,
     mocker,
     raises,
+    warns,
 )
 from protest.entities import LogCapture
 
 showcase_suite = ProTestSuite(
     "Showcase",
     tags=["showcase"],
-    description="Feature demonstrations: ForEach, mocker, caplog, raises, Retry",
+    description="Feature demonstrations: ForEach, mocker, caplog, raises, warns, Retry",
 )
 
 
@@ -214,6 +216,66 @@ async def test_raises_async() -> None:
 
     with raises(RuntimeError, match="WiFi"):
         await post_selfie()
+
+
+# =============================================================================
+# WARNS (warning assertions)
+# =============================================================================
+
+
+def old_grooming_algorithm(dog: Yorkshire) -> int:
+    """Deprecated grooming price calculator."""
+    warnings.warn(
+        "old_grooming_algorithm is deprecated, use calculate_grooming_price instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    base = 30
+    if dog.coat == Coat.LONG:
+        base += 15
+    return base
+
+
+@showcase_suite.test()
+def test_deprecated_grooming_function() -> None:
+    """Basic warns usage: catch deprecation warnings."""
+    dog = Yorkshire(name="Scruffy", size=Size.MINI, job=Job.UNEMPLOYED, age=24)
+
+    with warns(DeprecationWarning):
+        old_grooming_algorithm(dog)
+
+
+@showcase_suite.test()
+def test_warns_with_match_pattern() -> None:
+    """Warns with regex match."""
+    dog = Yorkshire(name="Bruno", size=Size.STANDARD, job=Job.BODYGUARD, age=48)
+
+    with warns(DeprecationWarning, match=r"deprecated.*calculate_grooming_price"):
+        old_grooming_algorithm(dog)
+
+
+@showcase_suite.test()
+def test_warns_captures_multiple() -> None:
+    """Capture and inspect multiple warnings."""
+
+    def risky_operation(dog: Yorkshire) -> str:
+        warnings.warn(f"{dog.name} is getting nervous", UserWarning, stacklevel=2)
+        warnings.warn(
+            f"Low treat reserves for {dog.name}", ResourceWarning, stacklevel=2
+        )
+        return "survived"
+
+    fluffy = Yorkshire(name="Fluffy", size=Size.TEACUP, job=Job.THERAPIST, age=18)
+
+    with warns() as record:
+        result = risky_operation(fluffy)
+
+    assert result == "survived"
+    expected_warning_count = 2
+    assert len(record) == expected_warning_count
+    assert record[0].category is UserWarning
+    assert "nervous" in str(record[0].message)
+    assert record[1].category is ResourceWarning
 
 
 # =============================================================================
