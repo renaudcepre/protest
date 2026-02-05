@@ -374,3 +374,85 @@ By default, Shell prints stdout/stderr so ProTest can capture it. Disable this i
 result = await Shell.run("noisy-command", print_output=False)
 # Output not printed to console, only in result.stdout/stderr
 ```
+
+## warns
+
+Context manager for capturing and validating warnings raised during test execution.
+
+### Basic Usage
+
+```python
+from protest import warns
+import warnings
+
+@session.test()
+def test_deprecation():
+    with warns(DeprecationWarning):
+        warnings.warn("old_function is deprecated", DeprecationWarning)
+```
+
+### Message Matching
+
+Use `match` to validate warning message with a regex pattern:
+
+```python
+@session.test()
+def test_warning_message():
+    with warns(UserWarning, match=r"value must be \d+"):
+        warnings.warn("value must be 42", UserWarning)
+```
+
+### Multiple Warning Types
+
+Accept any of several warning types using a tuple:
+
+```python
+@session.test()
+def test_multiple_types():
+    with warns((DeprecationWarning, PendingDeprecationWarning)):
+        warnings.warn("will be removed", DeprecationWarning)
+```
+
+### Capturing All Warnings
+
+Capture warnings without validation by omitting the expected type:
+
+```python
+@session.test()
+def test_capture_all():
+    with warns() as record:
+        warnings.warn("first", UserWarning)
+        warnings.warn("second", RuntimeWarning)
+
+    assert len(record) == 2
+    assert record[0].category is UserWarning
+    assert record[1].category is RuntimeWarning
+```
+
+### Record Attributes
+
+The context manager yields a list of stdlib `warnings.WarningMessage` objects:
+
+| Attribute | Description |
+|-----------|-------------|
+| `category` | Warning class (e.g., `UserWarning`) |
+| `message` | Warning object (use `str(w.message)` for text) |
+| `filename` | Source file where warning was raised |
+| `lineno` | Line number where warning was raised |
+
+### Failure Behavior
+
+`warns()` raises `AssertionError` when:
+
+1. **No expected warning raised**: If you specify a warning type but none is raised
+2. **Pattern not matched**: If `match` is specified but no warning matches the pattern
+
+```python
+# Fails: no warning raised
+with warns(UserWarning):
+    pass  # AssertionError: DID NOT WARN with UserWarning
+
+# Fails: pattern not found
+with warns(UserWarning, match=r"\d+"):
+    warnings.warn("no digits", UserWarning)  # AssertionError
+```
