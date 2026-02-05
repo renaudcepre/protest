@@ -163,6 +163,89 @@ def test_blocked():
     pass
 ```
 
+## Conditional Skip with Fixtures
+
+**This is a ProTest-exclusive feature.** Unlike pytest's `@pytest.mark.skipif` which only evaluates conditions at import time, ProTest can evaluate skip conditions at runtime with full access to resolved fixtures.
+
+### The Problem with pytest
+
+In pytest, you cannot access fixtures in skipif conditions:
+
+```python
+# pytest - THIS DOESN'T WORK
+@pytest.mark.skipif(config["ci"], reason="Skip in CI")  # ❌ config not available
+def test_something(config):
+    pass
+
+# pytest workarounds are ugly:
+def test_something(config):
+    if config["ci"]:
+        pytest.skip("Skip in CI")  # 😞 skip logic pollutes test body
+    # actual test...
+```
+
+### ProTest Solution
+
+ProTest evaluates skip conditions **after** fixture resolution, so your callable receives the actual fixture values:
+
+```python
+from typing import Annotated
+from protest import Use, fixture
+
+@fixture()
+def environment():
+    return {"is_ci": os.getenv("CI") == "true"}
+
+session.bind(environment)
+
+@session.test(
+    skip=lambda environment: environment["is_ci"],
+    skip_reason="Skip in CI environment",
+)
+def test_local_only(env: Annotated[dict, Use(environment)]):
+    # Clean test body - no skip logic here!
+    pass
+```
+
+**How it works:**
+1. Fixtures are resolved for the test
+2. ProTest introspects the skip callable's signature
+3. Matching fixtures are passed as kwargs to the callable
+4. The callable returns `True` (skip) or `False` (run)
+
+### Skip Object with Condition
+
+For complex conditions:
+
+```python
+from protest import Skip
+
+@session.test(skip=Skip(
+    condition=lambda config: config.get("feature_disabled"),
+    reason="Feature flag disabled",
+))
+def test_feature(config: Annotated[dict, Use(config_fixture)]):
+    pass
+```
+
+### Async Conditions
+
+Async conditions are supported:
+
+```python
+async def check_service_health() -> bool:
+    response = await http_client.get("/health")
+    return response.status != 200
+
+@session.test(skip=check_service_health, skip_reason="Service unhealthy")
+async def test_service():
+    pass
+```
+
+### Error Handling
+
+If a skip callable raises an exception, the test is marked as ERROR (not SKIP or FAIL).
+
 ## Expected Failure (xfail)
 
 Mark tests expected to fail:
@@ -237,6 +320,8 @@ When combining options:
 |-------------|----------|
 | `skip + xfail` | Skip takes priority (test not executed) |
 | `skip + retry` | Skip takes priority |
+| `skip(callable) + xfail` | Skip evaluated first; if skips, xfail ignored |
+| `skip(callable) + retry` | Skip evaluated first; if skips, no retry |
 | `xfail + retry` | Retry first, then xfail/xpass evaluation |
 | `timeout + retry` | Timeout triggers retry |
 

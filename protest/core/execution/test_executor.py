@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import time
 from contextlib import AsyncExitStack, asynccontextmanager
 from inspect import signature
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from protest.core.session import ProTestSession
+    from protest.entities.skip import Skip
     from protest.events.bus import EventBus
 
 
@@ -88,7 +90,7 @@ class TestExecutor:
         finally:
             reset_current_node_id(node_id_token)
 
-    async def _run_test(
+    async def _run_test(  # noqa: PLR0912 - complex test execution flow, refactoring would reduce readability
         self,
         item: TestItem,
         ctx: TestExecutionContext,
@@ -99,7 +101,8 @@ class TestExecutor:
         test_name = start_info.name
         node_id = start_info.node_id
 
-        if item.skip:
+        # Static skip - check before fixture resolution
+        if item.skip and item.skip.is_static:
             return self._outcome_builder.build(
                 TestExecutionResult(
                     test_name=test_name,
@@ -125,6 +128,33 @@ class TestExecutor:
                     is_fixture_error=True,
                 )
             )
+
+        # Conditional skip (callable) - evaluated AFTER fixture resolution
+        if item.skip and item.skip.is_conditional:
+            try:
+                should_skip = await self._evaluate_skip_condition(item.skip, kwargs)
+            except Exception as exc:
+                return self._outcome_builder.build(
+                    TestExecutionResult(
+                        test_name=test_name,
+                        node_id=node_id,
+                        suite_path=item.suite_path,
+                        duration=time.perf_counter() - start,
+                        output=buffer.getvalue(),
+                        error=exc,
+                        is_fixture_error=True,
+                    )
+                )
+            if should_skip:
+                return self._outcome_builder.build(
+                    TestExecutionResult(
+                        test_name=test_name,
+                        node_id=node_id,
+                        suite_path=item.suite_path,
+                        duration=time.perf_counter() - start,
+                        skip_reason=item.skip.reason,
+                    )
+                )
 
         await self._events.emit(Event.TEST_SETUP_DONE, start_info)
 
@@ -235,6 +265,52 @@ class TestExecutor:
         retry_on: type[Exception] | tuple[type[Exception], ...] | None,
     ) -> bool:
         return retry_on is None or isinstance(error, retry_on)
+
+    async def _evaluate_skip_condition(
+        self,
+        skip: Skip,
+        resolved_kwargs: dict[str, Any],
+    ) -> bool:
+        """Evaluate a conditional skip with resolved fixture values.
+
+        Args:
+            skip: The Skip configuration with callable condition
+            resolved_kwargs: Resolved fixture values for the test
+
+        Returns:
+            True if test should be skipped, False otherwise
+
+        Raises:
+            FixtureError: If the callable raises an exception
+        """
+        condition = skip.condition
+        assert callable(condition), "Expected callable for conditional skip"
+
+        # Introspect callable to pass only required kwargs
+        try:
+            cond_sig = signature(condition)
+            cond_params = set(cond_sig.parameters.keys())
+        except (ValueError, TypeError):
+            # Fallback: callable with no introspectable signature
+            cond_params = set()
+
+        # Filter kwargs to only those the condition accepts
+        filtered_kwargs = {
+            k: v for k, v in resolved_kwargs.items() if k in cond_params
+        }
+
+        try:
+            result = condition(**filtered_kwargs)
+            # Support async skip conditions
+            if inspect.isawaitable(result):
+                result = await result  # pyright: ignore[reportGeneralTypeIssues] - runtime type guard
+            return bool(result)
+        except Exception as exc:
+            # Wrap exception for consistent error message
+            raise FixtureError(
+                fixture_name="skip",
+                original=exc,
+            ) from exc
 
     @asynccontextmanager
     async def _acquire_fixture_semaphores(
