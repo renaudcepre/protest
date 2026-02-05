@@ -28,10 +28,10 @@ legacy_suite = ProTestSuite(
 @fixture()
 def fax_machine() -> Generator[str, None, None]:
     """Legacy fax machine - takes time to warm up and cool down."""
-    print("  [legacy] warming up fax machine...")  # noqa: T201
+    print("  [legacy] warming up fax machine...")  # noqa: T201 - debug output for demo
     time.sleep(0.05)
     yield "fax_ready"
-    print("  [legacy] fax machine cooling down")  # noqa: T201
+    print("  [legacy] fax machine cooling down")  # noqa: T201 - debug output for demo
 
 
 legacy_suite.bind(fax_machine)

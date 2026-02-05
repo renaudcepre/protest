@@ -11,9 +11,11 @@ class TestRaisesBasic:
             raise ValueError("test error")
 
     def test_raises_assertion_error_when_no_exception(self) -> None:
-        with pytest.raises(AssertionError, match="DID NOT RAISE ValueError"):  # noqa: SIM117
-            with raises(ValueError):
-                pass
+        with (
+            pytest.raises(AssertionError, match="DID NOT RAISE ValueError"),
+            raises(ValueError),
+        ):
+            pass
 
     def test_propagates_unexpected_exception_type(self) -> None:
         with pytest.raises(TypeError, match="wrong type"), raises(ValueError):
@@ -35,9 +37,11 @@ class TestRaisesWithMatch:
             raise ValueError("invalid input format")
 
     def test_match_fails_with_non_matching_pattern(self) -> None:
-        with pytest.raises(AssertionError, match=r"Pattern.+not found") as outer:  # noqa: SIM117
-            with raises(ValueError, match=r"expected pattern"):
-                raise ValueError("actual message")
+        with (
+            pytest.raises(AssertionError, match=r"Pattern.+not found") as outer,
+            raises(ValueError, match=r"expected pattern"),
+        ):
+            raise ValueError("actual message")
 
         assert outer.value.__cause__ is not None
         assert isinstance(outer.value.__cause__, ValueError)

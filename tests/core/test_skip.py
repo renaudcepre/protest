@@ -140,7 +140,7 @@ class TestSkipWithParameterizedTests:
         session = ProTestSession()
         executed = []
 
-        VALUES = ForEach([1, 2, 3])  # noqa: N806
+        VALUES = ForEach([1, 2, 3])  # noqa: N806 - test constant for parametrization
 
         @session.test(skip="Skip all variations")
         def test_parameterized(val: Annotated[int, From(VALUES)]) -> None:
@@ -161,7 +161,7 @@ class TestSkipWithParameterizedTests:
 
         session.register_plugin(CountingPlugin())
 
-        VALUES = ForEach([1, 2, 3])  # noqa: N806
+        VALUES = ForEach([1, 2, 3])  # noqa: N806 - test constant for parametrization
 
         @session.test(skip=True)
         def test_parameterized(val: Annotated[int, From(VALUES)]) -> None:

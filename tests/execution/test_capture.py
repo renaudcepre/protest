@@ -199,7 +199,7 @@ class TestCaptureIntegration:
 
     def test_print_captured_within_context(self) -> None:
         with GlobalCapturePatch(), CaptureCurrentTest() as buffer:
-            print("hello from print")  # noqa: T201
+            print("hello from print")  # noqa: T201 - testing print capture
 
         assert buffer.getvalue() == "hello from print\n"
 
@@ -209,7 +209,7 @@ class TestCaptureIntegration:
 
         try:
             with GlobalCapturePatch():
-                print("not captured")  # noqa: T201
+                print("not captured")  # noqa: T201 - testing print capture
         finally:
             sys.stdout = sys.__stdout__
 
@@ -221,7 +221,7 @@ class TestCaptureIntegration:
 
         try:
             with GlobalCapturePatch(show_output=True), CaptureCurrentTest() as buffer:
-                print("visible and captured")  # noqa: T201
+                print("visible and captured")  # noqa: T201 - testing print capture
         finally:
             sys.stdout = sys.__stdout__
 
@@ -234,7 +234,7 @@ class TestCaptureIntegration:
 
         try:
             with GlobalCapturePatch(show_output=False), CaptureCurrentTest() as buffer:
-                print("captured only")  # noqa: T201
+                print("captured only")  # noqa: T201 - testing print capture
         finally:
             sys.stdout = sys.__stdout__
 
@@ -245,7 +245,7 @@ class TestCaptureIntegration:
         with GlobalCapturePatch():
             set_session_setup_capture(True)
             try:
-                print("setup output")  # noqa: T201
+                print("setup output")  # noqa: T201 - testing print capture
             finally:
                 set_session_setup_capture(False)
 
@@ -257,7 +257,7 @@ class TestCaptureIntegration:
         with GlobalCapturePatch():
             set_session_teardown_capture(True)
             try:
-                print("teardown output")  # noqa: T201
+                print("teardown output")  # noqa: T201 - testing print capture
             finally:
                 set_session_teardown_capture(False)
 
@@ -270,7 +270,7 @@ class TestCaptureIntegration:
             set_session_setup_capture(True)
             set_session_teardown_capture(True)
             try:
-                print("goes to setup")  # noqa: T201
+                print("goes to setup")  # noqa: T201 - testing print capture
             finally:
                 set_session_setup_capture(False)
                 set_session_teardown_capture(False)
@@ -287,9 +287,9 @@ class TestCaptureIntegration:
 
         async def task_with_output(name: str, delay: float) -> None:
             with CaptureCurrentTest() as buffer:
-                print(f"[{name}] start")  # noqa: T201
+                print(f"[{name}] start")  # noqa: T201 - testing print capture
                 await asyncio.sleep(delay)
-                print(f"[{name}] end")  # noqa: T201
+                print(f"[{name}] end")  # noqa: T201 - testing print capture
                 results[name] = buffer.getvalue()
 
         with GlobalCapturePatch():
@@ -308,7 +308,7 @@ class TestCaptureIntegration:
         async def interleaved_task(name: str) -> None:
             with CaptureCurrentTest() as buffer:
                 for step in range(3):
-                    print(f"[{name}] step {step}")  # noqa: T201
+                    print(f"[{name}] step {step}")  # noqa: T201 - testing print capture
                     await asyncio.sleep(0.005)
                 results[name] = buffer.getvalue()
 

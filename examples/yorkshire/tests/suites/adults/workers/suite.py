@@ -117,7 +117,8 @@ async def test_chef_cooks_recipe(
     assert julia.can_work
     current_recipe["steps"].append("Mix ingredients")
     current_recipe["steps"].append("Bake at 180C")
-    assert len(current_recipe["steps"]) == 2  # noqa: PLR2004
+    expected_steps = 2
+    assert len(current_recipe["steps"]) == expected_steps
 
 
 # =============================================================================
@@ -131,9 +132,10 @@ async def test_worker_has_schedule(
     schedule: Annotated[WorkSchedule, Use(work_schedule)],
 ) -> None:
     """Any worker can check the schedule."""
+    expected_shift_hours = 10
     worker = await dog_factory(name="Worker", job=Job.THERAPIST, age=30)
     assert worker.can_work
-    assert schedule.shift_hours == 10  # noqa: PLR2004
+    assert schedule.shift_hours == expected_shift_hours
 
 
 @workers_suite.test()
@@ -145,7 +147,8 @@ async def test_scheduled_worker_factory(
     bodyguard = await worker_factory(name="Bruno", job=Job.BODYGUARD)
 
     # Both workers have age based on 10h shift (24 + 10 = 34)
-    assert therapist.age == 34  # noqa: PLR2004
-    assert bodyguard.age == 34  # noqa: PLR2004
+    expected_age = 24 + 10
+    assert therapist.age == expected_age
+    assert bodyguard.age == expected_age
     assert therapist.can_work
     assert bodyguard.can_work

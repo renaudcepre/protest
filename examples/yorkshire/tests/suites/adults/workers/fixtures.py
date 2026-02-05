@@ -23,9 +23,9 @@ def setup_work_environment(
     kennel_instance: Annotated[Kennel, Use(kennel)],
 ) -> Generator[None, None, None]:
     """Autouse fixture: prepares work environment when Workers suite starts."""
-    print("  [workers] Setting up work environment (kennel has capacity)")  # noqa: T201
+    print("  [workers] Setting up work environment (kennel has capacity)")  # noqa: T201 - debug output for demo
     yield
-    print("  [workers] Cleaning up work environment")  # noqa: T201
+    print("  [workers] Cleaning up work environment")  # noqa: T201 - debug output for demo
 
 
 @fixture()
@@ -34,9 +34,9 @@ def work_schedule(
 ) -> Generator[WorkSchedule, None, None]:
     """Work schedule shared across all workers tests."""
     schedule = WorkSchedule(kennel=kennel_instance, shift_start=8, shift_end=18)
-    print(f"  [workers] Created schedule: {schedule.shift_hours}h shift")  # noqa: T201
+    print(f"  [workers] Created schedule: {schedule.shift_hours}h shift")  # noqa: T201 - debug output for demo
     yield schedule
-    print("  [workers] Schedule ended")  # noqa: T201
+    print("  [workers] Schedule ended")  # noqa: T201 - debug output for demo
 
 
 @factory()
@@ -48,9 +48,9 @@ def scheduled_worker(
     """Factory for workers with schedule awareness."""
     age = 24 + schedule.shift_hours
     worker = Yorkshire(name=name, size=Size.STANDARD, job=job, age=age)
-    print(f"  [factory] Created {name} for {schedule.shift_hours}h shift")  # noqa: T201
+    print(f"  [factory] Created {name} for {schedule.shift_hours}h shift")  # noqa: T201 - debug output for demo
     yield worker
-    print(f"  [factory] {name} clocked out")  # noqa: T201
+    print(f"  [factory] {name} clocked out")  # noqa: T201 - debug output for demo
 
 
 # =============================================================================
@@ -64,9 +64,9 @@ def detective_tools(
 ) -> Generator[DetectiveTools, None, None]:
     """Detective equipment, depends on parent suite's work_schedule."""
     tools = DetectiveTools()
-    print(f"  [detectives] Tools ready (shift: {schedule.shift_hours}h)")  # noqa: T201
+    print(f"  [detectives] Tools ready (shift: {schedule.shift_hours}h)")  # noqa: T201 - debug output for demo
     yield tools
-    print("  [detectives] Tools stored")  # noqa: T201
+    print("  [detectives] Tools stored")  # noqa: T201 - debug output for demo
 
 
 @fixture()
@@ -91,10 +91,10 @@ def chef_kitchen(
 ) -> Generator[ChefKitchen, None, None]:
     """Kitchen setup, depends on parent suite's work_schedule."""
     kitchen = ChefKitchen(stove_on=True, ingredients=["treats", "bacon"])
-    print(f"  [chefs] Kitchen open (shift: {schedule.shift_hours}h)")  # noqa: T201
+    print(f"  [chefs] Kitchen open (shift: {schedule.shift_hours}h)")  # noqa: T201 - debug output for demo
     yield kitchen
     kitchen.stove_on = False
-    print("  [chefs] Kitchen closed")  # noqa: T201
+    print("  [chefs] Kitchen closed")  # noqa: T201 - debug output for demo
 
 
 @fixture()
