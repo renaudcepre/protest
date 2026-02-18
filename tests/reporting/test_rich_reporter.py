@@ -58,20 +58,36 @@ class TestRichReporterBasic:
         reporter.console = MagicMock()
         return reporter
 
+    @pytest.fixture
+    def reporter_v1(self) -> RichReporter:
+        reporter = RichReporter(verbosity=1)
+        reporter.console = MagicMock()
+        return reporter
+
     def test_on_collection_finish_stores_count(self, reporter: RichReporter) -> None:
         items = [_make_test_item(f"test_{idx}") for idx in range(5)]
         result = reporter.on_collection_finish(items)
         assert reporter._total_tests == 5
         assert result is items
 
-    def test_on_test_pass_prints(self, reporter: RichReporter) -> None:
+    def test_on_test_pass_prints(self, reporter_v1: RichReporter) -> None:
+        """Given verbosity=1, test pass prints to console."""
+        result = TestResult(
+            name="test_example", node_id="mod::test_example", duration=0.05
+        )
+        reporter_v1.on_test_pass(result)
+        reporter_v1.console.print.assert_called()
+
+    def test_on_test_pass_quiet(self, reporter: RichReporter) -> None:
+        """Given default verbosity, test pass does not print."""
         result = TestResult(
             name="test_example", node_id="mod::test_example", duration=0.05
         )
         reporter.on_test_pass(result)
-        reporter.console.print.assert_called()
+        reporter.console.print.assert_not_called()
 
     def test_on_test_fail_prints(self, reporter: RichReporter) -> None:
+        """Failures always print regardless of verbosity."""
         result = TestResult(
             name="test_failing",
             node_id="mod::test_failing",
@@ -192,19 +208,30 @@ class TestRichReporterTestStatus:
         reporter._output = output
         return reporter
 
-    def test_on_test_skip(self, reporter: RichReporter) -> None:
+    @pytest.fixture
+    def reporter_v1(self) -> RichReporter:
+        reporter = RichReporter(verbosity=1)
+        output = StringIO()
+        reporter.console = MagicMock()
+        reporter.console.print = lambda msg: output.write(str(msg) + "\n")
+        reporter._output = output
+        return reporter
+
+    def test_on_test_skip(self, reporter_v1: RichReporter) -> None:
+        """Given verbosity=1, skip status prints."""
         result = TestResult(
             name="test_skipped",
             node_id="mod::test_skipped",
             duration=0.0,
             skip_reason="Not ready",
         )
-        reporter.on_test_skip(result)
-        output = reporter._output.getvalue()
+        reporter_v1.on_test_skip(result)
+        output = reporter_v1._output.getvalue()
         assert "test_skipped" in output
         assert "Not ready" in output
 
-    def test_on_test_xfail(self, reporter: RichReporter) -> None:
+    def test_on_test_xfail(self, reporter_v1: RichReporter) -> None:
+        """Given verbosity=1, xfail status prints."""
         result = TestResult(
             name="test_expected_fail",
             node_id="mod::test_expected_fail",
@@ -212,12 +239,13 @@ class TestRichReporterTestStatus:
             xfail_reason="Known bug",
             error=AssertionError("expected"),
         )
-        reporter.on_test_xfail(result)
-        output = reporter._output.getvalue()
+        reporter_v1.on_test_xfail(result)
+        output = reporter_v1._output.getvalue()
         assert "test_expected_fail" in output
         assert "Known bug" in output
 
     def test_on_test_xpass(self, reporter: RichReporter) -> None:
+        """xpass always prints (like failures)."""
         result = TestResult(
             name="test_unexpected_pass",
             node_id="mod::test_unexpected_pass",
@@ -230,6 +258,7 @@ class TestRichReporterTestStatus:
         assert "XPASS" in output
 
     def test_on_test_fail_fixture_error(self, reporter: RichReporter) -> None:
+        """Fixture errors always print."""
         result = TestResult(
             name="test_fixture_fail",
             node_id="mod::test_fixture_fail",
@@ -297,8 +326,17 @@ class TestRichReporterRetry:
         reporter._output = output
         return reporter
 
+    @pytest.fixture
+    def reporter_v1(self) -> RichReporter:
+        reporter = RichReporter(verbosity=1)
+        output = StringIO()
+        reporter.console = MagicMock()
+        reporter.console.print = lambda msg: output.write(str(msg) + "\n")
+        reporter._output = output
+        return reporter
+
     def test_on_test_retry_with_delay(self, reporter: RichReporter) -> None:
-        """Retry message includes delay when > 0."""
+        """Retry message always prints (failures)."""
         reporter.on_test_retry(
             TestRetryInfo(
                 name="test_flaky",
@@ -316,9 +354,9 @@ class TestRichReporterRetry:
         assert "retrying in 1.5s" in output
         assert "ValueError" in output
 
-    def test_on_test_pass_with_retry(self, reporter: RichReporter) -> None:
-        """Pass message includes attempt info when retried."""
-        reporter.on_test_pass(
+    def test_on_test_pass_with_retry(self, reporter_v1: RichReporter) -> None:
+        """Given verbosity=1, pass message includes attempt info when retried."""
+        reporter_v1.on_test_pass(
             TestResult(
                 name="test_flaky",
                 node_id="module::test_flaky",
@@ -327,7 +365,7 @@ class TestRichReporterRetry:
                 max_attempts=3,
             )
         )
-        output = reporter._output.getvalue()
+        output = reporter_v1._output.getvalue()
         assert "test_flaky" in output
         assert "attempt 2/3" in output
 

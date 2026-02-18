@@ -79,7 +79,8 @@ class TestRunLastFailed:
 
         result = run_protest("run", "failing_session:session", "--cache-clear")
         result.assert_failure()
-        result.assert_output_contains("test_passing")
+        # Summary shows 3 tests ran (2 passed, 1 failed) - proves cache was cleared
+        assert "2/3 passed" in result.stdout
         result.assert_output_contains("test_failing")
 
 

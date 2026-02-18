@@ -206,6 +206,14 @@ def _create_run_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Disable stdout/stderr capture (show print output)",
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="verbosity",
+        action="count",
+        default=0,
+        help="Increase verbosity (-v for lifecycle, -vv for fixtures)",
+    )
     return parser
 
 

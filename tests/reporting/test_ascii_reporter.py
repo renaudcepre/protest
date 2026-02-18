@@ -26,8 +26,20 @@ from tests.factories.test_items import make_test_item
 
 @pytest.fixture
 def ascii_reporter() -> AsciiReporter:
-    """Provide a fresh AsciiReporter for each test."""
+    """Provide a fresh AsciiReporter with default verbosity (0)."""
     return AsciiReporter()
+
+
+@pytest.fixture
+def ascii_reporter_v1() -> AsciiReporter:
+    """Provide a fresh AsciiReporter with verbosity=1 (lifecycle)."""
+    return AsciiReporter(verbosity=1)
+
+
+@pytest.fixture
+def ascii_reporter_v2() -> AsciiReporter:
+    """Provide a fresh AsciiReporter with verbosity=2 (fixtures)."""
+    return AsciiReporter(verbosity=2)
 
 
 class TestFormatDuration:
@@ -69,32 +81,59 @@ class TestFormatTestName:
 
 class TestAsciiReporterHooks:
     def test_on_session_start(
-        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+        self, ascii_reporter_v1: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Given a session, when started, then 'Starting session' is printed."""
-        ascii_reporter.on_session_start()
+        """Given verbosity=1, when started, then 'Starting session' is printed."""
+        ascii_reporter_v1.on_session_start()
         captured = capsys.readouterr()
         assert "Starting session" in captured.out
 
-    def test_on_suite_start(
+    def test_on_session_start_quiet(
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Given a suite, when started, then suite name is printed."""
+        """Given default verbosity, when started, then nothing is printed."""
+        ascii_reporter.on_session_start()
+        captured = capsys.readouterr()
+        assert captured.out == ""
+
+    def test_on_suite_start_verbose(
+        self, ascii_reporter_v2: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Given verbosity=2, when suite starts, then setup message is printed."""
+        ascii_reporter_v2.on_suite_start(SuiteStartInfo(name=SuitePath("MySuite")))
+        captured = capsys.readouterr()
+        assert "suite 'MySuite' setup" in captured.out
+
+    def test_on_suite_start_quiet(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Given default verbosity, when suite starts, then nothing is printed."""
         ascii_reporter.on_suite_start(SuiteStartInfo(name=SuitePath("MySuite")))
         captured = capsys.readouterr()
-        assert "MySuite" in captured.out
+        assert captured.out == ""
 
     def test_on_test_pass(
+        self, ascii_reporter_v1: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Given verbosity=1, when test passes, then 'OK' marker and duration are shown."""
+        result = TestResult(
+            name="test_example", node_id="mod::test_example", duration=0.05
+        )
+        ascii_reporter_v1.on_test_pass(result)
+        captured = capsys.readouterr()
+        assert "OK test_example" in captured.out
+        assert "50ms" in captured.out
+
+    def test_on_test_pass_quiet(
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Given a passing test, when reported, then 'OK' marker and duration are shown."""
+        """Given default verbosity, when test passes, then nothing is printed."""
         result = TestResult(
             name="test_example", node_id="mod::test_example", duration=0.05
         )
         ascii_reporter.on_test_pass(result)
         captured = capsys.readouterr()
-        assert "OK test_example" in captured.out
-        assert "50ms" in captured.out
+        assert captured.out == ""
 
     def test_on_test_fail(
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
@@ -352,16 +391,16 @@ class TestAsciiReporterTestStatus:
     )
     def test_test_status_display(
         self,
-        ascii_reporter: AsciiReporter,
+        ascii_reporter_v1: AsciiReporter,
         capsys: pytest.CaptureFixture[str],
         handler_method: str,
         result_kwargs: dict,
         expected_marker: str,
         expected_texts: list[str],
     ) -> None:
-        """Given a test with special status, when reported, then marker and info are shown."""
+        """Given verbosity=1, when test has special status, then marker and info are shown."""
         result = TestResult(**result_kwargs)
-        getattr(ascii_reporter, handler_method)(result)
+        getattr(ascii_reporter_v1, handler_method)(result)
         captured = capsys.readouterr()
         assert f"{expected_marker} " in captured.out
         for text in expected_texts:
@@ -445,25 +484,41 @@ class TestAsciiReporterLifecycle:
     """Test lifecycle hooks (setup/teardown)."""
 
     def test_session_setup_done(
-        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+        self, ascii_reporter_v2: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Session setup done prints session setup message."""
-        ascii_reporter.on_session_setup_done(SessionSetupInfo(duration=0.1))
+        """Given verbosity=2, session setup done prints message."""
+        ascii_reporter_v2.on_session_setup_done(SessionSetupInfo(duration=0.1))
         captured = capsys.readouterr()
         assert "session setup" in captured.out
 
-    def test_suite_setup_done(
+    def test_session_setup_done_quiet(
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Suite setup done prints suite name."""
+        """Given default verbosity, session setup done is silent."""
+        ascii_reporter.on_session_setup_done(SessionSetupInfo(duration=0.1))
+        captured = capsys.readouterr()
+        assert captured.out == ""
+
+    def test_suite_setup_done(
+        self, ascii_reporter_v1: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Given verbosity=1, suite setup done prints suite header."""
+        ascii_reporter_v1.on_suite_setup_done(SuiteSetupInfo(name="MySuite", duration=0.1))
+        captured = capsys.readouterr()
+        assert "[] MySuite" in captured.out
+
+    def test_suite_setup_done_quiet(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Given default verbosity, suite setup done is silent."""
         ascii_reporter.on_suite_setup_done(SuiteSetupInfo(name="MySuite", duration=0.1))
         captured = capsys.readouterr()
-        assert "suite 'MySuite' setup" in captured.out
+        assert captured.out == ""
 
     def test_test_setup_done(
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Test setup done is silent (too verbose)."""
+        """Test setup done is silent at default verbosity."""
         ascii_reporter.on_test_setup_done(TestStartInfo(name="test_foo", node_id="x"))
         captured = capsys.readouterr()
         assert captured.out == ""
@@ -471,7 +526,7 @@ class TestAsciiReporterLifecycle:
     def test_test_teardown_start(
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Test teardown start is silent (too verbose)."""
+        """Test teardown start is silent at default verbosity."""
         ascii_reporter.on_test_teardown_start(
             TestTeardownInfo(name="test_foo", node_id="x", outcome=Event.TEST_PASS)
         )
@@ -479,20 +534,36 @@ class TestAsciiReporterLifecycle:
         assert captured.out == ""
 
     def test_suite_teardown_start(
-        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+        self, ascii_reporter_v2: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Suite teardown start prints suite name."""
-        ascii_reporter.on_suite_teardown_start("MySuite")
+        """Given verbosity=2, suite teardown start prints message."""
+        ascii_reporter_v2.on_suite_teardown_start("MySuite")
         captured = capsys.readouterr()
         assert "suite 'MySuite' teardown" in captured.out
 
-    def test_session_teardown_start(
+    def test_suite_teardown_start_quiet(
         self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Session teardown start prints session teardown message."""
-        ascii_reporter.on_session_teardown_start()
+        """Given default verbosity, suite teardown is silent."""
+        ascii_reporter.on_suite_teardown_start("MySuite")
+        captured = capsys.readouterr()
+        assert captured.out == ""
+
+    def test_session_teardown_start(
+        self, ascii_reporter_v2: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Given verbosity=2, session teardown start prints message."""
+        ascii_reporter_v2.on_session_teardown_start()
         captured = capsys.readouterr()
         assert "session teardown" in captured.out
+
+    def test_session_teardown_start_quiet(
+        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Given default verbosity, session teardown is silent."""
+        ascii_reporter.on_session_teardown_start()
+        captured = capsys.readouterr()
+        assert captured.out == ""
 
 
 class TestAsciiReporterRetry:
@@ -521,10 +592,10 @@ class TestAsciiReporterRetry:
         assert "ValueError" in captured.out
 
     def test_on_test_pass_with_retry(
-        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
+        self, ascii_reporter_v1: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Pass message includes attempt info when retried."""
-        ascii_reporter.on_test_pass(
+        """Given verbosity=1, pass message includes attempt info when retried."""
+        ascii_reporter_v1.on_test_pass(
             TestResult(
                 name="test_flaky",
                 node_id="module::test_flaky",
