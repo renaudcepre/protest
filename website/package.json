@@ -1,0 +1,40 @@
+{
+  "name": "protest-docs",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.2",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@iconify-json/lucide": "^1.2.87",
+    "@nuxt/content": "^3.11.2",
+    "@nuxt/fonts": "^0.13.0",
+    "@nuxt/ui": "^4.4.0",
+    "@nuxtjs/mdc": "^0.20.1",
+    "@nuxtjs/sitemap": "^7.6.0",
+    "better-sqlite3": "^12.6.2",
+    "nuxt": "^4.3.0",
+    "tailwindcss": "^4.1.18"
+  },
+  "devDependencies": {
+    "@nuxt/eslint": "^1.13.0",
+    "eslint": "^9.39.2",
+    "typescript": "^5.9.3",
+    "vue-tsc": "^3.2.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "better-sqlite3",
+      "esbuild",
+      "unrs-resolver"
+    ]
+  }
+}
