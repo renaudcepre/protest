@@ -4,8 +4,10 @@ const props = withDefaults(defineProps<{
   title?: string
   source?: string
   open?: boolean
+  openOutput?: boolean
 }>(), {
   open: false,
+  openOutput: true,
 })
 
 const ansiHtml = ref('')
@@ -13,6 +15,7 @@ const plainText = ref('')
 const sourceMarkdown = ref('')
 const hasSource = ref(false)
 const sourceOpen = ref(props.open)
+const outputOpen = ref(props.openOutput)
 const copied = ref(false)
 const loaded = ref(false)
 
@@ -53,83 +56,105 @@ async function copyToClipboard() {
 </script>
 
 <template>
-  <div class="my-4">
+  <div class="my-6 flex flex-col gap-1.5">
     <!-- Collapsible source code -->
     <div
       v-if="hasSource"
-      class="source-block border border-[var(--color-dark-700)] overflow-hidden"
-      :class="sourceOpen ? 'rounded-t-lg' : 'rounded-lg mb-0'"
+      class="panel overflow-hidden rounded-lg border border-white/10"
+      :class="sourceOpen ? 'panel--source-open' : ''"
     >
       <button
-        class="w-full flex items-center gap-2 px-4 py-2 bg-[var(--color-dark-800)] text-sm font-mono text-[var(--color-dark-400)] hover:text-[var(--color-dark-200)] transition-colors"
+        class="panel-header w-full flex items-center justify-between px-4 py-2.5 bg-white/[0.03] border-b border-white/10 cursor-pointer"
         @click="sourceOpen = !sourceOpen"
       >
-        <span
-          class="inline-block transition-transform duration-200"
-          :class="sourceOpen ? 'rotate-90' : ''"
-        >
-          &#9656;
-        </span>
-        <span>Source</span>
-        <span class="text-xs text-[var(--color-dark-500)]">{{ source }}</span>
+        <div class="flex items-center gap-2">
+          <span
+            class="chevron inline-block transition-transform duration-200 text-[var(--color-dark-500)]"
+            :class="sourceOpen ? 'rotate-90' : ''"
+          >
+            &#9656;
+          </span>
+          <span class="text-sm font-mono text-[var(--color-dark-400)]">{{ source }}</span>
+        </div>
       </button>
       <div
-        class="source-content overflow-hidden transition-all duration-300 ease-in-out"
-        :class="sourceOpen ? 'max-h-96' : 'max-h-0'"
+        class="overflow-hidden transition-all duration-300 ease-in-out"
+        :class="sourceOpen ? 'max-h-[28rem]' : 'max-h-0'"
       >
-        <div class="overflow-y-auto max-h-80 border-t border-[var(--color-dark-700)]">
+        <div class="overflow-y-auto max-h-96">
           <MDC :value="sourceMarkdown" />
         </div>
       </div>
     </div>
 
-    <!-- Terminal output block -->
-    <div
-      class="terminal-block overflow-hidden border border-[var(--color-dark-700)]"
-      :class="hasSource && sourceOpen ? 'rounded-b-lg border-t-0' : 'rounded-lg'"
-    >
-      <div
-        v-if="title"
-        class="terminal-header flex items-center justify-between px-4 py-2 bg-[var(--color-dark-800)] border-b border-[var(--color-dark-700)]"
+    <!-- Collapsible terminal output -->
+    <div class="panel overflow-hidden rounded-lg border border-white/10">
+      <button
+        class="panel-header w-full flex items-center justify-between px-4 py-2.5 bg-white/[0.03] border-b border-white/10 cursor-pointer"
+        @click="outputOpen = !outputOpen"
       >
-        <span class="text-sm font-mono text-[var(--color-dark-400)]">{{ title }}</span>
-        <button
-          class="text-xs text-[var(--color-dark-400)] hover:text-[var(--color-dark-200)] transition-colors"
-          @click="copyToClipboard"
+        <div class="flex items-center gap-2">
+          <span
+            class="chevron inline-block transition-transform duration-200 text-[var(--color-dark-500)]"
+            :class="outputOpen ? 'rotate-90' : ''"
+          >
+            &#9656;
+          </span>
+          <img src="/logo-icon.svg" alt="" class="h-4 w-auto opacity-50">
+          <span v-if="title" class="text-sm font-mono text-[var(--color-dark-400)]">{{ title }}</span>
+        </div>
+        <span
+          class="text-xs text-[var(--color-dark-500)] hover:text-[var(--color-dark-300)] transition-colors"
+          role="button"
+          @click.stop="copyToClipboard"
         >
           {{ copied ? 'Copied!' : 'Copy' }}
-        </button>
-      </div>
+        </span>
+      </button>
       <div
-        v-else
-        class="flex justify-end px-4 pt-2 bg-[var(--color-dark-950)]"
+        class="overflow-hidden transition-all duration-300 ease-in-out"
+        :class="outputOpen ? 'max-h-[40rem]' : 'max-h-0'"
       >
-        <button
-          class="text-xs text-[var(--color-dark-400)] hover:text-[var(--color-dark-200)] transition-colors"
-          @click="copyToClipboard"
-        >
-          {{ copied ? 'Copied!' : 'Copy' }}
-        </button>
-      </div>
-      <pre
-        v-if="loaded"
-        class="terminal-body px-4 py-3 bg-[var(--color-dark-950)] text-sm leading-relaxed overflow-x-auto font-mono"
-        v-html="ansiHtml"
-      />
-      <div
-        v-else
-        class="px-4 py-6 bg-[var(--color-dark-950)] text-[var(--color-dark-500)] text-sm font-mono animate-pulse"
-      >
-        Loading...
+        <div class="overflow-y-auto max-h-[38rem]">
+          <pre
+            v-if="loaded"
+            class="px-4 py-3 text-sm leading-relaxed overflow-x-auto font-mono bg-transparent"
+            v-html="ansiHtml"
+          />
+          <div
+            v-else
+            class="px-4 py-6 text-[var(--color-dark-500)] text-sm font-mono animate-pulse"
+          >
+            Loading...
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.source-block :deep(pre) {
+.panel {
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.85) 0%,
+    rgba(15, 23, 42, 0.75) 50%,
+    rgba(15, 23, 42, 0.85) 100%
+  );
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Subtle purple glow on source when open */
+.panel--source-open {
+  border-color: rgba(168, 85, 247, 0.2);
+  box-shadow: 0 0 20px -5px rgba(168, 85, 247, 0.1);
+}
+
+.panel :deep(pre) {
   margin: 0 !important;
   border-radius: 0 !important;
   border: none !important;
+  background: transparent !important;
 }
 </style>
