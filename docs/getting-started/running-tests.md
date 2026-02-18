@@ -111,6 +111,24 @@ protest run tests:session -s
 protest run tests:session --no-capture
 ```
 
+### Verbosity Levels (-v)
+
+Control output detail level. By default, only failures are shown with a live progress bar:
+
+```bash
+protest run tests:session           # Default: progress bar + failures only
+protest run tests:session -v        # Show all test names + suite headers
+protest run tests:session -vv       # Also show lifecycle (setup/teardown)
+protest run tests:session -vvv      # Also show fixtures
+```
+
+| Level | Shows |
+|-------|-------|
+| 0 (default) | Progress bar, failures, summary |
+| 1 (-v) | + All test names, suite headers |
+| 2 (-vv) | + Session/suite setup and teardown |
+| 3 (-vvv) | + Fixture setup and teardown |
+
 ### Collect Without Running
 
 List tests without executing them:

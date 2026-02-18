@@ -4,6 +4,7 @@ from pathlib import Path
 from typing_extensions import Self
 
 from protest.entities import (
+    FixtureInfo,
     HandlerInfo,
     SessionResult,
     SessionSetupInfo,
@@ -14,6 +15,8 @@ from protest.entities import (
     TestItem,
     TestResult,
     TestRetryInfo,
+    TestStartInfo,
+    TestTeardownInfo,
 )
 from protest.plugin import PluginBase, PluginContext
 
@@ -61,7 +64,8 @@ class AsciiReporter(PluginBase):
     name = "ascii-reporter"
     description = "Plain ASCII reporter"
 
-    def __init__(self) -> None:
+    def __init__(self, verbosity: int = 0) -> None:
+        self._verbosity = verbosity
         self._is_parallel = False
         self._failed_results: list[TestResult] = []
         self._error_results: list[TestResult] = []
@@ -69,7 +73,7 @@ class AsciiReporter(PluginBase):
     @classmethod
     def activate(cls, ctx: PluginContext) -> Self | None:
         if ctx.get("no_color", False):
-            return cls()
+            return cls(verbosity=ctx.get("verbosity", 0))
         return None
 
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
@@ -77,36 +81,66 @@ class AsciiReporter(PluginBase):
         return items
 
     def on_session_start(self) -> None:
-        print(">> Starting session")
-        print()
+        if self._verbosity >= 1:
+            print(">> Starting session")
+            print()
 
     def on_session_setup_done(self, info: SessionSetupInfo) -> None:
-        print("  session setup...")
+        if self._verbosity >= 2:
+            print(f"  session setup done ({_format_duration(info.duration)})")
 
     def on_suite_setup_done(self, info: SuiteSetupInfo) -> None:
-        print(f"  suite '{info.name}' setup...")
+        # Suite headers only at verbosity >= 1
+        if self._verbosity >= 1:
+            print(f"[] {info.name}")
 
     def on_session_teardown_start(self) -> None:
-        print("  session teardown...")
+        if self._verbosity >= 2:
+            print("  session teardown...")
 
     def on_suite_teardown_start(self, path: SuitePath) -> None:
-        print(f"  suite '{path}' teardown...")
+        if self._verbosity >= 2:
+            print(f"  suite '{path}' teardown...")
 
     def on_suite_end(self, result: SuiteResult) -> None:
-        if result.teardown_duration > 0:
+        if self._verbosity >= 2 and result.teardown_duration > 0:
             print(
                 f"  {result.name} teardown done ({_format_duration(result.teardown_duration)})"
             )
 
     def on_session_end(self, result: SessionResult) -> None:
-        if result.teardown_duration > 0:
+        if self._verbosity >= 2 and result.teardown_duration > 0:
             print(
                 f"  session teardown done ({_format_duration(result.teardown_duration)})"
             )
 
     def on_suite_start(self, info: SuiteStartInfo) -> None:
-        if not self._is_parallel:
-            print(f"[] {info.name}")
+        if self._verbosity >= 2:
+            print(f"  suite '{info.name}' setup...")
+
+    def on_fixture_setup_start(self, info: FixtureInfo) -> None:
+        if self._verbosity >= 3:
+            print(f"    -> fixture '{info.name}' setup... ({info.scope.value})")
+
+    def on_fixture_setup_done(self, info: FixtureInfo) -> None:
+        if self._verbosity >= 3:
+            print(f"    -> fixture '{info.name}' ready ({_format_duration(info.duration)})")
+
+    def on_fixture_teardown_start(self, info: FixtureInfo) -> None:
+        if self._verbosity >= 3:
+            print(f"    -> fixture '{info.name}' teardown...")
+
+    def on_fixture_teardown_done(self, info: FixtureInfo) -> None:
+        if self._verbosity >= 3:
+            print(f"    -> fixture '{info.name}' cleaned ({_format_duration(info.duration)})")
+
+    def on_test_setup_done(self, info: TestStartInfo) -> None:
+        if self._verbosity >= 3:
+            print(f"      > {info.name} setup done")
+
+    def on_test_teardown_start(self, info: TestTeardownInfo) -> None:
+        if self._verbosity >= 3:
+            print(f"      < {info.name} teardown...")
 
     def on_test_retry(self, info: TestRetryInfo) -> None:
         delay_msg = f", retrying in {info.delay}s" if info.delay > 0 else ""
@@ -117,12 +151,13 @@ class AsciiReporter(PluginBase):
         )
 
     def on_test_pass(self, result: TestResult) -> None:
-        name = _format_test_name(result, include_suite=self._is_parallel)
-        duration = _format_duration(result.duration)
-        retry_suffix = ""
-        if result.max_attempts > 1:
-            retry_suffix = f" [attempt {result.attempt}/{result.max_attempts}]"
-        print(f"  OK {name} ({duration}){retry_suffix}")
+        if self._verbosity >= 1:
+            name = _format_test_name(result, include_suite=self._is_parallel)
+            duration = _format_duration(result.duration)
+            retry_suffix = ""
+            if result.max_attempts > 1:
+                retry_suffix = f" [attempt {result.attempt}/{result.max_attempts}]"
+            print(f"  OK {name} ({duration}){retry_suffix}")
 
     def on_test_fail(self, result: TestResult) -> None:
         name = _format_test_name(result, include_suite=self._is_parallel)
@@ -147,15 +182,18 @@ class AsciiReporter(PluginBase):
                 print(f"    | {line}")
 
     def on_test_skip(self, result: TestResult) -> None:
-        name = _format_test_name(result, include_suite=self._is_parallel)
-        print(f"  -- {name} ({result.skip_reason})")
+        if self._verbosity >= 1:
+            name = _format_test_name(result, include_suite=self._is_parallel)
+            print(f"  -- {name} ({result.skip_reason})")
 
     def on_test_xfail(self, result: TestResult) -> None:
-        name = _format_test_name(result, include_suite=self._is_parallel)
-        duration = _format_duration(result.duration)
-        print(f"  xf {name} ({result.xfail_reason}) ({duration})")
+        if self._verbosity >= 1:
+            name = _format_test_name(result, include_suite=self._is_parallel)
+            duration = _format_duration(result.duration)
+            print(f"  xf {name} ({result.xfail_reason}) ({duration})")
 
     def on_test_xpass(self, result: TestResult) -> None:
+        # xpass is a problem - always show like failures
         name = _format_test_name(result, include_suite=self._is_parallel)
         duration = _format_duration(result.duration)
         print(f"  XP {name} UNEXPECTED PASS ({duration})")
