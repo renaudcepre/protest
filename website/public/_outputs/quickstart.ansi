@@ -1,0 +1,10 @@
+[2m  session setup...[0m
+[2m  suite 'MySuite' setup...[0m
+[36m       ◈ MySuite[0m
+   [32m✓[0m   test_all_fixtures [2m(14ms)[0m
+[2m  suite 'MySuite' teardown...[0m
+[2m  MySuite teardown done (3ms)[0m
+[2m  session teardown...[0m
+[2m  session teardown done (3ms)[0m
+
+[1;32m✓ ALL PASSED[0m │ 1/1 passed │ 0.06s

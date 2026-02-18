@@ -52,7 +52,7 @@ export default defineNuxtConfig({
     prerender: {
       crawlLinks: true,
       routes: ['/']
-    }
+    },
   },
 
   eslint: {

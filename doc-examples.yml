@@ -1,0 +1,12 @@
+outputs:
+  - id: quickstart
+    command: "protest run session:session"
+    working_dir: "examples/minimal"
+    source_file: "session.py"
+    expect_failure: false
+
+  - id: collect-only
+    command: "protest run session:session --collect-only"
+    working_dir: "examples/minimal"
+    source_file: "session.py"
+    expect_failure: false
