@@ -10,61 +10,118 @@ const props = withDefaults(defineProps<{
   openOutput: true,
 })
 
-const ansiHtml = ref('')
-const plainText = ref('')
-const sourceMarkdown = ref('')
-const hasSource = ref(false)
-const sourceOpen = ref(props.open)
-const outputOpen = ref(props.openOutput)
-const copied = ref(false)
-const loaded = ref(false)
+const { data: ansiData } = await useAsyncData(`output-${props.id}`, async () => {
+  const item = await queryCollection('examples')
+    .where('stem', '=', `_examples/${props.id}`)
+    .where('extension', '=', 'ansi')
+    .first()
+  if (!item?.raw) return null
 
-onMounted(async () => {
   const { AnsiUp } = await import('ansi_up')
-
-  // Fetch ANSI output
-  const raw = await $fetch<string>(`/_outputs/${props.id}.ansi`, {
-    responseType: 'text',
-  })
   const converter = new AnsiUp()
   converter.use_classes = false
-  ansiHtml.value = converter.ansi_to_html(raw)
-  plainText.value = raw.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
-
-  // Fetch source file if specified
-  if (props.source) {
-    try {
-      const source = await $fetch<string>(`/_outputs/sources/${props.source}`, {
-        responseType: 'text',
-      })
-      sourceMarkdown.value = '```python\n' + source.trimEnd() + '\n```'
-      hasSource.value = true
-    }
-    catch {
-      // Source file not found
-    }
+  return {
+    html: converter.ansi_to_html(item.raw),
   }
-
-  loaded.value = true
 })
 
-async function copyToClipboard() {
-  await navigator.clipboard.writeText(plainText.value.trim())
-  copied.value = true
-  setTimeout(() => { copied.value = false }, 2000)
+interface SourceSegment {
+  code: string
+  focused: boolean
 }
+
+function parseSource(raw: string): { segments: SourceSegment[], hasFocus: boolean } {
+  const lines = raw.split('\n')
+  const hasMarkers = lines.some(l => l.trim().startsWith('# doc:focus:'))
+
+  if (!hasMarkers) {
+    return { segments: [{ code: raw, focused: true }], hasFocus: false }
+  }
+
+  const segments: SourceSegment[] = []
+  let current: string[] = []
+  let inFocus = false
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed === '# doc:focus:start') {
+      if (current.length) {
+        segments.push({ code: current.join('\n'), focused: false })
+        current = []
+      }
+      inFocus = true
+      continue
+    }
+    if (trimmed === '# doc:focus:end') {
+      if (current.length) {
+        segments.push({ code: current.join('\n'), focused: true })
+        current = []
+      }
+      inFocus = false
+      continue
+    }
+    current.push(line)
+  }
+  if (current.length) {
+    segments.push({ code: current.join('\n'), focused: inFocus })
+  }
+
+  return { segments, hasFocus: true }
+}
+
+function stripMarkers(raw: string): string {
+  return raw.split('\n').filter(l => !l.trim().startsWith('# doc:focus:')).join('\n')
+}
+
+const { data: sourceData } = await useAsyncData(
+  `source-${props.source ?? 'none'}`,
+  async () => {
+    if (!props.source) return null
+    const stem = props.source.replace(/\.[^.]+$/, '')
+    const item = await queryCollection('examples')
+      .where('stem', '=', `_examples/${stem}`)
+      .where('extension', '=', 'py')
+      .first()
+    if (!item?.raw) return null
+
+    const { createHighlighter } = await import('shiki')
+    const highlighter = await createHighlighter({
+      themes: ['github-dark'],
+      langs: ['python']
+    })
+    const highlight = (code: string) => highlighter.codeToHtml(code, { lang: 'python', theme: 'github-dark' })
+
+    const raw = item.raw
+    const clean = stripMarkers(raw)
+    const { segments, hasFocus } = parseSource(raw)
+
+    return {
+      raw,
+      hasFocus,
+      fullHtml: highlight(clean),
+      segments: segments.map(seg => ({
+        ...seg,
+        html: highlight(seg.code),
+        lineCount: seg.code.split('\n').filter(l => l.trim()).length
+      }))
+    }
+  },
+)
+
+const ansiHtml = computed(() => ansiData.value?.html ?? '')
+const sourceOpen = ref(props.open)
+const outputOpen = ref(props.openOutput)
+const sourceExpanded = ref(false)
 </script>
 
 <template>
-  <div class="my-6 flex flex-col gap-1.5">
-    <!-- Collapsible source code -->
-    <div
-      v-if="hasSource"
-      class="panel overflow-hidden rounded-lg border border-white/10"
-      :class="sourceOpen ? 'panel--source-open' : ''"
-    >
+  <div
+    class="example-unit my-6 rounded-lg border border-white/10 overflow-hidden"
+  >
+    <!-- Source section -->
+    <div v-if="source">
       <button
-        class="panel-header w-full flex items-center justify-between px-4 py-2.5 bg-white/[0.03] border-b border-white/10 cursor-pointer"
+        class="section-header w-full flex items-center justify-between px-4 py-2.5 bg-white/[0.1] cursor-pointer"
         @click="sourceOpen = !sourceOpen"
       >
         <div class="flex items-center gap-2">
@@ -76,21 +133,56 @@ async function copyToClipboard() {
           </span>
           <span class="text-sm font-mono text-[var(--color-dark-400)]">{{ source }}</span>
         </div>
+        <span
+          v-if="sourceData?.hasFocus && sourceOpen"
+          class="text-xs text-[var(--color-dark-500)] hover:text-[var(--color-dark-300)] transition-colors cursor-pointer"
+          @click.stop="sourceExpanded = !sourceExpanded"
+        >
+          {{ sourceExpanded ? 'Focus' : 'Full' }}
+        </span>
       </button>
       <div
         class="overflow-hidden transition-all duration-300 ease-in-out"
-        :class="sourceOpen ? 'max-h-[28rem]' : 'max-h-0'"
+        :class="sourceOpen ? 'max-h-72' : 'max-h-0'"
       >
-        <div class="overflow-y-auto max-h-96">
-          <MDC :value="sourceMarkdown" />
+        <div class="overflow-y-auto max-h-64 border-t border-white/5">
+          <!-- No focus markers → full source -->
+          <template v-if="sourceData && !sourceData.hasFocus">
+            <div class="source-code" v-html="sourceData.fullHtml" />
+          </template>
+
+          <!-- Has focus markers → segment-based rendering -->
+          <template v-else-if="sourceData?.hasFocus">
+            <template v-for="(seg, i) in sourceData.segments" :key="i">
+              <!-- Collapsed: ⋯ N lines -->
+              <div
+                v-if="!sourceExpanded && !seg.focused && seg.lineCount > 0"
+                class="collapsed-line"
+                @click="sourceExpanded = true"
+              >
+                &#x22EF; {{ seg.lineCount }} lines
+              </div>
+              <!-- Expanded non-focused: dimmed, clickable to re-collapse -->
+              <div
+                v-else-if="sourceExpanded && !seg.focused"
+                class="unfocused-code"
+                @click="sourceExpanded = false"
+                v-html="seg.html"
+              />
+              <!-- Focused: always shown normally -->
+              <div v-else-if="seg.focused" class="source-code" v-html="seg.html" />
+            </template>
+          </template>
         </div>
       </div>
+
+      <div class="border-t border-white/10" />
     </div>
 
-    <!-- Collapsible terminal output -->
-    <div class="panel overflow-hidden rounded-lg border border-white/10">
+    <!-- Output section -->
+    <div>
       <button
-        class="panel-header w-full flex items-center justify-between px-4 py-2.5 bg-white/[0.03] border-b border-white/10 cursor-pointer"
+        class="section-header w-full flex items-center justify-between px-4 py-2.5 bg-white/[0.1] cursor-pointer"
         @click="outputOpen = !outputOpen"
       >
         <div class="flex items-center gap-2">
@@ -100,32 +192,26 @@ async function copyToClipboard() {
           >
             &#9656;
           </span>
-          <img src="/logo-icon.svg" alt="" class="h-4 w-auto opacity-50">
-          <span v-if="title" class="text-sm font-mono text-[var(--color-dark-400)]">{{ title }}</span>
+          <span v-if="title" class="text-sm font-mono text-[var(--color-dark-400)]">
+            {{ title }}
+          </span>
         </div>
-        <span
-          class="text-xs text-[var(--color-dark-500)] hover:text-[var(--color-dark-300)] transition-colors"
-          role="button"
-          @click.stop="copyToClipboard"
-        >
-          {{ copied ? 'Copied!' : 'Copy' }}
-        </span>
       </button>
       <div
         class="overflow-hidden transition-all duration-300 ease-in-out"
         :class="outputOpen ? 'max-h-[40rem]' : 'max-h-0'"
       >
-        <div class="overflow-y-auto max-h-[38rem]">
+        <div class="overflow-y-auto max-h-[38rem] border-t border-white/5">
           <pre
-            v-if="loaded"
+            v-if="ansiData"
             class="px-4 py-3 text-sm leading-relaxed overflow-x-auto font-mono bg-transparent"
             v-html="ansiHtml"
           />
-          <div
-            v-else
-            class="px-4 py-6 text-[var(--color-dark-500)] text-sm font-mono animate-pulse"
-          >
-            Loading...
+          <div v-else class="px-4 py-4 flex flex-col gap-2">
+            <div class="h-3 w-2/3 rounded bg-white/5 animate-pulse" />
+            <div class="h-3 w-1/2 rounded bg-white/5 animate-pulse" />
+            <div class="h-3 w-3/5 rounded bg-white/5 animate-pulse" />
+            <div class="h-3 w-1/3 rounded bg-white/5 animate-pulse" />
           </div>
         </div>
       </div>
@@ -134,27 +220,43 @@ async function copyToClipboard() {
 </template>
 
 <style scoped>
-.panel {
-  background: linear-gradient(
-    135deg,
-    rgba(15, 23, 42, 0.85) 0%,
-    rgba(15, 23, 42, 0.75) 50%,
-    rgba(15, 23, 42, 0.85) 100%
-  );
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+.example-unit {
+  background: var(--color-dark-800);
 }
 
-/* Subtle purple glow on source when open */
-.panel--source-open {
-  border-color: rgba(168, 85, 247, 0.2);
-  box-shadow: 0 0 20px -5px rgba(168, 85, 247, 0.1);
-}
-
-.panel :deep(pre) {
+.example-unit :deep(pre) {
   margin: 0 !important;
+  padding: 0.75rem 1rem !important;
   border-radius: 0 !important;
   border: none !important;
   background: transparent !important;
+  font-size: 0.875rem !important;
+  line-height: 1.625 !important;
+}
+
+.collapsed-line {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--color-dark-500);
+  padding: 4px 0;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.02);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.collapsed-line:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-dark-300);
+}
+
+.unfocused-code {
+  cursor: pointer;
+  opacity: 0.4;
+  transition: opacity 0.15s ease;
+}
+
+.unfocused-code:hover {
+  opacity: 0.65;
 }
 </style>

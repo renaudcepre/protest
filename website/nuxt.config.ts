@@ -42,7 +42,10 @@ export default defineNuxtConfig({
           },
           langs: ['python', 'bash', 'typescript', 'vue', 'json', 'yaml', 'toml']
         }
-      }
+      },
+      transformers: [
+        '~~/transformers/raw-text'
+      ]
     }
   },
 

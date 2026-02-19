@@ -10,7 +10,8 @@
     "preview": "nuxt preview",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "update-examples": "cd .. && python3 website/scripts/capture-output.py uv run protest run examples.minimal.session:session > website/content/_examples/quickstart.ansi && python3 website/scripts/capture-output.py uv run protest run examples.minimal.session:session --collect-only > website/content/_examples/collect-only.ansi"
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.87",
@@ -22,6 +23,7 @@
     "ansi_up": "^6.0.6",
     "better-sqlite3": "^12.6.2",
     "nuxt": "^4.3.0",
+    "shiki": "^3.22.0",
     "tailwindcss": "^4.1.18"
   },
   "devDependencies": {

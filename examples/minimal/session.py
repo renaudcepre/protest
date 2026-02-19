@@ -6,9 +6,11 @@ from typing import Annotated
 from protest import ProTestSession, ProTestSuite, Use, fixture
 
 
+# doc:focus:start
 @fixture()
 def session_db() -> Generator[str, None, None]:
     yield "session_db_value"
+# doc:focus:end
 
 
 @fixture()
@@ -30,6 +32,7 @@ my_suite.bind(suite_client)
 session.add_suite(my_suite)
 
 
+# doc:focus:start
 @my_suite.test()
 def test_all_fixtures(
     db: Annotated[str, Use(session_db)],
@@ -39,3 +42,4 @@ def test_all_fixtures(
     assert db == "session_db_value"
     assert client == "suite_client_value"
     assert data == "test_data_value"
+# doc:focus:end
