@@ -4,8 +4,6 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 from rich.console import Console  # type: ignore[import-not-found]
-from rich.live import Live  # type: ignore[import-not-found]
-from rich.text import Text  # type: ignore[import-not-found]
 from typing_extensions import Self
 
 from protest.entities import (
@@ -32,7 +30,6 @@ def _format_test_name(result: TestResult) -> str:
 
 
 MIN_DURATION_THRESHOLD = 0.001
-LIVE_REFRESH_PER_SECOND = 4
 
 
 def _format_duration(seconds: float) -> str:
@@ -44,7 +41,7 @@ def _format_duration(seconds: float) -> str:
 
 
 class RichReporter(PluginBase):
-    """Rich console reporter with colors and live status footer."""
+    """Rich console reporter with colors."""
 
     name = "rich-reporter"
     description = "Rich console reporter with colors"
@@ -55,7 +52,6 @@ class RichReporter(PluginBase):
         self._failed_results: list[TestResult] = []
         self._error_results: list[TestResult] = []
 
-        self._live: Live | None = None
         self._start_time: float = 0
         self._passed = 0
         self._failed = 0
@@ -80,68 +76,12 @@ class RichReporter(PluginBase):
             return None
         return cls()
 
-    def _make_status_line(self) -> Text:
-        elapsed = time.perf_counter() - self._start_time if self._start_time else 0
-        total_done = (
-            self._passed
-            + self._failed
-            + self._errors
-            + self._skipped
-            + self._xfailed
-            + self._xpassed
-        )
-
-        if self._failed == 0 and self._errors == 0 and self._xpassed == 0:
-            status = "[bold cyan]⋯ RUNNING[/]"
-        else:
-            status = "[bold red]✗ FAILURES[/]"
-
-        parts = [f"{self._passed}/{self._total_tests} passed"]
-        if self._skipped:
-            parts.append(f"[yellow]{self._skipped} skipped[/]")
-        if self._xfailed:
-            parts.append(f"[dim]{self._xfailed} xfailed[/]")
-        if self._xpassed:
-            parts.append(f"[red]{self._xpassed} xpassed[/]")
-        if self._failed:
-            parts.append(f"[red]{self._failed} failed[/]")
-        if self._errors:
-            parts.append(f"[yellow]{self._errors} errors[/]")
-
-        progress = f"[dim]({total_done}/{self._total_tests})[/]"
-        duration = f"{elapsed:.2f}s"
-        return Text.from_markup(
-            f"{status} │ {' │ '.join(parts)} │ {duration} {progress}"
-        )
-
     def _print(self, message: str) -> None:
-        if self._live and self._live.is_started:
-            self._live.console.print(message)  # pragma: no cover
-        else:
-            self.console.print(message)
-
-    def _update_live(self) -> None:
-        if self._live and self._live.is_started:
-            self._live.update(self._make_status_line())  # pragma: no cover
-
-    def _stop_live(self) -> None:
-        if self._live and self._live.is_started:  # pragma: no cover
-            self._live.stop()
-            self._live = None
+        self.console.print(message)
 
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
         self._total_tests = len(items)
         self._start_time = time.perf_counter()
-
-        if self.console.is_terminal:
-            self._live = Live(
-                self._make_status_line(),
-                console=self.console,
-                refresh_per_second=LIVE_REFRESH_PER_SECOND,
-                transient=True,
-            )
-            self._live.start()
-
         return items
 
     def on_session_start(self) -> None:
@@ -192,7 +132,6 @@ class RichReporter(PluginBase):
                 f" [dim]\\[attempt {result.attempt}/{result.max_attempts}][/]"
             )
         self._print(f"   [green]✓[/]   {name} [dim]({duration})[/]{retry_suffix}")
-        self._update_live()
 
     def on_test_fail(self, result: TestResult) -> None:
         name = _format_test_name(result)
@@ -222,13 +161,10 @@ class RichReporter(PluginBase):
             for line in result.output.rstrip().splitlines():
                 self._print(f"[dim]       │ {line}[/]")
 
-        self._update_live()
-
     def on_test_skip(self, result: TestResult) -> None:
         self._skipped += 1
         name = _format_test_name(result)
         self._print(f"   [yellow]○[/]   {name} [dim]({result.skip_reason})[/]")
-        self._update_live()
 
     def on_test_xfail(self, result: TestResult) -> None:
         self._xfailed += 1
@@ -237,17 +173,14 @@ class RichReporter(PluginBase):
         self._print(
             f"   [green]✗[/]   {name} [dim]({result.xfail_reason}) ({duration})[/]"
         )
-        self._update_live()
 
     def on_test_xpass(self, result: TestResult) -> None:
         self._xpassed += 1
         name = _format_test_name(result)
         duration = _format_duration(result.duration)
         self._print(f"   [red]⚡[/]   {name} [red]XPASS[/] [dim]({duration})[/]")
-        self._update_live()
 
     def on_session_interrupted(self, force_teardown: bool) -> None:
-        self._stop_live()
         if force_teardown:
             self.console.print(
                 "\n[bold yellow]⚠ Forcing teardown... (press Ctrl+C again to kill)[/]"
@@ -307,8 +240,6 @@ class RichReporter(PluginBase):
                 self.console.print(f"[dim]{escaped_line}[/]")
 
     def on_session_complete(self, result: SessionResult) -> None:
-        self._stop_live()
-
         if self._failed_results or self._error_results:
             self._print_failure_summary()
 
