@@ -21,3 +21,4 @@ wheels/
 web/node_modules/
 /examples/dogfood/httpx/httpx_src/
 /examples/dogfood/starlette/starlette_src/
+/htmlcov/
