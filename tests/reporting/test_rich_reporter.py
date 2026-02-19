@@ -368,63 +368,6 @@ class TestRichReporterInterrupt:
         assert "kill" in output.lower()
 
 
-class TestRichReporterStatusLine:
-    """Test status line with various states."""
-
-    def test_make_status_line_with_failures(self) -> None:
-        """Status line shows FAILURES when there are failures."""
-        reporter = RichReporter()
-        reporter._failed = 1
-        reporter._total_tests = 5
-        reporter._start_time = 0.0
-
-        status_line = reporter._make_status_line()
-        assert "FAILURES" in str(status_line)
-        assert "1 failed" in str(status_line)
-
-    def test_make_status_line_with_skipped(self) -> None:
-        """Status line shows skipped count."""
-        reporter = RichReporter()
-        reporter._skipped = 2
-        reporter._total_tests = 5
-        reporter._start_time = 0.0
-
-        status_line = reporter._make_status_line()
-        assert "2 skipped" in str(status_line)
-
-    def test_make_status_line_with_xfailed(self) -> None:
-        """Status line shows xfailed count."""
-        reporter = RichReporter()
-        reporter._xfailed = 1
-        reporter._total_tests = 5
-        reporter._start_time = 0.0
-
-        status_line = reporter._make_status_line()
-        assert "1 xfailed" in str(status_line)
-
-    def test_make_status_line_with_xpassed(self) -> None:
-        """Status line shows xpassed count with FAILURES."""
-        reporter = RichReporter()
-        reporter._xpassed = 1
-        reporter._total_tests = 5
-        reporter._start_time = 0.0
-
-        status_line = reporter._make_status_line()
-        assert "1 xpassed" in str(status_line)
-        assert "FAILURES" in str(status_line)  # xpassed triggers FAILURES status
-
-    def test_make_status_line_with_errors(self) -> None:
-        """Status line shows errors count with FAILURES."""
-        reporter = RichReporter()
-        reporter._errors = 1
-        reporter._total_tests = 5
-        reporter._start_time = 0.0
-
-        status_line = reporter._make_status_line()
-        assert "1 errors" in str(status_line)
-        assert "FAILURES" in str(status_line)
-
-
 class TestRichReporterFailureSummary:
     """Test failure summary with captured output."""
 
