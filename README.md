@@ -1,4 +1,4 @@
-![ProTest](assets/logo-term.svg)
+![ProTest](assets/logo-with-text-animate.svg)
 
 [![CI](https://github.com/renaudcepre/protest/actions/workflows/ci.yml/badge.svg)](https://github.com/renaudcepre/protest/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/renaudcepre/protest/graph/badge.svg?token=V0MLGEE5UZ)](https://codecov.io/gh/renaudcepre/protest)
