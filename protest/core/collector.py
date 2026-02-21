@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from inspect import signature
 from itertools import groupby, product
-from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin, get_type_hints
 
 from protest.di.decorators import get_fixture_marker, unwrap_fixture
 from protest.di.markers import Use
@@ -18,10 +18,16 @@ if TYPE_CHECKING:
 
 def _extract_use_fixtures(func: Callable[..., Any]) -> list[FixtureCallable]:
     """Extract fixtures referenced via Use() markers in function parameters."""
+    try:
+        type_hints = get_type_hints(func, include_extras=True)
+    except Exception:  # noqa: BLE001 - get_type_hints can fail on unresolvable annotations
+        type_hints = {}
+
     fixtures: list[FixtureCallable] = []
-    for param in signature(func).parameters.values():
-        if get_origin(param.annotation) is Annotated:
-            for metadata in get_args(param.annotation)[1:]:
+    for param_name in signature(func).parameters:
+        annotation = type_hints.get(param_name)
+        if annotation is not None and get_origin(annotation) is Annotated:
+            for metadata in get_args(annotation)[1:]:
                 if isinstance(metadata, Use):
                     # Unwrap FixtureWrapper to get the original function
                     fixtures.append(unwrap_fixture(metadata.dependency))
