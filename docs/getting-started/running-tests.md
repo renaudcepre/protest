@@ -127,6 +127,30 @@ If your module is in a specific directory:
 protest run tests:session --app-dir src
 ```
 
+## Running with Coverage
+
+ProTest doesn't include a built-in coverage tool, but works seamlessly with [coverage.py](https://coverage.readthedocs.io/). Just run `protest` through `coverage run`:
+
+```bash
+# Collect coverage data
+coverage run -m protest run tests:session
+
+# Show report with missing lines
+coverage report -m --include="app/*"
+
+# Or generate an HTML report
+coverage html --include="app/*"
+```
+
+If you use `uv`, prefix with `uv run`:
+
+```bash
+uv run coverage run -m protest run tests:session
+uv run coverage report -m --include="app/*"
+```
+
+> **Tip:** Add `coverage` to your dev dependencies (`uv add --group dev coverage`).
+
 ## Exit Codes
 
 | Code | Meaning |
