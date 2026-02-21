@@ -32,6 +32,8 @@ tests/
 3. **Fixtures live near their tests** - in the same file or a sibling `fixtures.py`
 4. **Nesting is meaningful** - `API::Users::Permissions` not arbitrary hierarchies
 
+> **Full guide:** [Project Organization](guides/project-organization.md) — multi-file patterns, anti-patterns, and a real-world walkthrough.
+
 ## Session Organization
 
 ### Good: Thin Entry Point
@@ -76,6 +78,20 @@ def test_something(): ...
 
 # ... 500 more lines ...
 ```
+
+### Bad: Side-Effect Imports
+
+```python
+# DON'T DO THIS - importing modules just for their registration side effects
+session = ProTestSession()
+suite = ProTestSuite("Domain")
+session.add_suite(suite)
+
+import tests.test_users   # noqa: F401, E402
+import tests.test_orders   # noqa: F401, E402
+```
+
+The imports are unused — they exist only to trigger `@suite.test()` registration at import time. This requires `# noqa` to silence linters and makes dependencies invisible. See the [Project Organization guide](guides/project-organization.md) for the correct pattern.
 
 ## Suite Design
 
@@ -487,6 +503,8 @@ async def test_draft_cannot_be_archived_directly(
 
 ## See Also
 
+- [Project Organization](guides/project-organization.md) - multi-file patterns and anti-patterns
+- [Testing FastAPI](guides/testing-fastapi.md) - async API testing with httpx
 - [Fixtures](core-concepts/fixtures.md)
 - [Factories](core-concepts/factories.md)
 - [Tags](core-concepts/tags.md) - Tag inheritance and filtering

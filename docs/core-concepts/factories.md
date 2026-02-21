@@ -35,8 +35,26 @@ Key points:
 - Scope is determined by binding: `session.bind()` or `suite.bind()`
 - No binding = TEST scope (fresh factory per test)
 - The test receives a `FixtureFactory[T]`, not the value directly
-- Call the factory with `await` - it's always async
+- Call the factory with `await` — it's always async
 - Each call can pass different arguments
+
+> **Warning: Factory calls are always async**, even if the factory function itself is `def` (not `async def`). This means your test **must** be `async def` if it calls a factory. Internally, `FixtureFactory.__call__` is async because it uses `asyncio.Lock` for thread-safe caching.
+
+### Common Mistake: Calling a Factory From a Sync Test
+
+```python
+# This will NOT work — factory() returns a coroutine, not T
+@suite.test()
+def test_bad(f: Annotated[FixtureFactory[User], Use(user)]):
+    u = f()  # u is a coroutine object, not a User!
+
+# Fix: make the test async
+@suite.test()
+async def test_good(f: Annotated[FixtureFactory[User], Use(user)]):
+    u = await f()  # u is a User
+```
+
+If you see `AttributeError` on what should be a model instance, or `TypeError: 'coroutine' object is not subscriptable`, check that your test is `async def` and that you're using `await`.
 
 ## Scope at Binding
 
