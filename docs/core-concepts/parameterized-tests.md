@@ -56,7 +56,7 @@ Factories and parameterization work together to replace pytest's indirect parame
 ### The pytest way (implicit)
 
 ```python
-# pytest - fixture reads param magically from request
+# pytest - fixture reads param from request.param
 @pytest.fixture
 def api_user(request, user_factory):
     role = getattr(request, "param", UserRole.dev)

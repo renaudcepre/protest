@@ -2,7 +2,7 @@
 
 **Async-first testing with explicit dependency injection.**
 
-ProTest is a Python testing framework designed for modern async applications. Instead of magic fixture names that appear from nowhere, ProTest requires you to explicitly declare what each test needs.
+ProTest is a Python testing framework designed for modern async applications. Instead of implicit fixture resolution by name, ProTest requires you to explicitly declare what each test needs.
 
 ## Why ProTest?
 
@@ -10,20 +10,18 @@ ProTest isn't just another test runner. It's built for **modern Python**: typed,
 
 ### Native I/O Concurrency
 
-Run HTTP tests in parallel for nearly free. No heavy processes, no RAM explosion—just asyncio.
+Tests run as coroutines on a single event loop. Parallel I/O tests without spawning separate processes.
 
 ```bash
 protest run tests:session -n 10
 ```
 
-*pytest-xdist spawns processes. ProTest uses coroutines.*
-
-### Zero-Magic Injection (IDE-Ready)
+### Explicit Injection (IDE-Ready)
 
 **Ctrl+Click works.** Your IDE knows every type. No guessing where fixtures come from.
 
 ```python
-# pytest: Where does "db" come from? Good luck finding it.
+# pytest: "db" is resolved by name — requires searching through fixtures
 def test_user(db): ...
 
 # ProTest: Ctrl+Click → Go to definition. Full type inference.
@@ -62,7 +60,7 @@ Know instantly if your **code** failed or your **infrastructure** crashed.
 ⚠ test_with_db: [FIXTURE] ConnectionError   # Infra issue - SETUP ERROR
 ```
 
-*pytest says FAILED for both. You waste time debugging the wrong thing.*
+*pytest reports both as FAILED, making it harder to distinguish test failures from infrastructure issues.*
 
 ### Typed Parameterization
 

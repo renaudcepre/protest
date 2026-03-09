@@ -165,26 +165,9 @@ def test_blocked():
 
 ## Conditional Skip with Fixtures
 
-**This is a ProTest-exclusive feature.** Unlike pytest's `@pytest.mark.skipif` which only evaluates conditions at import time, ProTest can evaluate skip conditions at runtime with full access to resolved fixtures.
+### Fixture-Aware Skip Conditions
 
-### The Problem with pytest
-
-In pytest, you cannot access fixtures in skipif conditions:
-
-```python
-# pytest - THIS DOESN'T WORK
-@pytest.mark.skipif(config["ci"], reason="Skip in CI")  # ❌ config not available
-def test_something(config):
-    pass
-
-# pytest workarounds are ugly:
-def test_something(config):
-    if config["ci"]:
-        pytest.skip("Skip in CI")  # 😞 skip logic pollutes test body
-    # actual test...
-```
-
-### ProTest Solution
+In pytest, `skipif` conditions are evaluated at import time and don't have access to fixtures. The typical workaround is calling `pytest.skip()` inside the test body, which mixes skip logic with test logic.
 
 ProTest evaluates skip conditions **after** fixture resolution, so your callable receives the actual fixture values:
 

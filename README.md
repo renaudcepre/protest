@@ -16,16 +16,14 @@ and explicit.
 
 ### Native I/O Concurrency
 
-Run HTTP tests in parallel for nearly free. No heavy processes, no RAM explosion—just
-asyncio.
+Tests run as coroutines on a single event loop. Parallel I/O tests without spawning
+separate processes.
 
 ```bash
 protest run tests:session -n 10
 ```
 
-*pytest-xdist spawns processes. ProTest uses coroutines.*
-
-### Zero-Magic Injection (IDE-Ready)
+### Explicit Injection (IDE-Ready)
 
 **Ctrl+Click works.** Your IDE knows every type. No guessing where fixtures come from.
 
@@ -75,7 +73,7 @@ Know instantly if your **code** failed or your **infrastructure** crashed.
 No more string-matching that breaks when you rename arguments.
 
 ```python
-# pytest: Rename "code" → runtime error, good luck
+# pytest: Renaming "code" causes a runtime error
 @pytest.mark.parametrize("code", [200, 201])
 def test_status(code): ...
 
@@ -123,7 +121,7 @@ async def test_users(user_factory: Annotated[FixtureFactory[User], Use(user)]):
 
 ### Conditional Skip with Fixtures
 
-**Skip tests based on runtime fixture values.** Impossible in pytest.
+**Skip tests based on runtime fixture values.** Not directly supported in pytest.
 
 ```python
 # pytest - IMPOSSIBLE: fixtures not available in skipif
@@ -165,7 +163,7 @@ protest run test_sample:session
 
 ## Explicit Dependencies
 
-No magic fixture names. You declare what you need:
+No implicit fixture resolution. You declare what you need:
 
 ```python
 from typing import Annotated
@@ -368,7 +366,7 @@ def db(request):
     return connect(request.param)
 
 
-def test_queries(db): ...  # Magic: runs twice
+def test_queries(db): ...  # Implicitly runs twice via fixture
 ```
 
 In ProTest, the **test** controls the parameterization via factories:
@@ -507,10 +505,10 @@ Cache stored in `.protest/cache.json`.
 | Params   | Hidden in fixture  | Visible in test (`From()` + factory) |
 | Async    | Plugin required    | Native                               |
 | Parallel | Plugin required    | Built-in                             |
-| Cycles   | Runtime error      | Impossible by design                 |
+| Cycles   | Runtime error      | Prevented at registration            |
 
-pytest is battle-tested with a huge ecosystem. Use ProTest if you want FastAPI-style
-explicit dependencies and native async in your tests.
+pytest has a large ecosystem and extensive community. ProTest is an alternative if you
+prefer FastAPI-style explicit dependencies and native async in your tests.
 
 ## License
 

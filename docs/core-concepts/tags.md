@@ -1,6 +1,6 @@
 # Tags
 
-Tags allow you to categorize and filter tests. ProTest's tag system has a killer feature: **automatic tag inheritance from fixtures**.
+Tags allow you to categorize and filter tests. ProTest's tag system includes **automatic tag inheritance from fixtures**.
 
 ## Declaring Tags
 
@@ -30,7 +30,7 @@ api_suite = ProTestSuite("API", tags=["api"])
 
 Suite tags are inherited by all tests in the suite (and child suites).
 
-## Tag Inheritance (Killer Feature)
+## Tag Inheritance
 
 When a test uses a fixture, it **automatically inherits all tags from that fixture**. This works transitively through the entire dependency chain.
 

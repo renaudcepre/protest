@@ -34,7 +34,7 @@ def test_logging(logs: Annotated[LogCapture, Use(caplog)]):
 
 ## mocker
 
-Provides a clean mocking API with automatic cleanup. No more `with patch(...)` indentation hell.
+Provides a flat mocking API with automatic cleanup, avoiding nested context managers.
 
 ```python
 from typing import Annotated
@@ -60,7 +60,9 @@ async def test_payment(m: Annotated[Mocker, Use(mocker)]):
 
 ### Why mocker instead of unittest.mock?
 
-**Problem 1: Indentation Hell**
+**Nested context managers**
+
+With `patch()` as context managers, multiple patches create deep nesting:
 
 ```python
 # Without mocker - nested context managers
@@ -72,7 +74,7 @@ def test_order():
                 process_order()
 ```
 
-**Problem 2: Decorator Conflicts**
+**Decorator conflicts with DI**
 
 `@patch` injects arguments positionally, which conflicts with ProTest's DI system:
 
@@ -81,11 +83,11 @@ def test_order():
 @patch("services.stripe.charge")
 @session.test()
 def test_order(mock_charge, db: Annotated[DB, Use(database)]):
-    # Who injects what? Chaos.
+    # Positional injection conflicts with Annotated parameters
     pass
 ```
 
-**Solution: mocker fixture**
+**mocker fixture**
 
 ```python
 # Clean, flat, explicit
@@ -279,7 +281,7 @@ async def test_cli():
 
 ### Why Shell instead of subprocess.run()?
 
-**Problem: Subprocess output is lost**
+**Subprocess output is not captured**
 
 ```python
 # DON'T DO THIS - output not captured by ProTest
