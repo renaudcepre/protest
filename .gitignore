@@ -11,7 +11,7 @@ wheels/
 
 .cursor
 .idea
-.claude/settings.local.json
+.claude/
 /.coverage
 
 .protest/
