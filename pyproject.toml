@@ -10,7 +10,15 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-    { name = "Renaud Cepre" }
+    { name = "Renaud Cepre", email = "renaudcepre@protonmail.com" }
+]
+keywords = [
+    "testing",
+    "async",
+    "dependency-injection",
+    "test-framework",
+    "asyncio",
+    "fixtures",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -27,6 +35,13 @@ dependencies = [
     "typing-extensions>=4.15.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/renaudcepre/protest"
+Documentation = "https://renaudcepre.github.io/protest/"
+Repository = "https://github.com/renaudcepre/protest"
+Changelog = "https://github.com/renaudcepre/protest/blob/main/CHANGELOG.md"
+Issues = "https://github.com/renaudcepre/protest/issues"
+
 [project.optional-dependencies]
 rich = [
     "rich>=13.0",
@@ -39,11 +54,7 @@ web = [
 [tool.ruff]
 output-format = "concise"
 line-length = 88
-extend-exclude = [
-    "examples/dogfood/httpx/httpx_src",
-    "examples/dogfood/starlette/starlette_src",
-    "examples/dogfood/pydantic/pydantic_src",
-]
+extend-exclude = []
 
 [tool.ruff.lint]
 select = [

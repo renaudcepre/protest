@@ -62,12 +62,22 @@ nav:
       - Built-in Fixtures: core-concepts/builtins.md
       - Factories: core-concepts/factories.md
       - Parameterized Tests: core-concepts/parameterized-tests.md
+      - Tags: core-concepts/tags.md
       - Dependency Injection: core-concepts/dependency-injection.md
       - Reporters: core-concepts/reporters.md
+  - Guides:
+      - Best Practices: best-practices.md
+      - Project Organization: guides/project-organization.md
+      - Testing FastAPI: guides/testing-fastapi.md
+      - Migrating from pytest: guides/pytest-to-protest.md
   - CLI Reference: cli.md
   - FAQ: faq.md
   - Internals:
+      - Architecture: internals/architecture.md
       - Events: internals/events.md
       - Event Bus: internals/event-bus.md
+      - Filters: internals/filters.md
       - Dependency Injection: internals/dependency-injection.md
       - Plugins: internals/plugins.md
+  - Design Docs:
+      - Fixture Scoping: architecture/fixture-scoping-design.md
