@@ -30,7 +30,7 @@ Using function references instead of string names has benefits:
 
 1. **IDE support**: Go to definition, find usages, refactoring
 2. **No typos**: Python raises `NameError` if you reference a non-existent function
-3. **No cycles**: You can't reference a function before it's defined
+3. **No cycles**: A function must be defined before it can be referenced, preventing circular dependencies
 
 ```python
 # This won't work - Python raises NameError

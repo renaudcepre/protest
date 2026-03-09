@@ -2,9 +2,9 @@
 
 How to write async integration tests for a FastAPI application using ProTest, httpx, and `asgi-lifespan`.
 
-## The Problem
+## Async Client with Lifespan
 
-FastAPI's `TestClient` is synchronous and doesn't compose well with ProTest's async-first approach. The natural alternative is `httpx.AsyncClient` with `ASGITransport`, but there's a catch: **httpx does not trigger ASGI lifespan events**.
+FastAPI's `TestClient` is synchronous. For ProTest's async-first approach, `httpx.AsyncClient` with `ASGITransport` is the natural fit — but **httpx does not trigger ASGI lifespan events**.
 
 This means if your app uses `@asynccontextmanager` lifespan (the modern FastAPI pattern for startup/shutdown), your app state won't be initialized during tests:
 
