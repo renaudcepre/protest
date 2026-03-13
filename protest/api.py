@@ -35,6 +35,7 @@ def run_session(  # noqa: PLR0913 - public API with many optional params
     session: ProTestSession,
     concurrency: int | None = None,
     exitfirst: bool = False,
+    maxfail: int = 0,
     last_failed: bool = False,
     cache_clear: bool = False,
     include_tags: set[str] | None = None,
@@ -54,7 +55,8 @@ def run_session(  # noqa: PLR0913 - public API with many optional params
     Args:
         session: The ProTestSession to run.
         concurrency: Number of concurrent workers (None = use session default).
-        exitfirst: Stop after first failure.
+        exitfirst: Stop after first failure (equivalent to maxfail=1).
+        maxfail: Stop after N failures/errors (0 = no limit).
         last_failed: Only run tests that failed in the last run.
         cache_clear: Clear the cache before running.
         include_tags: Only run tests with these tags (OR logic).
@@ -78,11 +80,16 @@ def run_session(  # noqa: PLR0913 - public API with many optional params
         if ctx.get("concurrency") is not None:
             session.concurrency = ctx.get("concurrency")
         session.exitfirst = ctx.get("exitfirst", False)
+        ctx_maxfail = ctx.get("maxfail", 0)
+        if ctx_maxfail:
+            session.maxfail = ctx_maxfail
         session.capture = not ctx.get("no_capture", False)
     else:
         if concurrency is not None:
             session.concurrency = concurrency
         session.exitfirst = exitfirst
+        if maxfail:
+            session.maxfail = maxfail
         session.capture = capture
 
     # Register default plugins if none registered

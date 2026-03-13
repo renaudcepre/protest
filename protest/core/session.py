@@ -68,6 +68,7 @@ class ProTestSession:
         self._plugin_classes: list[type[PluginBase]] = []
         self._plugins_activated: bool = False
         self._exitfirst: bool = False
+        self._maxfail: int = 0
         self._capture: bool = True
         self._setup_duration: float = 0
         self._teardown_duration: float = 0
@@ -94,6 +95,19 @@ class ProTestSession:
     @exitfirst.setter
     def exitfirst(self, value: bool) -> None:
         self._exitfirst = value
+        if value and self._maxfail == 0:
+            self._maxfail = 1
+
+    @property
+    def maxfail(self) -> int:
+        """Maximum number of failures/errors before stopping (0 = no limit)."""
+        return self._maxfail
+
+    @maxfail.setter
+    def maxfail(self, value: int) -> None:
+        if value < 0:
+            raise ValueError(f"maxfail must be non-negative, got {value}")
+        self._maxfail = value
 
     @property
     def capture(self) -> bool:

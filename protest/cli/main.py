@@ -197,7 +197,14 @@ def _create_run_parser() -> argparse.ArgumentParser:
         "-x",
         "--exitfirst",
         action="store_true",
-        help="Exit after first failed test",
+        help="Exit after first failed test (equivalent to --maxfail=1)",
+    )
+    parser.add_argument(
+        "--maxfail",
+        type=int,
+        default=0,
+        metavar="N",
+        help="Stop after N failures/errors (0 = no limit)",
     )
     parser.add_argument(
         "-s",

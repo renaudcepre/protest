@@ -35,6 +35,7 @@ class _ParallelExecutionState:
     fixture_semaphores: dict[FixtureCallable, asyncio.Semaphore]
     tracker: SuiteTracker
     exitfirst_flag: asyncio.Event | None
+    maxfail: int = 0
     # Incremental counter instead of storing all outcomes (memory optimization)
     counts: TestCounts = field(default_factory=TestCounts)
     counts_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
@@ -148,7 +149,8 @@ class ParallelExecutor:
             suite_semaphores=suite_semaphores,
             fixture_semaphores=fixture_semaphores,
             tracker=tracker,
-            exitfirst_flag=asyncio.Event() if self._session.exitfirst else None,
+            exitfirst_flag=asyncio.Event() if self._session.maxfail else None,
+            maxfail=self._session.maxfail,
         )
 
     async def _process_queue(self, ctx: _ParallelExecutionState) -> None:
@@ -167,10 +169,12 @@ class ParallelExecutor:
                     # Atomic increment - don't store full outcome (memory optimization)
                     async with ctx.counts_lock:
                         ctx.counts = ctx.counts + outcome.counts
-                    if ctx.exitfirst_flag and (
-                        outcome.counts.failed or outcome.counts.errored
-                    ):
-                        ctx.exitfirst_flag.set()
+                        if (
+                            ctx.exitfirst_flag
+                            and ctx.maxfail
+                            and (ctx.counts.failed + ctx.counts.errored) >= ctx.maxfail
+                        ):
+                            ctx.exitfirst_flag.set()
             finally:
                 ctx.queue.task_done()
 
