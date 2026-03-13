@@ -44,6 +44,38 @@ class TestRunExitFirst:
         )
 
 
+class TestRunMaxFail:
+    def test_maxfail_stops_after_n_failures(
+        self, run_protest: Callable[..., CLIResult]
+    ) -> None:
+        result = run_protest("run", "multi_fail_session:session", "--maxfail", "1")
+        result.assert_failure()
+        assert "0/1" in result.stdout, (
+            f"Expected only 1 test run with --maxfail=1, got: {result.stdout}"
+        )
+
+    def test_maxfail_two_allows_two_failures(
+        self, run_protest: Callable[..., CLIResult]
+    ) -> None:
+        result = run_protest("run", "multi_fail_session:session", "--maxfail", "2")
+        result.assert_failure()
+        assert "0/2" in result.stdout, (
+            f"Expected 2 tests run with --maxfail=2, got: {result.stdout}"
+        )
+
+    def test_exitfirst_equivalent_to_maxfail_one(
+        self, run_protest: Callable[..., CLIResult]
+    ) -> None:
+        result_x = run_protest("run", "multi_fail_session:session", "-x")
+        result_maxfail = run_protest(
+            "run", "multi_fail_session:session", "--maxfail", "1"
+        )
+        result_x.assert_failure()
+        result_maxfail.assert_failure()
+        assert "0/1" in result_x.stdout
+        assert "0/1" in result_maxfail.stdout
+
+
 class TestRunTagFiltering:
     def test_run_with_include_tag(self, run_protest: Callable[..., CLIResult]) -> None:
         result = run_protest("run", "tagged_session:session", "-t", "unit")

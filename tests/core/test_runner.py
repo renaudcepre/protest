@@ -587,6 +587,223 @@ class TestRunnerExitFirst:
         assert "suite2" not in executed
 
 
+class TestRunnerMaxFail:
+    """Tests for --maxfail=N behavior."""
+
+    def test_maxfail_stops_after_n_failures(self) -> None:
+        """With maxfail=2, stops after 2 failures."""
+        session = ProTestSession(concurrency=1)
+        session.maxfail = 2
+        executed: list[str] = []
+
+        @session.test()
+        def test_fail_1() -> None:
+            executed.append("fail_1")
+            raise ValueError("failure 1")
+
+        @session.test()
+        def test_fail_2() -> None:
+            executed.append("fail_2")
+            raise ValueError("failure 2")
+
+        @session.test()
+        def test_should_not_run() -> None:
+            executed.append("should_not_run")
+
+        runner = TestRunner(session)
+        result = runner.run()
+
+        assert result.success is False
+        assert "fail_1" in executed
+        assert "fail_2" in executed
+        assert "should_not_run" not in executed
+
+    def test_maxfail_allows_tests_before_threshold(self) -> None:
+        """Tests that pass before reaching maxfail threshold still run."""
+        session = ProTestSession(concurrency=1)
+        session.maxfail = 2
+        executed: list[str] = []
+
+        @session.test()
+        def test_pass_1() -> None:
+            executed.append("pass_1")
+
+        @session.test()
+        def test_fail_1() -> None:
+            executed.append("fail_1")
+            raise ValueError("failure 1")
+
+        @session.test()
+        def test_pass_2() -> None:
+            executed.append("pass_2")
+
+        @session.test()
+        def test_fail_2() -> None:
+            executed.append("fail_2")
+            raise ValueError("failure 2")
+
+        @session.test()
+        def test_should_not_run() -> None:
+            executed.append("should_not_run")
+
+        runner = TestRunner(session)
+        result = runner.run()
+
+        assert result.success is False
+        assert "pass_1" in executed
+        assert "fail_1" in executed
+        assert "pass_2" in executed
+        assert "fail_2" in executed
+        assert "should_not_run" not in executed
+
+    def test_maxfail_zero_runs_all(self) -> None:
+        """With maxfail=0 (default), all tests run even after failures."""
+        session = ProTestSession(concurrency=1)
+        executed: list[str] = []
+
+        @session.test()
+        def test_fail_1() -> None:
+            executed.append("fail_1")
+            raise ValueError("failure 1")
+
+        @session.test()
+        def test_fail_2() -> None:
+            executed.append("fail_2")
+            raise ValueError("failure 2")
+
+        @session.test()
+        def test_pass() -> None:
+            executed.append("pass")
+
+        runner = TestRunner(session)
+        runner.run()
+
+        expected_count = 3
+        assert len(executed) == expected_count
+
+    def test_maxfail_counts_errors_too(self) -> None:
+        """Errors (not just assertion failures) count toward maxfail."""
+        session = ProTestSession(concurrency=1)
+        session.maxfail = 2
+        executed: list[str] = []
+
+        @session.test()
+        def test_assertion_fail() -> None:
+            executed.append("assertion_fail")
+            raise AssertionError("assertion failure")
+
+        @session.test()
+        def test_runtime_error() -> None:
+            executed.append("runtime_error")
+            raise RuntimeError("unexpected error")
+
+        @session.test()
+        def test_should_not_run() -> None:
+            executed.append("should_not_run")
+
+        runner = TestRunner(session)
+        result = runner.run()
+
+        assert result.success is False
+        assert "assertion_fail" in executed
+        assert "runtime_error" in executed
+        assert "should_not_run" not in executed
+
+    def test_maxfail_with_concurrency(self) -> None:
+        """maxfail is respected with concurrent workers."""
+        session = ProTestSession(concurrency=4)
+        session.maxfail = 2
+        executed: list[str] = []
+
+        @session.test()
+        async def test_fast_fail_1() -> None:
+            await asyncio.sleep(0.01)
+            executed.append("fast_fail_1")
+            raise ValueError("failure 1")
+
+        @session.test()
+        async def test_fast_fail_2() -> None:
+            await asyncio.sleep(0.01)
+            executed.append("fast_fail_2")
+            raise ValueError("failure 2")
+
+        @session.test()
+        async def test_slow_pass_1() -> None:
+            await asyncio.sleep(0.1)
+            executed.append("slow_pass_1")
+
+        @session.test()
+        async def test_slow_pass_2() -> None:
+            await asyncio.sleep(0.1)
+            executed.append("slow_pass_2")
+
+        runner = TestRunner(session)
+        result = runner.run()
+
+        assert result.success is False
+        fail_count = sum(1 for name in executed if "fail" in name)
+        assert fail_count >= 2, "at least 2 failures should have executed"
+        total_tests = 4
+        assert len(executed) < total_tests, (
+            f"maxfail should stop early: {executed}"
+        )
+
+    def test_maxfail_across_suites(self) -> None:
+        """maxfail stops processing subsequent suites."""
+        session = ProTestSession(concurrency=1)
+        session.maxfail = 2
+
+        suite1 = ProTestSuite("Suite1")
+        suite2 = ProTestSuite("Suite2")
+        session.add_suite(suite1)
+        session.add_suite(suite2)
+
+        executed: list[str] = []
+
+        @suite1.test()
+        def test_suite1_fail_1() -> None:
+            executed.append("suite1_fail_1")
+            raise ValueError("fail 1")
+
+        @suite1.test()
+        def test_suite1_fail_2() -> None:
+            executed.append("suite1_fail_2")
+            raise ValueError("fail 2")
+
+        @suite2.test()
+        def test_suite2_should_not_run() -> None:
+            executed.append("suite2")
+
+        runner = TestRunner(session)
+        runner.run()
+
+        assert "suite1_fail_1" in executed
+        assert "suite1_fail_2" in executed
+        assert "suite2" not in executed
+
+    def test_exitfirst_sets_maxfail_to_one(self) -> None:
+        """Setting exitfirst=True sets maxfail=1."""
+        session = ProTestSession()
+        session.exitfirst = True
+        assert session.maxfail == 1
+
+    def test_maxfail_overrides_exitfirst(self) -> None:
+        """Explicit maxfail takes precedence over exitfirst default."""
+        session = ProTestSession()
+        session.exitfirst = True
+        session.maxfail = 3
+        assert session.maxfail == 3
+
+    def test_maxfail_negative_raises(self) -> None:
+        """Negative maxfail raises ValueError."""
+        session = ProTestSession()
+        try:
+            session.maxfail = -1
+            raise AssertionError("Should have raised ValueError")
+        except ValueError:
+            pass
+
+
 class TestRunnerTypeHintFailure:
     """Tests for type hint resolution edge cases."""
 

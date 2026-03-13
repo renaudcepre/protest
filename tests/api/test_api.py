@@ -75,6 +75,50 @@ class TestRunSession:
         assert execution_order == ["first"]
 
 
+    def test_run_session_maxfail(self) -> None:
+        session = ProTestSession()
+        execution_order: list[str] = []
+
+        @session.test()
+        def test_first() -> None:
+            execution_order.append("first")
+            raise AssertionError("fail first")
+
+        @session.test()
+        def test_second() -> None:
+            execution_order.append("second")
+            raise AssertionError("fail second")
+
+        @session.test()
+        def test_third() -> None:
+            execution_order.append("third")
+
+        result = run_session(session, maxfail=2)
+        assert result.success is False
+        assert execution_order == ["first", "second"]
+
+    def test_run_session_maxfail_allows_passing_between(self) -> None:
+        session = ProTestSession()
+        execution_order: list[str] = []
+
+        @session.test()
+        def test_pass() -> None:
+            execution_order.append("pass")
+
+        @session.test()
+        def test_fail() -> None:
+            execution_order.append("fail")
+            raise AssertionError("fail")
+
+        @session.test()
+        def test_pass_2() -> None:
+            execution_order.append("pass_2")
+
+        result = run_session(session, maxfail=1)
+        assert result.success is False
+        assert execution_order == ["pass", "fail"]
+
+
 class TestRunSessionTagFiltering:
     def test_include_tags(self) -> None:
         session = ProTestSession()
