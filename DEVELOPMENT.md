@@ -105,5 +105,5 @@ Documentation source is in `docs/` using MkDocs with Material theme.
 ## Running the Example
 
 ```bash
-uv run protest run examples.yorkshire.session:session
+uv run protest run examples.yorkshire.tests.session:session
 ```
