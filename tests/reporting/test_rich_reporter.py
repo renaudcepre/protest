@@ -64,22 +64,23 @@ class TestRichReporterBasic:
         reporter.console = MagicMock()
         return reporter
 
-    def test_on_collection_finish_stores_count(self, reporter: RichReporter) -> None:
+    def test_on_collection_finish_returns_items(self, reporter: RichReporter) -> None:
         items = [_make_test_item(f"test_{idx}") for idx in range(5)]
         result = reporter.on_collection_finish(items)
-        assert reporter._total_tests == 5
         assert result is items
 
-    def test_on_test_pass_prints(self, reporter_v1: RichReporter) -> None:
-        """Given verbosity=1, test pass prints to console."""
+    def test_on_test_pass_prints(self, reporter: RichReporter) -> None:
+        """Given default verbosity, test pass prints to console."""
         result = TestResult(
             name="test_example", node_id="mod::test_example", duration=0.05
         )
-        reporter_v1.on_test_pass(result)
-        reporter_v1.console.print.assert_called()
+        reporter.on_test_pass(result)
+        reporter.console.print.assert_called()
 
-    def test_on_test_pass_quiet(self, reporter: RichReporter) -> None:
-        """Given default verbosity, test pass does not print."""
+    def test_on_test_pass_quiet(self) -> None:
+        """Given quiet mode (verbosity=-1), test pass does not print."""
+        reporter = RichReporter(verbosity=-1)
+        reporter.console = MagicMock()
         result = TestResult(
             name="test_example", node_id="mod::test_example", duration=0.05
         )

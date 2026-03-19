@@ -319,16 +319,9 @@ async def test_retry_with_specific_exception(
 
 
 @showcase_suite.test()
-async def test_yorkshire_math_skills(
-    factory: Annotated[FixtureFactory[Yorkshire], Use(yorkshire)],
-) -> None:
+async def test_intentional_failure() -> None:
     """Intentionally failing test for error reporting demo."""
-    fifi = await factory(name="Fifi", job=Job.INFLUENCER)
-    treats_expected = 10
-    treats_actual = 7
-    assert treats_actual == treats_expected, (
-        f"{fifi.name} counted {treats_actual} treats but expected {treats_expected}"
-    )
+    raise AssertionError("This test fails on purpose to demonstrate failure output")
 
 
 # =============================================================================

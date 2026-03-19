@@ -99,6 +99,10 @@ def main() -> None:
 
     command = sys.argv[1]
 
+    if command in ("--help", "-h"):
+        _print_help()
+        return
+
     if command == "tags":
         _handle_tags_command()
         return
@@ -207,6 +211,13 @@ def _create_run_parser() -> argparse.ArgumentParser:
         help="Disable stdout/stderr capture (show print output)",
     )
     parser.add_argument(
+        "-q",
+        "--quiet",
+        dest="quiet",
+        action="store_true",
+        help="Minimal output (progress bar only)",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         dest="verbosity",
@@ -227,9 +238,14 @@ def _handle_run_command() -> None:
     base_parser = _create_base_parser()
     base_args, remaining = base_parser.parse_known_args(argv)
 
-    # If --help in remaining and no target, show help without loading session
+    # If --help without target, show full help with all plugin options
     if ("--help" in remaining or "-h" in remaining) and not base_args.target:
-        _create_run_parser().parse_args(["--help"])
+        from protest.core.session import ProTestSession
+
+        full_parser = _create_run_parser()
+        for plugin_class in ProTestSession.default_plugin_classes():
+            plugin_class.add_cli_options(full_parser)
+        full_parser.parse_args(["--help"])
         return
 
     if not base_args.target:
@@ -256,8 +272,16 @@ def _handle_run_command() -> None:
 
     # Phase 5: Build context
     from protest.plugin import PluginContext
+    from protest.reporting.verbosity import Verbosity
 
-    ctx = PluginContext(args={**vars(args), "target_suite": suite_filter})
+    effective_verbosity = Verbosity.QUIET if args.quiet else args.verbosity
+    ctx = PluginContext(
+        args={
+            **vars(args),
+            "target_suite": suite_filter,
+            "verbosity": effective_verbosity,
+        }
+    )
 
     # Phase 6: Run tests (api.run_session handles plugin activation)
     run_tests(session, ctx, collect_only=args.collect_only)

@@ -1,4 +1,3 @@
-import time
 import traceback
 from argparse import ArgumentParser
 from pathlib import Path
@@ -22,6 +21,7 @@ from protest.entities import (
     TestTeardownInfo,
 )
 from protest.plugin import PluginBase, PluginContext
+from protest.reporting.verbosity import Verbosity
 
 
 def _format_test_name(result: TestResult) -> str:
@@ -52,19 +52,15 @@ class RichReporter(PluginBase):
     def __init__(self, verbosity: int = 0) -> None:
         self.console = Console(highlight=False)
         self._verbosity = verbosity
-        self._total_tests = 0
         self._failed_results: list[TestResult] = []
         self._error_results: list[TestResult] = []
 
-        self._start_time: float = 0
         self._passed = 0
         self._failed = 0
         self._errors = 0
         self._skipped = 0
         self._xfailed = 0
         self._xpassed = 0
-        # Progress tracking for visual squares
-        self._test_statuses: list[str] = []  # "pass", "fail", "error", "skip", "xfail", "xpass"
 
     @classmethod
     def add_cli_options(cls, parser: ArgumentParser) -> None:
@@ -82,120 +78,77 @@ class RichReporter(PluginBase):
             return None
         return cls(verbosity=ctx.get("verbosity", 0))
 
-    def _make_progress_squares(self) -> str:
-        """Build visual progress indicator with colored squares."""
-        max_squares = 100  # Condense to bar if more tests
-
-        if self._total_tests <= max_squares:
-            # Individual squares for each test
-            squares = []
-            for status in self._test_statuses:
-                if status == "pass":
-                    squares.append("[green]■[/]")
-                elif status == "fail":
-                    squares.append("[red]■[/]")
-                elif status == "error":
-                    squares.append("[yellow]■[/]")
-                elif status == "skip":
-                    squares.append("[dim]■[/]")
-                elif status == "xfail":
-                    squares.append("[dim green]■[/]")
-                else:  # xpass
-                    squares.append("[red]■[/]")
-            # Pending tests
-            pending = self._total_tests - len(self._test_statuses)
-            squares.extend(["[dim]□[/]"] * pending)
-            return "".join(squares)
-        else:
-            # Condensed progress bar for many tests
-            bar_width = 30
-            done = len(self._test_statuses)
-            filled = int((done / self._total_tests) * bar_width) if self._total_tests else 0
-            empty = bar_width - filled
-
-            # Color based on failures
-            if self._failed > 0 or self._errors > 0:
-                bar_color = "red"
-            else:
-                bar_color = "green"
-
-            return f"[{bar_color}]{'█' * filled}[/][dim]{'░' * empty}[/]"
-
     def _print(self, message: str) -> None:
         self.console.print(message)
 
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
-        self._total_tests = len(items)
-        self._start_time = time.perf_counter()
         return items
 
     def on_session_start(self) -> None:
-        if self._verbosity >= 2:
+        if self._verbosity >= Verbosity.LIFECYCLE:
             self._print("[dim]  session setup...[/]")
 
     def on_session_setup_done(self, info: SessionSetupInfo) -> None:
-        if self._verbosity >= 2:
+        if self._verbosity >= Verbosity.LIFECYCLE:
             self._print(
                 f"[dim]  session setup done ({_format_duration(info.duration)})[/]"
             )
 
     def on_suite_setup_done(self, info: SuiteSetupInfo) -> None:
-        # Suite headers at verbosity >= 1
-        if self._verbosity >= 1:
+        if self._verbosity >= Verbosity.NORMAL:
             self._print(f"[cyan]       ◈ {info.name}[/]")
-        # At verbosity 0, suite headers are hidden (progress bar shows status)
 
     def on_session_teardown_start(self) -> None:
-        if self._verbosity >= 2:
+        if self._verbosity >= Verbosity.LIFECYCLE:
             self._print("[dim]  session teardown...[/]")
 
     def on_suite_teardown_start(self, path: SuitePath) -> None:
-        if self._verbosity >= 2:
+        if self._verbosity >= Verbosity.LIFECYCLE:
             self._print(f"[dim]  suite '{path}' teardown...[/]")
 
     def on_suite_end(self, result: SuiteResult) -> None:
-        if self._verbosity >= 2 and result.teardown_duration > 0:
+        if self._verbosity >= Verbosity.LIFECYCLE and result.teardown_duration > 0:
             self._print(
                 f"[dim]  {result.name} teardown done ({_format_duration(result.teardown_duration)})[/]"
             )
 
     def on_session_end(self, result: SessionResult) -> None:
-        if self._verbosity >= 2 and result.teardown_duration > 0:
+        if self._verbosity >= Verbosity.LIFECYCLE and result.teardown_duration > 0:
             self._print(
                 f"[dim]  session teardown done ({_format_duration(result.teardown_duration)})[/]"
             )
 
     def on_suite_start(self, info: SuiteStartInfo) -> None:
-        if self._verbosity >= 2:
+        if self._verbosity >= Verbosity.LIFECYCLE:
             self._print(f"[dim]  suite '{info.name}' setup...[/]")
 
     def on_fixture_setup_start(self, info: FixtureInfo) -> None:
-        if self._verbosity >= 3:
+        if self._verbosity >= Verbosity.FIXTURES:
             scope_str = f"[dim]({info.scope.value})[/]"
             self._print(f"[dim]    ↳ fixture '{info.name}' setup... {scope_str}[/]")
 
     def on_fixture_setup_done(self, info: FixtureInfo) -> None:
-        if self._verbosity >= 3:
+        if self._verbosity >= Verbosity.FIXTURES:
             self._print(
                 f"[dim]    ↳ fixture '{info.name}' ready ({_format_duration(info.duration)})[/]"
             )
 
     def on_fixture_teardown_start(self, info: FixtureInfo) -> None:
-        if self._verbosity >= 3:
+        if self._verbosity >= Verbosity.FIXTURES:
             self._print(f"[dim]    ↳ fixture '{info.name}' teardown...[/]")
 
     def on_fixture_teardown_done(self, info: FixtureInfo) -> None:
-        if self._verbosity >= 3:
+        if self._verbosity >= Verbosity.FIXTURES:
             self._print(
                 f"[dim]    ↳ fixture '{info.name}' cleaned ({_format_duration(info.duration)})[/]"
             )
 
     def on_test_setup_done(self, info: TestStartInfo) -> None:
-        if self._verbosity >= 3:
+        if self._verbosity >= Verbosity.FIXTURES:
             self._print(f"[dim]       → {info.name} setup done[/]")
 
     def on_test_teardown_start(self, info: TestTeardownInfo) -> None:
-        if self._verbosity >= 3:
+        if self._verbosity >= Verbosity.FIXTURES:
             self._print(f"[dim]       ← {info.name} teardown...[/]")
 
     def on_test_retry(self, info: TestRetryInfo) -> None:
@@ -208,8 +161,7 @@ class RichReporter(PluginBase):
 
     def on_test_pass(self, result: TestResult) -> None:
         self._passed += 1
-        self._test_statuses.append("pass")
-        if self._verbosity >= 1:
+        if self._verbosity >= Verbosity.NORMAL:
             name = _format_test_name(result)
             duration = _format_duration(result.duration)
             retry_suffix = ""
@@ -228,11 +180,9 @@ class RichReporter(PluginBase):
         if result.is_fixture_error:
             self._error_results.append(result)
             self._errors += 1
-            self._test_statuses.append("error")
         else:
             self._failed_results.append(result)
             self._failed += 1
-            self._test_statuses.append("fail")
 
         # Failures ALWAYS show regardless of verbosity
         if result.is_fixture_error:
@@ -252,15 +202,13 @@ class RichReporter(PluginBase):
 
     def on_test_skip(self, result: TestResult) -> None:
         self._skipped += 1
-        self._test_statuses.append("skip")
-        if self._verbosity >= 1:
+        if self._verbosity >= Verbosity.NORMAL:
             name = _format_test_name(result)
             self._print(f"   [yellow]○[/]   {name} [dim]({result.skip_reason})[/]")
 
     def on_test_xfail(self, result: TestResult) -> None:
         self._xfailed += 1
-        self._test_statuses.append("xfail")
-        if self._verbosity >= 1:
+        if self._verbosity >= Verbosity.NORMAL:
             name = _format_test_name(result)
             duration = _format_duration(result.duration)
             self._print(
@@ -269,7 +217,6 @@ class RichReporter(PluginBase):
 
     def on_test_xpass(self, result: TestResult) -> None:
         self._xpassed += 1
-        self._test_statuses.append("xpass")
         # xpass is a problem - always show it like failures
         name = _format_test_name(result)
         duration = _format_duration(result.duration)

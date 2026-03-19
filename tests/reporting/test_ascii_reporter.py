@@ -124,14 +124,13 @@ class TestAsciiReporterHooks:
         assert "OK test_example" in captured.out
         assert "50ms" in captured.out
 
-    def test_on_test_pass_quiet(
-        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Given default verbosity, when test passes, then nothing is printed."""
+    def test_on_test_pass_quiet(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Given quiet mode (verbosity=-1), when test passes, then nothing is printed."""
+        reporter = AsciiReporter(verbosity=-1)
         result = TestResult(
             name="test_example", node_id="mod::test_example", duration=0.05
         )
-        ascii_reporter.on_test_pass(result)
+        reporter.on_test_pass(result)
         captured = capsys.readouterr()
         assert captured.out == ""
 
@@ -503,15 +502,16 @@ class TestAsciiReporterLifecycle:
         self, ascii_reporter_v1: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Given verbosity=1, suite setup done prints suite header."""
-        ascii_reporter_v1.on_suite_setup_done(SuiteSetupInfo(name="MySuite", duration=0.1))
+        ascii_reporter_v1.on_suite_setup_done(
+            SuiteSetupInfo(name="MySuite", duration=0.1)
+        )
         captured = capsys.readouterr()
         assert "[] MySuite" in captured.out
 
-    def test_suite_setup_done_quiet(
-        self, ascii_reporter: AsciiReporter, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        """Given default verbosity, suite setup done is silent."""
-        ascii_reporter.on_suite_setup_done(SuiteSetupInfo(name="MySuite", duration=0.1))
+    def test_suite_setup_done_quiet(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Given quiet mode (verbosity=-1), suite setup done is silent."""
+        reporter = AsciiReporter(verbosity=-1)
+        reporter.on_suite_setup_done(SuiteSetupInfo(name="MySuite", duration=0.1))
         captured = capsys.readouterr()
         assert captured.out == ""
 

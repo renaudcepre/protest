@@ -33,6 +33,7 @@ from protest.execution.capture import set_session_teardown_capture
 from protest.filters.keyword import KeywordFilterPlugin
 from protest.filters.suite import SuiteFilterPlugin
 from protest.reporting.ascii import AsciiReporter
+from protest.reporting.ctrf import CTRFReporter
 from protest.reporting.log_file import LogFilePlugin
 from protest.reporting.rich_reporter import RichReporter
 from protest.tags.plugin import TagFilterPlugin
@@ -237,21 +238,24 @@ class ProTestSession:
         if plugin_class not in self._plugin_classes:
             self._plugin_classes.append(plugin_class)
 
-    def register_default_plugins(self) -> None:
-        """Register all standard ProTest plugins for CLI discovery.
+    @staticmethod
+    def default_plugin_classes() -> list[type[PluginBase]]:
+        """Return the list of standard plugin classes."""
+        return [
+            CachePlugin,
+            TagFilterPlugin,
+            SuiteFilterPlugin,
+            KeywordFilterPlugin,
+            RichReporter,
+            AsciiReporter,
+            CTRFReporter,
+            LogFilePlugin,
+        ]
 
-        This includes: RichReporter, AsciiReporter, CachePlugin, LogFilePlugin,
-        TagFilterPlugin, SuiteFilterPlugin, KeywordFilterPlugin.
-        """
-        # Filters first (they modify the items list in on_collection_finish)
-        self.use(CachePlugin)
-        self.use(TagFilterPlugin)
-        self.use(SuiteFilterPlugin)
-        self.use(KeywordFilterPlugin)
-        # Reporters last (they receive the filtered items count)
-        self.use(RichReporter)
-        self.use(AsciiReporter)
-        self.use(LogFilePlugin)
+    def register_default_plugins(self) -> None:
+        """Register all standard ProTest plugins for CLI discovery."""
+        for plugin_class in self.default_plugin_classes():
+            self.use(plugin_class)
 
     @property
     def plugin_classes(self) -> list[type[PluginBase]]:

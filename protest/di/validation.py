@@ -17,7 +17,7 @@ def _extract_from_params(func: Callable[..., Any]) -> dict[str, ForEach[Any]]:
     """Extract parameters annotated with From(source)."""
     try:
         type_hints = get_type_hints(func, include_extras=True)
-    except Exception:  # noqa: BLE001 - get_type_hints can fail on unresolvable annotations
+    except Exception:
         type_hints = {}
 
     result: dict[str, ForEach[Any]] = {}

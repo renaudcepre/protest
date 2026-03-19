@@ -116,26 +116,28 @@ async def test_create_pack_batch_creation(
     factory: Annotated[YorkshireFactory, Use(dog_factory)],
 ) -> None:
     """Test create_pack() for batch creation."""
+    before = len(factory.created)
     pack = factory.create_pack(count=5, prefix="Pup")
 
     expected_count = 5
     assert len(pack) == expected_count
     assert pack[0].name == "Pup_0"
     assert pack[4].name == "Pup_4"
-    # Factory tracks all created dogs
-    assert len(factory.created) == expected_count
+    # Factory tracks all created dogs (suite-scoped, so count is cumulative)
+    assert len(factory.created) - before == expected_count
 
 
 @custom_factory_suite.test()
 async def test_factory_tracks_created_dogs(
     factory: Annotated[YorkshireFactory, Use(dog_factory)],
 ) -> None:
-    """Test that factory.created tracks all dogs."""
+    """Test that factory.created tracks new dogs."""
+    before = len(factory.created)
     factory.create("Alice")
     factory.create("Bob")
     factory.create_puppy("Charlie")
 
     expected_count = 3
-    assert len(factory.created) == expected_count
-    names = [dog.name for dog in factory.created]
-    assert names == ["Alice", "Bob", "Charlie"]
+    assert len(factory.created) - before == expected_count
+    recent = [dog.name for dog in factory.created[before:]]
+    assert recent == ["Alice", "Bob", "Charlie"]

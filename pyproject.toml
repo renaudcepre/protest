@@ -103,6 +103,9 @@ ignore = [
 "protest/reporting/ascii.py" = [
     "T201", # print is the purpose of this module
 ]
+"protest/reporting/rich_reporter.py" = [
+    "T201", # print is the purpose of this module
+]
 "protest/reporting/factory.py" = [
     "PLC0415", # lazy imports for optional rich dependency
     "PLR0911", # many returns is decision tree pattern
