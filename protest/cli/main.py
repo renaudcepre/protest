@@ -99,6 +99,10 @@ def main() -> None:
 
     command = sys.argv[1]
 
+    if command in ("--help", "-h"):
+        _print_help()
+        return
+
     if command == "tags":
         _handle_tags_command()
         return
@@ -234,9 +238,14 @@ def _handle_run_command() -> None:
     base_parser = _create_base_parser()
     base_args, remaining = base_parser.parse_known_args(argv)
 
-    # If --help in remaining and no target, show help without loading session
+    # If --help without target, show full help with all plugin options
     if ("--help" in remaining or "-h" in remaining) and not base_args.target:
-        _create_run_parser().parse_args(["--help"])
+        from protest.core.session import ProTestSession
+
+        full_parser = _create_run_parser()
+        for plugin_class in ProTestSession.default_plugin_classes():
+            plugin_class.add_cli_options(full_parser)
+        full_parser.parse_args(["--help"])
         return
 
     if not base_args.target:
