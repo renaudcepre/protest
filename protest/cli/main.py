@@ -215,7 +215,7 @@ def _create_run_parser() -> argparse.ArgumentParser:
         "--quiet",
         dest="quiet",
         action="store_true",
-        help="Minimal output (progress bar only)",
+        help="Minimal output (summary only)",
     )
     parser.add_argument(
         "-v",
