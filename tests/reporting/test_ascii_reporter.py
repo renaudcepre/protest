@@ -503,7 +503,9 @@ class TestAsciiReporterLifecycle:
         self, ascii_reporter_v1: AsciiReporter, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Given verbosity=1, suite setup done prints suite header."""
-        ascii_reporter_v1.on_suite_setup_done(SuiteSetupInfo(name="MySuite", duration=0.1))
+        ascii_reporter_v1.on_suite_setup_done(
+            SuiteSetupInfo(name="MySuite", duration=0.1)
+        )
         captured = capsys.readouterr()
         assert "[] MySuite" in captured.out
 

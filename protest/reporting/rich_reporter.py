@@ -64,7 +64,9 @@ class RichReporter(PluginBase):
         self._xfailed = 0
         self._xpassed = 0
         # Progress tracking for visual squares
-        self._test_statuses: list[str] = []  # "pass", "fail", "error", "skip", "xfail", "xpass"
+        self._test_statuses: list[
+            str
+        ] = []  # "pass", "fail", "error", "skip", "xfail", "xpass"
 
     @classmethod
     def add_cli_options(cls, parser: ArgumentParser) -> None:
@@ -106,20 +108,25 @@ class RichReporter(PluginBase):
             pending = self._total_tests - len(self._test_statuses)
             squares.extend(["[dim]□[/]"] * pending)
             return "".join(squares)
-        else:
-            # Condensed progress bar for many tests
-            bar_width = 30
+        # Condensed progress bar for many tests
+        bar_width = 30
+        done = len(self._test_statuses)
+        filled = int((done / self._total_tests) * bar_width) if self._total_tests else 0
+        empty = bar_width - filled
+
+        # Color based on failures
+        bar_color = "red" if self._failed > 0 or self._errors > 0 else "green"
+
+        return f"[{bar_color}]{'█' * filled}[/][dim]{'░' * empty}[/]"
+
+    def _update_progress(self) -> None:
+        if self._verbosity == 0 and self._total_tests > 0:
             done = len(self._test_statuses)
-            filled = int((done / self._total_tests) * bar_width) if self._total_tests else 0
-            empty = bar_width - filled
-
-            # Color based on failures
-            if self._failed > 0 or self._errors > 0:
-                bar_color = "red"
-            else:
-                bar_color = "green"
-
-            return f"[{bar_color}]{'█' * filled}[/][dim]{'░' * empty}[/]"
+            squares = self._make_progress_squares()
+            self.console.print(
+                f"\r  {squares} [dim]{done}/{self._total_tests}[/]", end=""
+            )
+            self.console.file.flush()
 
     def _print(self, message: str) -> None:
         self.console.print(message)
@@ -218,6 +225,7 @@ class RichReporter(PluginBase):
                     f" [dim]\\[attempt {result.attempt}/{result.max_attempts}][/]"
                 )
             self._print(f"   [green]✓[/]   {name} [dim]({duration})[/]{retry_suffix}")
+        self._update_progress()
 
     def on_test_fail(self, result: TestResult) -> None:
         name = _format_test_name(result)
@@ -249,6 +257,7 @@ class RichReporter(PluginBase):
         if result.output:
             for line in result.output.rstrip().splitlines():
                 self._print(f"[dim]       │ {line}[/]")
+        self._update_progress()
 
     def on_test_skip(self, result: TestResult) -> None:
         self._skipped += 1
@@ -256,6 +265,7 @@ class RichReporter(PluginBase):
         if self._verbosity >= 1:
             name = _format_test_name(result)
             self._print(f"   [yellow]○[/]   {name} [dim]({result.skip_reason})[/]")
+        self._update_progress()
 
     def on_test_xfail(self, result: TestResult) -> None:
         self._xfailed += 1
@@ -266,6 +276,7 @@ class RichReporter(PluginBase):
             self._print(
                 f"   [green]✗[/]   {name} [dim]({result.xfail_reason}) ({duration})[/]"
             )
+        self._update_progress()
 
     def on_test_xpass(self, result: TestResult) -> None:
         self._xpassed += 1
@@ -274,6 +285,7 @@ class RichReporter(PluginBase):
         name = _format_test_name(result)
         duration = _format_duration(result.duration)
         self._print(f"   [red]⚡[/]   {name} [red]XPASS[/] [dim]({duration})[/]")
+        self._update_progress()
 
     def on_session_interrupted(self, force_teardown: bool) -> None:
         if force_teardown:
@@ -335,6 +347,9 @@ class RichReporter(PluginBase):
                 self._print(f"[dim]{escaped_line}[/]")
 
     def on_session_complete(self, result: SessionResult) -> None:
+        if self._verbosity == 0 and self._total_tests > 0:
+            self.console.print()  # newline after progress bar
+
         if self._failed_results or self._error_results:
             self._print_failure_summary()
 

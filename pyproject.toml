@@ -102,6 +102,11 @@ ignore = [
 ]
 "protest/reporting/ascii.py" = [
     "T201", # print is the purpose of this module
+    "PLR2004", # verbosity level comparisons
+]
+"protest/reporting/rich_reporter.py" = [
+    "T201", # print is the purpose of this module
+    "PLR2004", # verbosity level comparisons
 ]
 "protest/reporting/factory.py" = [
     "PLC0415", # lazy imports for optional rich dependency

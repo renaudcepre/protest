@@ -101,16 +101,6 @@ Opens http://127.0.0.1:8000 with live reload.
 
 Documentation source is in `docs/` using MkDocs with Material theme.
 
-## Web Reporter
-
-The web reporter UI is in `web/`:
-
-```bash
-cd web
-npm install
-npm run dev      # Dev server
-npm run build    # Build to protest/reporting/assets/
-```
 
 ## Running the Example
 

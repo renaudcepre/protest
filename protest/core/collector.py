@@ -20,7 +20,7 @@ def _extract_use_fixtures(func: Callable[..., Any]) -> list[FixtureCallable]:
     """Extract fixtures referenced via Use() markers in function parameters."""
     try:
         type_hints = get_type_hints(func, include_extras=True)
-    except Exception:  # noqa: BLE001 - get_type_hints can fail on unresolvable annotations
+    except Exception:
         type_hints = {}
 
     fixtures: list[FixtureCallable] = []

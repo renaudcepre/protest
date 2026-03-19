@@ -124,7 +124,9 @@ class AsciiReporter(PluginBase):
 
     def on_fixture_setup_done(self, info: FixtureInfo) -> None:
         if self._verbosity >= 3:
-            print(f"    -> fixture '{info.name}' ready ({_format_duration(info.duration)})")
+            print(
+                f"    -> fixture '{info.name}' ready ({_format_duration(info.duration)})"
+            )
 
     def on_fixture_teardown_start(self, info: FixtureInfo) -> None:
         if self._verbosity >= 3:
@@ -132,7 +134,9 @@ class AsciiReporter(PluginBase):
 
     def on_fixture_teardown_done(self, info: FixtureInfo) -> None:
         if self._verbosity >= 3:
-            print(f"    -> fixture '{info.name}' cleaned ({_format_duration(info.duration)})")
+            print(
+                f"    -> fixture '{info.name}' cleaned ({_format_duration(info.duration)})"
+            )
 
     def on_test_setup_done(self, info: TestStartInfo) -> None:
         if self._verbosity >= 3:
