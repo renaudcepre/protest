@@ -207,6 +207,13 @@ def _create_run_parser() -> argparse.ArgumentParser:
         help="Disable stdout/stderr capture (show print output)",
     )
     parser.add_argument(
+        "-q",
+        "--quiet",
+        dest="quiet",
+        action="store_true",
+        help="Minimal output (progress bar only)",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         dest="verbosity",
@@ -256,8 +263,16 @@ def _handle_run_command() -> None:
 
     # Phase 5: Build context
     from protest.plugin import PluginContext
+    from protest.reporting.verbosity import Verbosity
 
-    ctx = PluginContext(args={**vars(args), "target_suite": suite_filter})
+    effective_verbosity = Verbosity.QUIET if args.quiet else args.verbosity
+    ctx = PluginContext(
+        args={
+            **vars(args),
+            "target_suite": suite_filter,
+            "verbosity": effective_verbosity,
+        }
+    )
 
     # Phase 6: Run tests (api.run_session handles plugin activation)
     run_tests(session, ctx, collect_only=args.collect_only)

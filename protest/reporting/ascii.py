@@ -19,6 +19,7 @@ from protest.entities import (
     TestTeardownInfo,
 )
 from protest.plugin import PluginBase, PluginContext
+from protest.reporting.verbosity import Verbosity
 
 _MIN_NODE_ID_PARTS = 2
 
@@ -81,69 +82,68 @@ class AsciiReporter(PluginBase):
         return items
 
     def on_session_start(self) -> None:
-        if self._verbosity >= 1:
+        if self._verbosity >= Verbosity.LIFECYCLE:
             print(">> Starting session")
             print()
 
     def on_session_setup_done(self, info: SessionSetupInfo) -> None:
-        if self._verbosity >= 2:
+        if self._verbosity >= Verbosity.LIFECYCLE:
             print(f"  session setup done ({_format_duration(info.duration)})")
 
     def on_suite_setup_done(self, info: SuiteSetupInfo) -> None:
-        # Suite headers only at verbosity >= 1
-        if self._verbosity >= 1:
+        if self._verbosity >= Verbosity.NORMAL:
             print(f"[] {info.name}")
 
     def on_session_teardown_start(self) -> None:
-        if self._verbosity >= 2:
+        if self._verbosity >= Verbosity.LIFECYCLE:
             print("  session teardown...")
 
     def on_suite_teardown_start(self, path: SuitePath) -> None:
-        if self._verbosity >= 2:
+        if self._verbosity >= Verbosity.LIFECYCLE:
             print(f"  suite '{path}' teardown...")
 
     def on_suite_end(self, result: SuiteResult) -> None:
-        if self._verbosity >= 2 and result.teardown_duration > 0:
+        if self._verbosity >= Verbosity.LIFECYCLE and result.teardown_duration > 0:
             print(
                 f"  {result.name} teardown done ({_format_duration(result.teardown_duration)})"
             )
 
     def on_session_end(self, result: SessionResult) -> None:
-        if self._verbosity >= 2 and result.teardown_duration > 0:
+        if self._verbosity >= Verbosity.LIFECYCLE and result.teardown_duration > 0:
             print(
                 f"  session teardown done ({_format_duration(result.teardown_duration)})"
             )
 
     def on_suite_start(self, info: SuiteStartInfo) -> None:
-        if self._verbosity >= 2:
+        if self._verbosity >= Verbosity.LIFECYCLE:
             print(f"  suite '{info.name}' setup...")
 
     def on_fixture_setup_start(self, info: FixtureInfo) -> None:
-        if self._verbosity >= 3:
+        if self._verbosity >= Verbosity.FIXTURES:
             print(f"    -> fixture '{info.name}' setup... ({info.scope.value})")
 
     def on_fixture_setup_done(self, info: FixtureInfo) -> None:
-        if self._verbosity >= 3:
+        if self._verbosity >= Verbosity.FIXTURES:
             print(
                 f"    -> fixture '{info.name}' ready ({_format_duration(info.duration)})"
             )
 
     def on_fixture_teardown_start(self, info: FixtureInfo) -> None:
-        if self._verbosity >= 3:
+        if self._verbosity >= Verbosity.FIXTURES:
             print(f"    -> fixture '{info.name}' teardown...")
 
     def on_fixture_teardown_done(self, info: FixtureInfo) -> None:
-        if self._verbosity >= 3:
+        if self._verbosity >= Verbosity.FIXTURES:
             print(
                 f"    -> fixture '{info.name}' cleaned ({_format_duration(info.duration)})"
             )
 
     def on_test_setup_done(self, info: TestStartInfo) -> None:
-        if self._verbosity >= 3:
+        if self._verbosity >= Verbosity.FIXTURES:
             print(f"      > {info.name} setup done")
 
     def on_test_teardown_start(self, info: TestTeardownInfo) -> None:
-        if self._verbosity >= 3:
+        if self._verbosity >= Verbosity.FIXTURES:
             print(f"      < {info.name} teardown...")
 
     def on_test_retry(self, info: TestRetryInfo) -> None:
@@ -155,7 +155,7 @@ class AsciiReporter(PluginBase):
         )
 
     def on_test_pass(self, result: TestResult) -> None:
-        if self._verbosity >= 1:
+        if self._verbosity >= Verbosity.NORMAL:
             name = _format_test_name(result, include_suite=self._is_parallel)
             duration = _format_duration(result.duration)
             retry_suffix = ""
@@ -186,12 +186,12 @@ class AsciiReporter(PluginBase):
                 print(f"    | {line}")
 
     def on_test_skip(self, result: TestResult) -> None:
-        if self._verbosity >= 1:
+        if self._verbosity >= Verbosity.NORMAL:
             name = _format_test_name(result, include_suite=self._is_parallel)
             print(f"  -- {name} ({result.skip_reason})")
 
     def on_test_xfail(self, result: TestResult) -> None:
-        if self._verbosity >= 1:
+        if self._verbosity >= Verbosity.NORMAL:
             name = _format_test_name(result, include_suite=self._is_parallel)
             duration = _format_duration(result.duration)
             print(f"  xf {name} ({result.xfail_reason}) ({duration})")
