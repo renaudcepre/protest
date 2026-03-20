@@ -105,3 +105,15 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           fail_ci_if_error: false
+
+  test-summary:
+    needs: test
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: All tests passed
+        run: |
+          if [ "${{ needs.test.result }}" != "success" ]; then
+            echo "One or more test matrix jobs failed."
+            exit 1
+          fi
