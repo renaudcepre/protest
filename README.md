@@ -215,10 +215,14 @@ def test_user(user: Annotated[User, Use(get_test_user)]):
 
 ## Installation
 
+ProTest is not yet on PyPI. Install directly from GitHub:
+
 ```bash
-git clone https://github.com/renaudcepre/protest.git
-cd protest
-uv sync
+# With uv (recommended)
+uv add git+https://github.com/renaudcepre/protest.git
+
+# With pip
+pip install git+https://github.com/renaudcepre/protest.git
 ```
 
 ## CLI Usage

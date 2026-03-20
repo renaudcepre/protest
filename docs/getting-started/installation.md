@@ -3,9 +3,20 @@
 ## Requirements
 
 - Python 3.10 or higher
-- [uv](https://docs.astral.sh/uv/) (recommended package manager)
 
-## Install from source
+## Install
+
+ProTest is not yet on PyPI. Install directly from GitHub:
+
+```bash
+# With uv (recommended)
+uv add git+https://github.com/renaudcepre/protest.git
+
+# With pip
+pip install git+https://github.com/renaudcepre/protest.git
+```
+
+## Install from source (development)
 
 ```bash
 git clone https://github.com/renaudcepre/protest.git
