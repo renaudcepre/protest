@@ -194,7 +194,7 @@ Problems:
 
 ## Real-World Example
 
-The [Yorkshire example](../../examples/yorkshire/) demonstrates this pattern at scale:
+The [Yorkshire example](https://github.com/renaudcepre/protest/tree/main/examples/yorkshire) demonstrates this pattern at scale:
 
 ```
 yorkshire/tests/
