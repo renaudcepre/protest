@@ -13,7 +13,7 @@ from protest.loader import LoadError, load_session
 from protest.plugin import PluginBase
 from protest.shell import CommandResult, Shell
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 __all__ = [
     "AsyncMockType",
