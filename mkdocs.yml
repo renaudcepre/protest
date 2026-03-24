@@ -79,5 +79,3 @@ nav:
       - Filters: internals/filters.md
       - Dependency Injection: internals/dependency-injection.md
       - Plugins: internals/plugins.md
-  - Design Docs:
-      - Fixture Scoping: architecture/fixture-scoping-design.md
