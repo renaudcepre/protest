@@ -7,7 +7,7 @@ import inspect
 import time
 from contextlib import AsyncExitStack, asynccontextmanager
 from inspect import signature
-from typing import TYPE_CHECKING, Any, get_type_hints
+from typing import TYPE_CHECKING, Any
 
 from protest.core.collector import get_transitive_fixtures
 from protest.core.outcome import OutcomeBuilder, TestExecutionResult
@@ -20,11 +20,13 @@ from protest.entities import (
     TestStartInfo,
     TestTeardownInfo,
 )
+from protest.entities.events import EvalPayload
 from protest.events.types import Event
 from protest.exceptions import FixtureError
 from protest.execution.async_bridge import ensure_async
 from protest.execution.capture import (
     CaptureCurrentTest,
+    get_current_log_records,
     reset_current_node_id,
     set_current_node_id,
 )
@@ -112,8 +114,6 @@ class TestExecutor:
                 )
             )
 
-        start = time.perf_counter()
-
         try:
             kwargs = await self._resolve_test_kwargs(item, ctx)
         except Exception as exc:
@@ -122,12 +122,14 @@ class TestExecutor:
                     test_name=test_name,
                     node_id=node_id,
                     suite_path=item.suite_path,
-                    duration=time.perf_counter() - start,
+                    duration=0,
                     output=buffer.getvalue(),
                     error=exc,
                     is_fixture_error=True,
                 )
             )
+
+        start = time.perf_counter()
 
         # Conditional skip (callable) - evaluated AFTER fixture resolution
         if item.skip and item.skip.is_conditional:
@@ -162,26 +164,33 @@ class TestExecutor:
         previous_errors: list[Exception] = []
         error: Exception | None = None
         is_fixture_error = False
+        eval_payload: EvalPayload | None = None
         attempt = 1  # Initialized here; always overwritten by loop
 
         for attempt in range(1, max_attempts + 1):
             error = None
             is_fixture_error = False
+            eval_payload = None
 
             try:
                 if item.timeout is not None:
                     try:
-                        await asyncio.wait_for(
+                        return_value = await asyncio.wait_for(
                             ensure_async(item.func, **kwargs),
                             timeout=item.timeout,
                         )
                     except asyncio.TimeoutError:
-                        # Only wrap timeout from wait_for, not from test code
                         raise asyncio.TimeoutError(
                             f"Test exceeded timeout of {item.timeout}s"
                         ) from None
                 else:
-                    await ensure_async(item.func, **kwargs)
+                    return_value = await ensure_async(item.func, **kwargs)
+
+                # For eval items: capture EvalPayload and determine pass/fail
+                if item.is_eval and isinstance(return_value, EvalPayload):
+                    eval_payload = return_value
+                    if not eval_payload.passed:
+                        error = _build_eval_error(eval_payload)
             except FixtureError as exc:
                 error = exc.original
                 is_fixture_error = True
@@ -231,6 +240,9 @@ class TestExecutor:
                 attempt=attempt,
                 max_attempts=max_attempts,
                 previous_errors=tuple(previous_errors),
+                is_eval=item.is_eval,
+                eval_payload=eval_payload,
+                log_records=tuple(get_current_log_records()),
             )
         )
 
@@ -243,10 +255,9 @@ class TestExecutor:
         func_signature = signature(item.func)
         kwargs: dict[str, Any] = dict(item.case_kwargs)
 
-        try:
-            type_hints = get_type_hints(item.func, include_extras=True)
-        except Exception:
-            type_hints = {}
+        from protest.di.hints import get_type_hints_compat
+
+        type_hints = get_type_hints_compat(item.func)
 
         for param_name, param in func_signature.parameters.items():
             if param_name in kwargs:
@@ -346,3 +357,13 @@ class TestExecutor:
             for _, sem in sems_sorted:
                 await stack.enter_async_context(_semaphore_context(sem))
             yield
+
+
+def _build_eval_error(payload: EvalPayload) -> AssertionError:
+    """Build a descriptive AssertionError from failed eval scores."""
+    failed = [
+        f"{name}={entry.value}"
+        for name, entry in payload.scores.items()
+        if not entry.passed
+    ]
+    return AssertionError(f"{', '.join(failed)}")

@@ -16,6 +16,7 @@ class Event(Enum):
     SUITE_SETUP_DONE = "suite_setup_done"
     SUITE_TEARDOWN_START = "suite_teardown_start"
     SUITE_END = "suite_end"
+    EVAL_SUITE_END = "eval_suite_end"
     TEST_START = "test_start"
     TEST_ACQUIRED = "test_acquired"
     TEST_SETUP_DONE = "test_setup_done"
@@ -34,3 +35,4 @@ class Event(Enum):
     FIXTURE_TEARDOWN_START = "fixture_teardown_start"
     FIXTURE_TEARDOWN_DONE = "fixture_teardown_done"
     SESSION_INTERRUPTED = "session_interrupted"
+    USER_PRINT = "user_print"
