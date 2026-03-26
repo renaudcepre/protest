@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from protest.di.decorators import unwrap_fixture
 
@@ -42,18 +42,22 @@ class ProTestSuite:
         description: Optional description for documentation purposes.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         name: str,
         max_concurrency: int | None = None,
         tags: list[str] | None = None,
         description: str | None = None,
+        kind: str = "test",
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         if max_concurrency is not None and max_concurrency < 1:
             raise InvalidMaxConcurrencyError(max_concurrency)
 
         self._name = name
+        self._kind = kind
         self._description = description
+        self._metadata: dict[str, Any] = dict(metadata) if metadata else {}
         self._session: ProTestSession | None = None
         self._parent_suite: ProTestSuite | None = None
         self._tests: list[TestRegistration] = []
@@ -69,6 +73,14 @@ class ProTestSuite:
     @property
     def description(self) -> str | None:
         return self._description
+
+    @property
+    def kind(self) -> str:
+        return self._kind
+
+    @property
+    def suite_metadata(self) -> dict[str, Any]:
+        return self._metadata
 
     @property
     def full_path(self) -> SuitePath:
@@ -122,6 +134,7 @@ class ProTestSuite:
         skip_reason: str = "Skipped",
         xfail: bool | str | Xfail | None = None,
         retry: int | Retry | None = None,
+        is_eval: bool = False,
     ) -> Callable[[FuncT], FuncT]:
         def decorator(func: FuncT) -> FuncT:
             if timeout is not None and timeout < 0:
@@ -139,8 +152,30 @@ class ProTestSuite:
                     xfail=norm_xfail,
                     timeout=timeout,
                     retry=norm_retry,
+                    is_eval=is_eval,
                 )
             )
+            return func
+
+        return decorator
+
+    def eval(
+        self,
+        evaluators: list[Any] | None = None,
+        expected_key: str = "expected",
+        tags: list[str] | None = None,
+        timeout: float | None = None,
+    ) -> Callable[[FuncT], FuncT]:
+        """Register a scored eval test on this suite."""
+        from protest.evals.wrapper import make_eval_wrapper
+
+        def decorator(func: FuncT) -> FuncT:
+            wrapper = make_eval_wrapper(
+                func,
+                evaluators or [],
+                expected_key,
+            )
+            self.test(tags=tags, timeout=timeout, is_eval=True)(wrapper)
             return func
 
         return decorator

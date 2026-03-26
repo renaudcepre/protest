@@ -1,7 +1,10 @@
 """Test runner orchestration."""
 
+from __future__ import annotations
+
 import asyncio
 import time
+from typing import TYPE_CHECKING, Any
 
 from protest.core.collector import Collector
 from protest.core.execution import ParallelExecutor, SuiteManager, TestExecutor
@@ -22,6 +25,10 @@ from protest.execution.capture import (
 from protest.execution.context import cancellation_event
 from protest.execution.interrupt import InterruptHandler
 
+if TYPE_CHECKING:
+    from protest.entities.events import TestResult
+    from protest.evals.types import EvalCaseResult
+
 
 class TestRunner:
     """Executes tests with parallel support and fixture lifecycle management.
@@ -36,6 +43,7 @@ class TestRunner:
         self._interrupt_handler = InterruptHandler()
         self._interrupted = False
         self._force_interrupt_emitted = False
+        self._eval_results: dict[str, list[EvalCaseResult]] = {}
 
         # Extracted components
         self._suite_manager = SuiteManager(session)
@@ -61,9 +69,22 @@ class TestRunner:
             self._interrupt_handler.uninstall()
             loop.close()
 
+    def _collect_eval_result(self, result: TestResult) -> None:
+        """Internal handler: collect eval results from TEST_PASS/FAIL events."""
+        if not result.is_eval or result.eval_payload is None:
+            return
+        suite_name = result.suite_path.root_name if result.suite_path else "evals"
+        case_result = _build_eval_case_result(result)
+        self._eval_results.setdefault(suite_name, []).append(case_result)
+
     async def _main_loop(self) -> bool:
         """The main async loop for running tests."""
         session_start = time.perf_counter()
+
+        # Register internal eval collector before tests run
+        self._eval_results.clear()
+        self._session.events.on(Event.TEST_PASS, self._collect_eval_result)
+        self._session.events.on(Event.TEST_FAIL, self._collect_eval_result)
 
         collector = Collector()
         items = collector.collect(self._session)
@@ -79,9 +100,12 @@ class TestRunner:
 
         total_counts = TestCounts()
         # Inject cancellation event into context for teardown awareness
+        from protest.execution.capture import reset_event_bus, set_event_bus
+
         cancel_token = cancellation_event.set(
             self._interrupt_handler.force_teardown_event
         )
+        bus_token = set_event_bus(self._session.events)
         try:
             with GlobalCapturePatch(show_output=not self._session.capture):
                 async with self._session:
@@ -112,6 +136,8 @@ class TestRunner:
                     ):
                         suite_result = self._suite_manager.build_result(suite_path)
                         await self._session.events.emit(Event.SUITE_END, suite_result)
+                        # Emit EVAL_SUITE_END for eval suites
+                        await self._emit_eval_suite_end(suite_path)
 
                     await self._session.events.emit(Event.SESSION_TEARDOWN_START)
         finally:
@@ -124,6 +150,7 @@ class TestRunner:
                 await self._session.events.emit(Event.SESSION_INTERRUPTED, True)
                 self._force_interrupt_emitted = True
             cancellation_event.reset(cancel_token)
+            reset_event_bus(bus_token)
 
         if self._interrupt_handler.should_stop_new_tests:
             self._interrupted = True
@@ -151,8 +178,57 @@ class TestRunner:
             await self._session.events.wait_pending()
 
         await self._session.events.emit(Event.SESSION_COMPLETE, session_result)
+        # Unregister eval collector
+        self._session.events.off(Event.TEST_PASS, self._collect_eval_result)
+        self._session.events.off(Event.TEST_FAIL, self._collect_eval_result)
+
         return (
             total_counts.failed == 0
             and total_counts.errored == 0
             and total_counts.xpassed == 0
         )
+
+    async def _emit_eval_suite_end(self, suite_path: Any) -> None:
+        """Emit EVAL_SUITE_END if this suite_path corresponds to an eval suite."""
+        from protest.evals.types import EvalSuiteReport
+
+        suite_name = (
+            suite_path.root_name
+            if hasattr(suite_path, "root_name")
+            else str(suite_path)
+        )
+        eval_cases = self._eval_results.get(suite_name)
+        if not eval_cases:
+            return
+        report = EvalSuiteReport(
+            suite_name=suite_name,
+            cases=tuple(eval_cases),
+            duration=sum(c.duration for c in eval_cases),
+        )
+        await self._session.events.emit(Event.EVAL_SUITE_END, report)
+
+
+def _build_eval_case_result(result: TestResult) -> EvalCaseResult:
+    """Build EvalCaseResult from a TestResult with eval_payload."""
+    from protest.evals.types import EvalCaseResult, EvalScore
+
+    payload = result.eval_payload
+    assert payload is not None
+    return EvalCaseResult(
+        case_name=payload.case_name or "",
+        node_id=result.node_id,
+        scores=tuple(
+            EvalScore(
+                name=name,
+                value=entry.value,
+            )
+            for name, entry in payload.scores.items()
+        ),
+        duration=payload.task_duration,
+        passed=not (result.error is not None or not payload.passed),
+        inputs=payload.inputs,
+        output=payload.output,
+        expected_output=payload.expected_output,
+        case_hash=payload.case_hash,
+        eval_hash=payload.eval_hash,
+    )
