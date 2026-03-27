@@ -1,3 +1,4 @@
+from protest import console
 from protest.api import collect_tests, list_tags, run_session
 from protest.assertions import ExceptionInfo, RaisesContext, raises, warns
 from protest.core.session import ProTestSession

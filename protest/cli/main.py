@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from protest.core.session import ProTestSession
@@ -103,19 +103,21 @@ def main() -> None:
         _print_help()
         return
 
-    if command == "tags":
-        _handle_tags_command()
+    commands: dict[str, Any] = {
+        "tags": _handle_tags_command,
+        "run": lambda: _handle_run_command(kind_filter="test"),
+        "eval": lambda: _handle_run_command(kind_filter="eval"),
+        "history": _handle_history_command,
+        "live": _handle_live_command,
+    }
+
+    handler = commands.get(command)
+    if handler:
+        handler()
         return
 
-    if command == "run":
-        _handle_run_command()
-        return
-
-    if command == "live":
-        _handle_live_command()
-        return
-
-    print(f"Error: Unknown command '{command}'. Use 'run', 'tags', or 'live'.")
+    valid = ", ".join(f"'{c}'" for c in commands)
+    print(f"Error: Unknown command '{command}'. Use {valid}.")
     sys.exit(1)
 
 
@@ -143,9 +145,11 @@ def _print_help() -> None:
     """Print main help."""
     print("ProTest - Async-first Python test framework\n")
     print("Commands:")
-    print("  run    Run tests")
-    print("  live   Start live reporter server")
-    print("  tags   Tag inspection commands")
+    print("  run      Run tests")
+    print("  eval     Run evaluations")
+    print("  history  Browse run history")
+    print("  live     Start live reporter server")
+    print("  tags     Tag inspection commands")
     print(HELP_EPILOG)
 
 
@@ -228,8 +232,15 @@ def _create_run_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _handle_run_command() -> None:
-    """Handle 'protest run' subcommand with two-phase parsing."""
+def _handle_history_command() -> None:
+    """Handle 'protest history' subcommand."""
+    from protest.cli.history import handle_history_command
+
+    handle_history_command(sys.argv[2:])
+
+
+def _handle_run_command(kind_filter: str | None = None) -> None:
+    """Handle 'protest run' / 'protest eval' with two-phase parsing."""
     from protest.loader import LoadError, load_session, parse_target
 
     argv = sys.argv[2:]
@@ -275,13 +286,14 @@ def _handle_run_command() -> None:
     from protest.reporting.verbosity import Verbosity
 
     effective_verbosity = Verbosity.QUIET if args.quiet else args.verbosity
-    ctx = PluginContext(
-        args={
-            **vars(args),
-            "target_suite": suite_filter,
-            "verbosity": effective_verbosity,
-        }
-    )
+    ctx_args: dict[str, Any] = {
+        **vars(args),
+        "target_suite": suite_filter,
+        "verbosity": effective_verbosity,
+    }
+    if kind_filter:
+        ctx_args["kind_filter"] = kind_filter
+    ctx = PluginContext(args=ctx_args)
 
     # Phase 6: Run tests (api.run_session handles plugin activation)
     run_tests(session, ctx, collect_only=args.collect_only)
