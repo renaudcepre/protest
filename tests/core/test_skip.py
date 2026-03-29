@@ -54,7 +54,7 @@ class TestSkipDecorator:
     def test_suite_skip_decorator(self) -> None:
         session = ProTestSession()
         suite = ProTestSuite("test")
-        session.include_suite(suite)
+        session.add_suite(suite)
 
         @suite.test(skip="Suite test skipped")
         def test_skipped() -> None:

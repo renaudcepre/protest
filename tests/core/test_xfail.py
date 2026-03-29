@@ -57,7 +57,7 @@ class TestXfailDecorator:
     def test_suite_xfail_decorator(self) -> None:
         session = ProTestSession()
         suite = ProTestSuite("test")
-        session.include_suite(suite)
+        session.add_suite(suite)
 
         @suite.test(xfail="Suite test xfailed")
         def test_xfailed() -> None:

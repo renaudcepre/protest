@@ -88,7 +88,7 @@ class TestCollector:
         """Collects tests from suites."""
         session = ProTestSession()
         suite = ProTestSuite("my_suite")
-        session.include_suite(suite)
+        session.add_suite(suite)
 
         @suite.test()
         def suite_test() -> None:
@@ -107,7 +107,7 @@ class TestCollector:
         """Collects both standalone and suite tests."""
         session = ProTestSession()
         suite = ProTestSuite("my_suite")
-        session.include_suite(suite)
+        session.add_suite(suite)
 
         @session.test()
         def standalone_test() -> None:
@@ -129,7 +129,7 @@ class TestCollector:
         """Collected items have correct node_ids."""
         session = ProTestSession()
         suite = ProTestSuite("MySuite")
-        session.include_suite(suite)
+        session.add_suite(suite)
 
         @session.test()
         def standalone() -> None:
