@@ -10,6 +10,8 @@ from protest.entities.core import (
     format_fixture_scope,
 )
 from protest.entities.events import (
+    EvalPayload,
+    EvalScoreEntry,
     FixtureInfo,
     HandlerInfo,
     RunResult,
@@ -31,6 +33,8 @@ from protest.entities.suite_path import SuitePath
 from protest.entities.xfail import Xfail, normalize_xfail
 
 __all__ = [
+    "EvalPayload",
+    "EvalScoreEntry",
     "Fixture",
     "FixtureCallable",
     "FixtureInfo",

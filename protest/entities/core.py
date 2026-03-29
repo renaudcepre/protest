@@ -49,6 +49,7 @@ class TestRegistration:
     xfail: Xfail | None = None
     timeout: float | None = None
     retry: Retry | None = None
+    is_eval: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +112,7 @@ class TestItem:
     xfail: Xfail | None = None
     timeout: float | None = None
     retry: Retry | None = None
+    is_eval: bool = False
 
     @property
     def test_name(self) -> str:

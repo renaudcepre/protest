@@ -1,6 +1,6 @@
 # Evals
 
-Evaluate LLM outputs with scored metrics, thresholds, and historical tracking.
+Evaluate LLM outputs with scored metrics and historical tracking.
 
 ## What is an Eval?
 
@@ -15,7 +15,7 @@ ProTest evals use the same infrastructure as tests: fixtures, DI, parallelism, t
 from typing import Annotated
 
 from protest import ForEach, From
-from protest.evals import EvalCase, EvalSession, evaluator
+from protest.evals import EvalCase, EvalSession, ModelInfo, evaluator
 from protest.evals.evaluators import contains_keywords
 
 cases = ForEach([
@@ -23,7 +23,7 @@ cases = ForEach([
     EvalCase(inputs="What is 2+2?", expected="4", name="math"),
 ])
 
-session = EvalSession()
+session = EvalSession(model=ModelInfo(name="gpt-4o-mini"))
 
 @session.eval(evaluators=[contains_keywords(keywords=["Marie"])])
 async def chatbot(case: Annotated[EvalCase, From(cases)]) -> str:
@@ -41,7 +41,7 @@ protest eval evals.session:session
 1. Your function receives case data via `ForEach`/`From` (same as parameterized tests)
 2. It returns the output (string, object, anything)
 3. ProTest passes the output to evaluators → scores
-4. Scores determine pass/fail via thresholds
+4. Bool verdicts determine pass/fail
 5. Aggregated stats appear in the terminal
 
 The rest of the pipeline — fixtures, DI, parallelism, reporters — works identically to tests.
@@ -87,15 +87,44 @@ An evaluator is a function decorated with `@evaluator` that receives an `EvalCon
 
 ### Return Types
 
-Evaluators return `bool` (simple verdict) or a `dataclass` (structured result). The framework reads fields by type:
+Evaluators return `bool` (simple verdict) or a `dataclass` (structured result). In dataclasses, annotate fields to tell the framework what each one is:
 
-| Field Type | Role |
+```python
+from typing import Annotated
+from protest.evals import Metric, Verdict, Reason
+```
+
+| Annotation | Role |
 |------------|------|
-| `bool` | Verdict — pass/fail (`all(bool_fields)`) |
-| `float` | Metric — aggregated in stats (mean/p50/p95) |
-| `str` | Reason — displayed on failure, stored in history |
+| `Annotated[bool, Verdict]` | Verdict — pass/fail (`all(verdicts)`) |
+| `Annotated[float, Metric]` | Metric — aggregated in stats (mean/p50/p95) |
+| `Annotated[int, Metric]` | Metric — converted to float |
+| `Annotated[str, Reason]` | Reason — displayed on failure, stored in history |
 
-Returning `float`, `dict`, or any other type raises `TypeError`.
+Unannotated fields are ignored by the runner — free metadata.
+
+Returning `float`, `dict`, or any other non-dataclass/non-bool type raises `TypeError`.
+
+### Tracking-Only Evaluators
+
+A dataclass with `Metric` fields but no `Verdict` is tracking-only. The case always passes for this evaluator — it measures without gating.
+
+```python
+@dataclass
+class OverlapMetrics:
+    overlap: Annotated[float, Metric]
+
+@evaluator
+def word_overlap(ctx: EvalContext) -> OverlapMetrics:
+    ...
+```
+
+In the terminal, tracking evaluators show with `·` instead of `✓`/`✗`:
+
+```
+✓  chatbot[lookup] (1.2s) keyword_recall=0.95 all_present=✓
+·  chatbot[lookup]         overlap=0.80
+```
 
 ### Simple Evaluator
 
@@ -109,12 +138,14 @@ def not_empty(ctx: EvalContext) -> bool:
 
 ```python
 from dataclasses import dataclass
+from typing import Annotated
+from protest.evals import Metric, Verdict, Reason
 
 @dataclass
 class KeywordScores:
-    keyword_recall: float      # metric → stats
-    all_present: bool          # verdict → pass/fail
-    detail: str = ""           # reason → shown on failure
+    keyword_recall: Annotated[float, Metric]
+    all_present: Annotated[bool, Verdict]
+    detail: Annotated[str, Reason] = ""
 
 @evaluator
 def keyword_check(ctx: EvalContext, keywords: list[str], min_recall: float = 0.5) -> KeywordScores:
@@ -134,9 +165,9 @@ The threshold (`min_recall`) is a parameter of the evaluator, not a framework co
 ```python
 @dataclass
 class JudgeResult:
-    accuracy: float
-    accurate_enough: bool
-    reason: str = ""
+    accuracy: Annotated[float, Metric]
+    accurate_enough: Annotated[bool, Verdict]
+    reason: Annotated[str, Reason] = ""
 
 @evaluator
 async def llm_judge(ctx: EvalContext, rubric: str = "", min_score: float = 0.7) -> JudgeResult:
@@ -223,9 +254,13 @@ session = EvalSession(model=ModelInfo(name="qwen-2.5"))
 
 ## Evaluator Errors
 
-If an evaluator raises an exception (e.g. LLM judge timeout), the case is marked as **error** (not fail). The stack trace appears in the output. Scores from other evaluators that ran before the error are lost.
+If an evaluator raises an exception (e.g. LLM judge timeout), the case is marked as **error** (not fail). The stack trace appears in the output.
 
-> **Tip:** For non-deterministic evaluators (LLM judges), catch exceptions in the evaluator and return a score indicating failure rather than letting them propagate.
+> **Tip:** For non-deterministic evaluators (LLM judges), catch exceptions in the evaluator and return a verdict indicating failure rather than letting them propagate.
+
+## Name Collisions
+
+If two evaluators return dataclasses with the same field name (e.g. both have `accuracy`), the runner prefixes with the evaluator name when it detects a conflict: `llm_judge.accuracy`, `fact_check.accuracy`.
 
 ## Multi-Model Sessions
 
@@ -290,16 +325,20 @@ Flags are independent and combinable: `-v --show-output --show-logs`.
 ### Default
 
 ```
-   ✓   chatbot[lookup] (3.39s) facts_score=1.00 facts_ok=✓
-   ✗   chatbot[causal]: facts_ok=False, LLMJudge=False
+   ✓   chatbot[lookup] (1.2s) keyword_recall=1.00 all_keywords_present=✓
+   ✗   chatbot[math]: all_keywords_present=False
+       │ inputs: What is 2+2?
+       │ output: The answer is 4.
+       │ expected: 4
+       │ detail: found 0/1
 
-         Eval: chatbot (26 cases)
-┏━━━━━━━━━━━━━┳━━━━━━┳━━━━━━┳━━━━━━┳━━━━━━┓
-┃ Score       ┃ mean ┃  p50 ┃   p5 ┃  p95 ┃
-┡━━━━━━━━━━━━━╇━━━━━━╇━━━━━━╇━━━━━━╇━━━━━━┩
-│ facts_score │ 0.37 │ 0.00 │ 0.00 │ 1.00 │
-└─────────────┴──────┴──────┴──────┴──────┘
-  Passed: 14/26 (53.8%)
+           Eval: chatbot (2 cases)
+┏━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━┳━━━━━━┳━━━━━━┓
+┃ Score           ┃ mean ┃  p50 ┃   p5 ┃  p95 ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━╇━━━━━━╇━━━━━━┩
+│ keyword_recall  │ 0.50 │ 0.50 │ 0.00 │ 1.00 │
+└─────────────────┴──────┴──────┴──────┴──────┘
+  Passed: 1/2 (50.0%)
   Results: .protest/results/chatbot_20260329_091422
 ```
 
@@ -334,7 +373,7 @@ protest history --evals --compare
 Each case in history carries two hashes:
 
 - **`case_hash`** — hash of inputs + expected output. Changes when the test data changes.
-- **`eval_hash`** — hash of evaluators + thresholds. Changes when the scoring criteria change.
+- **`eval_hash`** — hash of evaluators. Changes when the scoring criteria change.
 
 `protest history --compare` uses these hashes to detect modified cases vs regressions. If a case's `eval_hash` changed between runs, it's reported as "scoring modified" rather than a real regression.
 

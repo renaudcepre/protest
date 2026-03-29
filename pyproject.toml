@@ -49,6 +49,9 @@ rich = [
 web = [
     "websockets>=12.0",
 ]
+evals = [
+    "pydantic-evals>=0.1",
+]
 
 
 [tool.ruff]
@@ -99,6 +102,23 @@ ignore = [
 "protest/core/session.py" = [
     "PLC0415", # lazy import for optional rich dependency
     "PLR0913", # many args is deliberate API design
+]
+"protest/core/execution/test_executor.py" = [
+    "PLR0915", # _run_test is inherently complex (retry loop + eval capture)
+]
+"protest/history/**" = [
+    "PLC0415", # lazy imports
+    "S603", # subprocess git calls are safe
+    "PLR0913", # load_history has many filter params by design
+]
+"protest/cli/history.py" = [
+    "T201", # print for CLI output
+    "PLC0415", # lazy imports
+]
+"protest/evals/**" = [
+    "T201", # print for eval reporting
+    "PLC0415", # lazy imports for optional pydantic-evals dependency
+    "PLR0913", # adapter functions have many params by design
 ]
 "protest/reporting/ascii.py" = [
     "T201", # print is the purpose of this module
