@@ -1,6 +1,6 @@
 """ProTest evals — native eval support."""
 
-from protest.evals.evaluator import EvalCase, EvalContext, Metric, Reason, Verdict, evaluator
+from protest.evals.evaluator import EvalCase, EvalContext, Metric, Reason, ShortCircuit, Verdict, evaluator
 from protest.evals.session import EvalSession
 from protest.evals.types import (
     EvalCaseResult,
@@ -23,6 +23,7 @@ __all__ = [
     "ModelInfo",
     "Reason",
     "ScoreStats",
+    "ShortCircuit",
     "Verdict",
     "evaluator",
 ]

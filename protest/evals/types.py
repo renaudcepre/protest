@@ -53,24 +53,27 @@ class EvalScore:
 
     name: str
     value: float | bool | str
+    skipped: bool = False
 
     @property
     def is_verdict(self) -> bool:
-        return isinstance(self.value, bool)
+        return not self.skipped and isinstance(self.value, bool)
 
     @property
     def is_metric(self) -> bool:
-        return isinstance(self.value, (int, float)) and not isinstance(self.value, bool)
+        return not self.skipped and isinstance(self.value, (int, float)) and not isinstance(self.value, bool)
 
     @property
     def is_reason(self) -> bool:
-        return isinstance(self.value, str)
+        return not self.skipped and isinstance(self.value, str)
 
     @property
     def passed(self) -> bool:
+        if self.skipped:
+            return True  # skipped scores don't affect pass/fail
         if isinstance(self.value, bool):
             return self.value
-        return True  # metrics and reasons always "pass"
+        return True
 
 
 @dataclass(frozen=True, slots=True)

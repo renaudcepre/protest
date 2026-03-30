@@ -14,6 +14,7 @@ class EvalScoreEntry:
 
     value: float | bool | str
     passed: bool = True
+    skipped: bool = False
 
 
 @dataclass(frozen=True, slots=True)

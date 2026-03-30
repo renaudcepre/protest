@@ -55,6 +55,9 @@ def _format_eval_scores_inline(result: TestResult) -> str:
         return ""
     parts = []
     for name, entry in result.eval_payload.scores.items():
+        if entry.skipped:
+            parts.append(f"{name}=⊘")
+            continue
         val = entry.value
         if isinstance(val, bool):
             parts.append(f"{name}={'✓' if val else '✗'}")

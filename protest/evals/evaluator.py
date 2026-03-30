@@ -80,6 +80,27 @@ class EvalCase:
         return self.name or f"EvalCase({self.inputs!r})"
 
 
+class ShortCircuit:
+    """Group evaluators with fail-fast behavior.
+
+    The first Verdict=False stops the group. Evaluators outside
+    the ShortCircuit run regardless.
+
+    Usage::
+
+        evaluators=[
+            not_empty,
+            ShortCircuit([
+                contains_expected_facts(min_score=0.5),
+                llm_judge(rubric="..."),  # skipped if above fails
+            ]),
+        ]
+    """
+
+    def __init__(self, evaluators: list[Any]) -> None:
+        self.evaluators = evaluators
+
+
 class Metric:
     """Annotate a float/int field as a metric for stats aggregation."""
 

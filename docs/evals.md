@@ -185,6 +185,24 @@ EvalCase(inputs="easy lookup", evaluators=[keyword_check(keywords=["paris"], min
 EvalCase(inputs="hard causal", evaluators=[keyword_check(keywords=["paris"], min_recall=0.3)]),
 ```
 
+### ShortCircuit
+
+Skip expensive evaluators (LLM judges) when cheap ones already fail:
+
+```python
+from protest.evals import ShortCircuit
+
+evaluators=[
+    not_empty,                                     # always runs
+    ShortCircuit([
+        contains_expected_facts(min_score=0.3),    # 0ms — if fail → stop
+        llm_judge(rubric="factual accuracy"),       # 3s — skipped if above fails
+    ]),
+]
+```
+
+`ShortCircuit` is a group of ordered evaluators. The first `Verdict=False` stops the group. Evaluators outside the `ShortCircuit` always run.
+
 ### Using Evaluators
 
 ```python

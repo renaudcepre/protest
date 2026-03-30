@@ -361,9 +361,10 @@ class TestExecutor:
 
 def _build_eval_error(payload: EvalPayload) -> AssertionError:
     """Build a descriptive AssertionError from failed eval scores."""
-    failed = [
-        f"{name}={entry.value}"
-        for name, entry in payload.scores.items()
-        if not entry.passed
-    ]
-    return AssertionError(f"{', '.join(failed)}")
+    parts = []
+    for name, entry in payload.scores.items():
+        if entry.skipped:
+            parts.append(f"{name}=⊘")
+        elif not entry.passed:
+            parts.append(f"{name}={entry.value}")
+    return AssertionError(f"{', '.join(parts)}")

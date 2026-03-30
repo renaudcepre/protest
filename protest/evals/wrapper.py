@@ -13,7 +13,7 @@ import time
 from typing import Any
 
 from protest.entities.events import EvalPayload, EvalScoreEntry
-from protest.evals.evaluator import EvalContext, extract_scores_from_result
+from protest.evals.evaluator import EvalContext, ShortCircuit, extract_scores_from_result
 from protest.evals.types import EvalScore
 
 
@@ -65,6 +65,7 @@ def make_eval_wrapper(
                 s.name: EvalScoreEntry(
                     value=s.value,
                     passed=s.passed,
+                    skipped=s.skipped,
                 )
                 for s in scores
             },
@@ -163,6 +164,10 @@ async def run_evaluators(
 
     scores: list[EvalScore] = []
     for ev in evaluators:
+        if isinstance(ev, ShortCircuit):
+            scores.extend(await _run_short_circuit(ev.evaluators, ctx))
+            continue
+
         evaluator_name = getattr(ev, "__name__", type(ev).__name__)
         try:
             raw = ev(ctx)
@@ -173,4 +178,29 @@ async def run_evaluators(
 
             raise FixtureError(f"evaluator '{evaluator_name}'", exc) from exc
 
+    return scores
+
+
+async def _run_short_circuit(
+    evaluators: list[Any], ctx: EvalContext[Any, Any],
+) -> list[EvalScore]:
+    """Run evaluators in order, stop at first Verdict=False."""
+    scores: list[EvalScore] = []
+    for i, ev in enumerate(evaluators):
+        evaluator_name = getattr(ev, "__name__", type(ev).__name__)
+        try:
+            raw = ev(ctx)
+            result = await raw if asyncio.iscoroutine(raw) else raw
+        except Exception as exc:
+            from protest.exceptions import FixtureError
+
+            raise FixtureError(f"evaluator '{evaluator_name}'", exc) from exc
+        extracted = extract_scores_from_result(result, evaluator_name)
+        scores.extend(extracted)
+        if any(s.is_verdict and not s.passed for s in extracted):
+            # Mark remaining evaluators as skipped
+            for skipped_ev in evaluators[i + 1 :]:
+                skipped_name = getattr(skipped_ev, "__name__", type(skipped_ev).__name__)
+                scores.append(EvalScore(name=skipped_name, value=False, skipped=True))
+            break
     return scores

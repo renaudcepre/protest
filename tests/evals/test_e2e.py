@@ -866,6 +866,67 @@ class TestScoringV2:
         assert results[0].is_fixture_error is True
 
 
+class TestShortCircuit:
+    """ShortCircuit: skip expensive evaluators when cheap ones fail."""
+
+    def test_short_circuit_skips_on_fail(self) -> None:
+        from protest.evals import ShortCircuit
+
+        call_log: list[str] = []
+
+        @evaluator
+        def cheap(ctx: EvalContext) -> bool:
+            call_log.append("cheap")
+            return "hello" in ctx.output.lower()
+
+        @evaluator
+        def expensive(ctx: EvalContext) -> bool:
+            call_log.append("expensive")
+            return True
+
+        session = EvalSession()
+
+        @session.eval(evaluators=[ShortCircuit([cheap, expensive])])
+        def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
+            return echo_task(case["inputs"])
+
+        runner = TestRunner(session)
+        runner.run()
+
+        # case_pass: cheap ✓ → expensive ✓ (both called)
+        # case_fail: cheap ✗ → expensive SKIPPED
+        assert call_log.count("cheap") == 2
+        assert call_log.count("expensive") == 1
+
+    def test_short_circuit_all_pass(self) -> None:
+        from protest.evals import ShortCircuit
+
+        call_log: list[str] = []
+
+        @evaluator
+        def check_a(ctx: EvalContext) -> bool:
+            call_log.append("a")
+            return True
+
+        @evaluator
+        def check_b(ctx: EvalContext) -> bool:
+            call_log.append("b")
+            return True
+
+        single = ForEach([{"inputs": "x", "expected": "x", "name": "c1"}], ids=lambda c: c["name"])
+        session = EvalSession()
+
+        @session.eval(evaluators=[ShortCircuit([check_a, check_b])])
+        def eval_echo(case: Annotated[dict, From(single)]) -> str:
+            return echo_task(case["inputs"])
+
+        runner = TestRunner(session)
+        result = runner.run()
+
+        assert result.success is True
+        assert call_log == ["a", "b"]
+
+
 # ---------------------------------------------------------------------------
 # Results files per run
 # ---------------------------------------------------------------------------
