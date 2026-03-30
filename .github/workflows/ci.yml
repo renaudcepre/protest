@@ -103,7 +103,7 @@ jobs:
           files: coverage.xml
           fail_ci_if_error: false
 
-c  docs:
+  docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
