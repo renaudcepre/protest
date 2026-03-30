@@ -13,13 +13,25 @@ Implementation can change freely as long as these tests pass.
 from __future__ import annotations
 
 import json
+import subprocess
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path  # noqa: TC003 — used at runtime (pytest tmp_path)
 from typing import Annotated, Any
 
-from protest import ForEach, From, ProTestSession
+from protest import ForEach, From, ProTestSession, Use, fixture
+from protest.api import run_session
+from protest.core.collector import Collector
 from protest.core.runner import TestRunner
-from protest.evals import EvalContext, EvalSession, Metric, ModelInfo, Verdict, evaluator
+from protest.core.suite import ProTestSuite
+from protest.evals import (
+    EvalContext,
+    EvalSession,
+    Metric,
+    ModelInfo,
+    ShortCircuit,
+    Verdict,
+    evaluator,
+)
 from protest.evals.evaluators import (
     contains_expected,
     contains_keywords,
@@ -31,6 +43,12 @@ from protest.evals.evaluators import (
     not_empty,
     word_overlap,
 )
+from protest.evals.hashing import compute_case_hash, compute_eval_hash
+from protest.evals.results_writer import EvalResultsWriter
+from protest.evals.types import EvalSuiteReport  # noqa: TC001 — used at runtime
+from protest.filters.kind import KindFilterPlugin
+from protest.history.storage import append_entry, clean_dirty
+from protest.plugin import PluginBase, PluginContext
 
 # ---------------------------------------------------------------------------
 # Fixtures: deterministic evaluators + task
@@ -159,8 +177,6 @@ class TestKindFiltering:
     """Suites have kind, filtering works."""
 
     def test_test_suite_has_kind_test(self) -> None:
-        from protest.core.suite import ProTestSuite
-
         suite = ProTestSuite("my_tests")
         assert suite.kind == "test"
 
@@ -174,9 +190,6 @@ class TestKindFiltering:
         assert any(s.kind == "eval" for s in session._suites)
 
     def test_kind_filter_keeps_only_matching(self) -> None:
-        from protest.core.suite import ProTestSuite
-        from protest.filters.kind import KindFilterPlugin
-
         test_suite = ProTestSuite("tests")
         eval_suite = ProTestSuite("evals", kind="eval")
 
@@ -193,8 +206,6 @@ class TestKindFiltering:
         session.add_suite(test_suite)
         session.add_suite(eval_suite)
 
-        from protest.core.collector import Collector
-
         items = Collector().collect(session)
         assert len(items) == 2
 
@@ -206,8 +217,6 @@ class TestKindFiltering:
 
     def test_unified_session_runs_tests_only(self) -> None:
         """protest run behavior: only kind=test suites."""
-        from protest.core.suite import ProTestSuite
-
         session = ProTestSession()
 
         test_suite = ProTestSuite("unit")
@@ -223,9 +232,6 @@ class TestKindFiltering:
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
-        from protest.api import run_session
-        from protest.plugin import PluginContext
-
         ctx = PluginContext(args={"kind_filter": "test"})
         run_session(session, ctx=ctx)
 
@@ -233,8 +239,6 @@ class TestKindFiltering:
 
     def test_unified_session_runs_evals_only(self) -> None:
         """protest eval behavior: only kind=eval suites."""
-        from protest.core.suite import ProTestSuite
-
         session = ProTestSession()
 
         test_suite = ProTestSuite("unit")
@@ -249,9 +253,6 @@ class TestKindFiltering:
         @session.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
-
-        from protest.api import run_session
-        from protest.plugin import PluginContext
 
         ctx = PluginContext(args={"kind_filter": "eval"})
         run_session(session, ctx=ctx)
@@ -272,9 +273,6 @@ class TestEvalOutput:
     """
 
     def test_report_contains_score_stats(self) -> None:
-        from protest.evals.types import EvalSuiteReport
-        from protest.plugin import PluginBase
-
         reports: list[EvalSuiteReport] = []
 
         class ReportCapture(PluginBase):
@@ -300,9 +298,6 @@ class TestEvalOutput:
         assert any(s.name == "accuracy" for s in stats)
 
     def test_report_has_pass_count(self) -> None:
-        from protest.evals.types import EvalSuiteReport
-        from protest.plugin import PluginBase
-
         reports: list[EvalSuiteReport] = []
 
         class ReportCapture(PluginBase):
@@ -327,8 +322,6 @@ class TestEvalOutput:
 
     def test_failed_eval_has_error_with_score_details(self) -> None:
         """When an eval case fails, the error message includes score details."""
-        from protest.plugin import PluginBase
-
         errors: list[Any] = []
 
         class ErrorCollector(PluginBase):
@@ -345,8 +338,6 @@ class TestEvalOutput:
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
-        from protest.api import run_session
-
         run_session(session)
 
         # case_fail has matches_expected=False
@@ -362,8 +353,6 @@ class TestEvalPayloadFlow:
     """EvalPayload flows through the framework correctly."""
 
     def test_test_result_has_eval_payload(self) -> None:
-        from protest.plugin import PluginBase
-
         collected: list[Any] = []
 
         class Collector(PluginBase):
@@ -395,8 +384,6 @@ class TestEvalPayloadFlow:
 
     def test_lifecycle_events_have_case_id_in_node_id(self) -> None:
         """setup_done/teardown_start events carry node_id with [case_id]."""
-        from protest.plugin import PluginBase
-
         setup_ids: list[str] = []
         teardown_ids: list[str] = []
 
@@ -427,8 +414,6 @@ class TestEvalPayloadFlow:
 
     def test_evaluator_exception_is_error_not_fail(self) -> None:
         """An evaluator that raises is treated as error (infra), not test fail."""
-        from protest.plugin import PluginBase
-
         results: list[Any] = []
 
         class Collector(PluginBase):
@@ -463,8 +448,6 @@ class TestEvalPayloadFlow:
         assert "LLM judge timeout" in str(results[0].error)
 
     def test_non_eval_test_has_no_payload(self) -> None:
-        from protest.plugin import PluginBase
-
         collected: list[Any] = []
 
         class Collector(PluginBase):
@@ -497,8 +480,6 @@ class TestHistory:
     """JSONL history format and querying."""
 
     def _run_eval(self, tmp_path: Path) -> None:
-        from protest.api import run_session
-
         session = EvalSession(model=ModelInfo(name="test-model"), history_dir=tmp_path)
 
         @session.eval(evaluators=[fake_accuracy])
@@ -540,8 +521,6 @@ class TestHistory:
         assert "cases" in suite
 
     def test_history_test_run_has_null_evals(self, tmp_path: Path) -> None:
-        from protest.api import run_session
-
         session = ProTestSession(history=True, history_dir=tmp_path)
 
         @session.test()
@@ -561,8 +540,6 @@ class TestHistory:
         assert len(lines) == 2
 
     def test_history_metadata_included(self, tmp_path: Path) -> None:
-        from protest.api import run_session
-
         session = EvalSession(
             history_dir=tmp_path,
             metadata={"env": "test", "version": "1.0"},
@@ -589,13 +566,9 @@ class TestCleanDirty:
 
     def test_clean_dirty_removes_current_head_only(self, tmp_path: Path) -> None:
         # Entry with current HEAD + dirty
-        import subprocess
-
-        from protest.history.storage import append_entry, clean_dirty
-
         try:
             current_commit = subprocess.run(
-                ["git", "rev-parse", "HEAD"],
+                ["git", "rev-parse", "HEAD"],  # noqa: S607
                 capture_output=True,
                 text=True,
                 timeout=5,
@@ -634,8 +607,6 @@ class TestCaseHashing:
 
     def test_case_hash_stored_in_history(self, tmp_path: Path) -> None:
         """History entries include case_hash and eval_hash per case."""
-        from protest.api import run_session
-
         session = EvalSession(history_dir=tmp_path)
 
         @session.eval(evaluators=[fake_accuracy])
@@ -656,24 +627,18 @@ class TestCaseHashing:
 
     def test_case_hash_changes_on_input_change(self) -> None:
         """Different inputs -> different case_hash."""
-        from protest.evals.hashing import compute_case_hash
-
         h1 = compute_case_hash("hello world", "expected")
         h2 = compute_case_hash("hello world modified", "expected")
         assert h1 != h2
 
     def test_case_hash_stable_for_same_input(self) -> None:
         """Same inputs -> same case_hash (deterministic)."""
-        from protest.evals.hashing import compute_case_hash
-
         h1 = compute_case_hash("hello world", "expected")
         h2 = compute_case_hash("hello world", "expected")
         assert h1 == h2
 
     def test_eval_hash_changes_on_evaluator_change(self) -> None:
         """Different evaluators -> different eval_hash."""
-        from protest.evals.hashing import compute_eval_hash
-
         e1 = contains_keywords(keywords=["hello"])
         e2 = contains_keywords(keywords=["hello", "world"])
         h1 = compute_eval_hash([e1])
@@ -762,8 +727,6 @@ class TestScoringV2:
 
     def test_bool_evaluator_pass(self) -> None:
         """Evaluator returning True -> case passes."""
-        from protest.plugin import PluginBase
-
         results: list[Any] = []
 
         class Collector(PluginBase):
@@ -798,8 +761,6 @@ class TestScoringV2:
 
     def test_dataclass_without_bool_is_tracking_only(self) -> None:
         """Dataclass with only float fields -> tracking-only, always passes."""
-        from protest.plugin import PluginBase
-
         results: list[Any] = []
 
         class Collector(PluginBase):
@@ -833,8 +794,6 @@ class TestScoringV2:
 
     def test_float_return_raises_type_error(self) -> None:
         """Evaluator returning naked float -> TypeError (caught as fixture error)."""
-        from protest.plugin import PluginBase
-
         results: list[Any] = []
 
         class Collector(PluginBase):
@@ -870,8 +829,6 @@ class TestShortCircuit:
     """ShortCircuit: skip expensive evaluators when cheap ones fail."""
 
     def test_short_circuit_skips_on_fail(self) -> None:
-        from protest.evals import ShortCircuit
-
         call_log: list[str] = []
 
         @evaluator
@@ -899,8 +856,6 @@ class TestShortCircuit:
         assert call_log.count("expensive") == 1
 
     def test_short_circuit_all_pass(self) -> None:
-        from protest.evals import ShortCircuit
-
         call_log: list[str] = []
 
         @evaluator
@@ -913,7 +868,9 @@ class TestShortCircuit:
             call_log.append("b")
             return True
 
-        single = ForEach([{"inputs": "x", "expected": "x", "name": "c1"}], ids=lambda c: c["name"])
+        single = ForEach(
+            [{"inputs": "x", "expected": "x", "name": "c1"}], ids=lambda c: c["name"]
+        )
         session = EvalSession()
 
         @session.eval(evaluators=[ShortCircuit([check_a, check_b])])
@@ -936,8 +893,6 @@ class TestResultsFiles:
     """Per-case markdown files written to .protest/results/<suite>_<ts>/."""
 
     def _run_eval(self, tmp_path: Path) -> Path:
-        from protest.evals.results_writer import EvalResultsWriter
-
         results_dir = tmp_path / "results"
         session = EvalSession()
         writer = EvalResultsWriter(history_dir=tmp_path)
@@ -994,8 +949,6 @@ class TestMultiDatasetHistory:
     """Multiple @session.eval calls produce distinct suites in history."""
 
     def _run_multi(self, tmp_path: Path) -> dict[str, Any]:
-        from protest.api import run_session
-
         pipeline_cases = ForEach(
             [
                 {"inputs": "hello", "expected": "hello", "name": "c1"},
@@ -1059,7 +1012,6 @@ class TestEvalTaskFixtures:
 
     def test_task_with_session_fixture_is_injected(self) -> None:
         """Une fixture session-scoped est injectee dans task via Use()."""
-        from protest import Use, fixture
 
         @fixture()
         def prefix_service() -> str:
@@ -1090,8 +1042,6 @@ class TestEvalTaskFixtures:
 
     def test_session_fixture_resolved_once_for_all_cases(self) -> None:
         """Une session fixture ne doit etre appelee qu'une fois meme avec N cas."""
-        from protest import Use, fixture
-
         call_count = 0
 
         @fixture()

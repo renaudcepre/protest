@@ -140,10 +140,7 @@ def _render_case(case: EvalCaseResult) -> str:
 
 
 def _format_score(score: EvalScore) -> str:
-    if score.is_metric:
-        icon = "·"
-    else:
-        icon = "✓" if score.passed else "✗"
+    icon = "·" if score.is_metric else ("✓" if score.passed else "✗")
     return f"- **{score.name}**: {score.value} {icon}"
 
 

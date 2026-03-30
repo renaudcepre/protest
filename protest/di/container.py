@@ -22,6 +22,7 @@ from protest.di.decorators import (
     unwrap_fixture,
 )
 from protest.di.factory import FixtureFactory
+from protest.di.hints import get_type_hints_compat
 from protest.di.markers import Use
 from protest.di.proxy import FixtureErrorWrapper
 from protest.entities import (
@@ -779,8 +780,6 @@ class FixtureContainer:
         """Analyze function signature and store dependencies."""
         actual_func = unwrap_fixture(func)
         func_signature = signature(actual_func)
-
-        from protest.di.hints import get_type_hints_compat
 
         type_hints = get_type_hints_compat(actual_func)
 

@@ -1,9 +1,12 @@
+import logging
+import sys
 import traceback
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import Any
 
 from rich.console import Console  # type: ignore[import-not-found]
+from rich.table import Table  # type: ignore[import-not-found]
 from typing_extensions import Self
 
 from protest.entities import (
@@ -21,6 +24,7 @@ from protest.entities import (
     TestStartInfo,
     TestTeardownInfo,
 )
+from protest.evals.types import EvalSuiteReport
 from protest.plugin import PluginBase, PluginContext
 from protest.reporting.verbosity import Verbosity
 
@@ -151,8 +155,6 @@ class RichReporter(PluginBase):
         """Show captured log records if --show-logs is active."""
         if not self._show_logs or not result.log_records:
             return
-        import logging
-
         min_level = getattr(logging, self._show_logs.upper(), logging.INFO)
         for record in result.log_records:
             if record.levelno >= min_level:
@@ -170,10 +172,6 @@ class RichReporter(PluginBase):
 
     def _print_bypass(self, message: str) -> None:
         """Print bypassing capture (for lifecycle messages emitted during tests)."""
-        import sys
-
-        from rich.console import Console
-
         stream = getattr(sys.stdout, "_original", sys.stdout)
         Console(file=stream, highlight=False).print(message)
 
@@ -397,10 +395,6 @@ class RichReporter(PluginBase):
                 self._print(f"[dim]{escaped_line}[/]")
 
     def on_user_print(self, data: Any) -> None:
-        import sys
-
-        from rich.console import Console
-
         msg, raw = data
         # Write to the real stdout, bypassing capture
         stream = getattr(sys.stdout, "_original", sys.stdout)
@@ -411,10 +405,6 @@ class RichReporter(PluginBase):
             c.print(f"[dim]       │[/] {msg}")
 
     def on_eval_suite_end(self, report: Any) -> None:
-        from rich.table import Table
-
-        from protest.evals.types import EvalSuiteReport
-
         if not isinstance(report, EvalSuiteReport):
             return
         stats = report.all_score_stats()
@@ -444,8 +434,16 @@ class RichReporter(PluginBase):
             self._print(
                 f"  [cyan]Eval: {report.suite_name} ({report.total_count} cases)[/]"
             )
-        rate_pct = report.pass_rate * 100
-        color = "green" if rate_pct >= 100 else "yellow" if rate_pct >= 50 else "red"
+        full_pass = 100
+        half_pass = 50
+        rate_pct = report.pass_rate * full_pass
+        color = (
+            "green"
+            if rate_pct >= full_pass
+            else "yellow"
+            if rate_pct >= half_pass
+            else "red"
+        )
         self._print(
             f"  [{color}]Passed: {report.passed_count}/{report.total_count} ({rate_pct:.1f}%)[/]"
         )

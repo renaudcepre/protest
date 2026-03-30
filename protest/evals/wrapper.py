@@ -13,7 +13,11 @@ import time
 from typing import Any
 
 from protest.entities.events import EvalPayload, EvalScoreEntry
-from protest.evals.evaluator import EvalContext, ShortCircuit, extract_scores_from_result
+from protest.evals.evaluator import (
+    EvalContext,
+    ShortCircuit,
+    extract_scores_from_result,
+)
 from protest.evals.types import EvalScore
 
 
@@ -182,7 +186,8 @@ async def run_evaluators(
 
 
 async def _run_short_circuit(
-    evaluators: list[Any], ctx: EvalContext[Any, Any],
+    evaluators: list[Any],
+    ctx: EvalContext[Any, Any],
 ) -> list[EvalScore]:
     """Run evaluators in order, stop at first Verdict=False."""
     scores: list[EvalScore] = []
@@ -200,7 +205,9 @@ async def _run_short_circuit(
         if any(s.is_verdict and not s.passed for s in extracted):
             # Mark remaining evaluators as skipped
             for skipped_ev in evaluators[i + 1 :]:
-                skipped_name = getattr(skipped_ev, "__name__", type(skipped_ev).__name__)
+                skipped_name = getattr(
+                    skipped_ev, "__name__", type(skipped_ev).__name__
+                )
                 scores.append(EvalScore(name=skipped_name, value=False, skipped=True))
             break
     return scores

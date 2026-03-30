@@ -61,7 +61,11 @@ class EvalScore:
 
     @property
     def is_metric(self) -> bool:
-        return not self.skipped and isinstance(self.value, (int, float)) and not isinstance(self.value, bool)
+        return (
+            not self.skipped
+            and isinstance(self.value, (int, float))
+            and not isinstance(self.value, bool)
+        )
 
     @property
     def is_reason(self) -> bool:

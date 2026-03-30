@@ -44,7 +44,9 @@ class WordOverlapResult:
 
 
 @evaluator
-def contains_keywords(ctx: EvalContext, keywords: list[str], min_recall: float = 0.0) -> ContainsKeywordsResult:
+def contains_keywords(
+    ctx: EvalContext, keywords: list[str], min_recall: float = 0.0
+) -> ContainsKeywordsResult:
     """Check that the output contains expected keywords (case-insensitive)."""
     output_lower = ctx.output.lower()
     found = sum(1 for kw in keywords if kw.lower() in output_lower)

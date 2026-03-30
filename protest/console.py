@@ -19,8 +19,12 @@ If no event bus is available (outside a protest session), falls back to stderr.
 
 from __future__ import annotations
 
+import contextlib
 import re
 import sys
+
+from protest.events.types import Event
+from protest.execution.capture import get_event_bus
 
 
 def print(msg: str, *, raw: bool = False) -> None:
@@ -33,22 +37,16 @@ def print(msg: str, *, raw: bool = False) -> None:
         msg: The message to print. Supports Rich markup unless raw=True.
         raw: If True, no markup processing — message passed as-is.
     """
-    from protest.execution.capture import get_event_bus
-
     bus = get_event_bus()
     if bus is None:
         _fallback_print(msg, raw)
         return
 
-    from protest.events.types import Event
-
     # Call handlers directly (sync, bypasses async emit).
     # This ensures messages appear immediately, not after the test.
-    for handler_entry in bus._handlers.get(Event.USER_PRINT, []):
-        try:
+    for handler_entry in bus._handlers.get(Event.USER_PRINT, []):  # type: ignore[union-attr]
+        with contextlib.suppress(Exception):
             handler_entry.func((msg, raw))
-        except Exception:
-            pass
 
 
 def _fallback_print(msg: str, raw: bool) -> None:

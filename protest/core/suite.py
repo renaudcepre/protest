@@ -21,6 +21,7 @@ from protest.entities import (
     normalize_skip,
     normalize_xfail,
 )
+from protest.evals.wrapper import make_eval_wrapper
 from protest.exceptions import ConcurrencyMismatchError, InvalidMaxConcurrencyError
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
@@ -167,7 +168,6 @@ class ProTestSuite:
         timeout: float | None = None,
     ) -> Callable[[FuncT], FuncT]:
         """Register a scored eval test on this suite."""
-        from protest.evals.wrapper import make_eval_wrapper
 
         def decorator(func: FuncT) -> FuncT:
             wrapper = make_eval_wrapper(

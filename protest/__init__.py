@@ -42,6 +42,7 @@ __all__ = [
     "__version__",
     "caplog",
     "collect_tests",
+    "console",
     "factory",
     "fixture",
     "list_tags",

@@ -5,6 +5,7 @@ from __future__ import annotations
 from inspect import signature
 from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
+from protest.di.hints import get_type_hints_compat
 from protest.di.markers import ForEach, From
 from protest.exceptions import ParameterizedFixtureError
 from protest.utils import get_callable_name
@@ -15,8 +16,6 @@ if TYPE_CHECKING:
 
 def _extract_from_params(func: Callable[..., Any]) -> dict[str, ForEach[Any]]:
     """Extract parameters annotated with From(source)."""
-    from protest.di.hints import get_type_hints_compat
-
     type_hints = get_type_hints_compat(func)
 
     result: dict[str, ForEach[Any]] = {}

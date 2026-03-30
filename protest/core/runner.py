@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from protest.core.collector import Collector
 from protest.core.execution import ParallelExecutor, SuiteManager, TestExecutor
 from protest.core.outcome import OutcomeBuilder
-from protest.core.session import ProTestSession
+from protest.core.session import ProTestSession  # noqa: TC001 — used at runtime
 from protest.core.tracker import SuiteTracker
 from protest.entities import (
     RunResult,
@@ -17,9 +17,12 @@ from protest.entities import (
     SessionSetupInfo,
     TestCounts,
 )
+from protest.evals.types import EvalCaseResult, EvalScore, EvalSuiteReport
 from protest.events.types import Event
 from protest.execution.capture import (
     GlobalCapturePatch,
+    reset_event_bus,
+    set_event_bus,
     set_session_setup_capture,
 )
 from protest.execution.context import cancellation_event
@@ -27,7 +30,6 @@ from protest.execution.interrupt import InterruptHandler
 
 if TYPE_CHECKING:
     from protest.entities.events import TestResult
-    from protest.evals.types import EvalCaseResult
 
 
 class TestRunner:
@@ -77,7 +79,7 @@ class TestRunner:
         case_result = _build_eval_case_result(result)
         self._eval_results.setdefault(suite_name, []).append(case_result)
 
-    async def _main_loop(self) -> bool:
+    async def _main_loop(self) -> bool:  # noqa: PLR0915
         """The main async loop for running tests."""
         session_start = time.perf_counter()
 
@@ -100,8 +102,6 @@ class TestRunner:
 
         total_counts = TestCounts()
         # Inject cancellation event into context for teardown awareness
-        from protest.execution.capture import reset_event_bus, set_event_bus
-
         cancel_token = cancellation_event.set(
             self._interrupt_handler.force_teardown_event
         )
@@ -190,8 +190,6 @@ class TestRunner:
 
     async def _emit_eval_suite_end(self, suite_path: Any) -> None:
         """Emit EVAL_SUITE_END if this suite_path corresponds to an eval suite."""
-        from protest.evals.types import EvalSuiteReport
-
         suite_name = (
             suite_path.root_name
             if hasattr(suite_path, "root_name")
@@ -210,8 +208,6 @@ class TestRunner:
 
 def _build_eval_case_result(result: TestResult) -> EvalCaseResult:
     """Build EvalCaseResult from a TestResult with eval_payload."""
-    from protest.evals.types import EvalCaseResult, EvalScore
-
     payload = result.eval_payload
     assert payload is not None
     return EvalCaseResult(

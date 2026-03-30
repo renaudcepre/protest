@@ -1,9 +1,11 @@
+import sys
 import traceback
 from pathlib import Path
 from typing import Any
 
 from typing_extensions import Self
 
+from protest.console import strip_markup
 from protest.entities import (
     FixtureInfo,
     HandlerInfo,
@@ -19,6 +21,7 @@ from protest.entities import (
     TestStartInfo,
     TestTeardownInfo,
 )
+from protest.evals.types import EvalSuiteReport
 from protest.plugin import PluginBase, PluginContext
 from protest.reporting.verbosity import Verbosity
 
@@ -149,8 +152,6 @@ class AsciiReporter(PluginBase):
 
     @staticmethod
     def _print_bypass(msg: str) -> None:
-        import sys
-
         stream = getattr(sys.stdout, "_original", sys.stdout)
         stream.write(msg + "\n")
         stream.flush()
@@ -260,10 +261,6 @@ class AsciiReporter(PluginBase):
                 print(f"  {line}")
 
     def on_user_print(self, data: Any) -> None:
-        import sys
-
-        from protest.console import strip_markup
-
         msg, raw = data
         text = msg if raw else strip_markup(msg)
         stream = getattr(sys.stdout, "_original", sys.stdout)
@@ -271,8 +268,6 @@ class AsciiReporter(PluginBase):
         stream.flush()
 
     def on_eval_suite_end(self, report: Any) -> None:
-        from protest.evals.types import EvalSuiteReport
-
         if not isinstance(report, EvalSuiteReport):
             return
         stats = report.all_score_stats()

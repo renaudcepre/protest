@@ -14,6 +14,7 @@ Shared by the core DI system and evals runner. Handles two failure modes:
 
 from __future__ import annotations
 
+import contextlib
 import inspect
 import re
 from typing import Any, get_type_hints
@@ -21,23 +22,17 @@ from typing import Any, get_type_hints
 
 def get_type_hints_compat(func: Any) -> dict[str, Any]:
     """Resolve type hints with PEP 563 / TYPE_CHECKING fallbacks."""
-    try:
+    with contextlib.suppress(Exception):
         return get_type_hints(func, include_extras=True)
-    except Exception:
-        pass
 
     # Build a namespace from the entire call stack (covers local fixtures).
     localns: dict[str, Any] = {}
-    try:
+    with contextlib.suppress(Exception):
         for frame_info in inspect.stack():
             localns.update(frame_info.frame.f_locals)
-    except Exception:
-        pass
 
-    try:
+    with contextlib.suppress(Exception):
         return get_type_hints(func, localns=localns, include_extras=True)
-    except Exception:
-        pass
 
     # TYPE_CHECKING fallback: substitute Any for unresolvable names.
     return _get_type_hints_substituting_any(func, localns)

@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from protest.core.collector import get_transitive_fixtures
 from protest.core.outcome import OutcomeBuilder, TestExecutionResult
 from protest.di.container import FixtureContainer
+from protest.di.hints import get_type_hints_compat
 from protest.entities import (
     FixtureCallable,
     TestItem,
@@ -254,8 +255,6 @@ class TestExecutor:
         """Resolve fixture dependencies for a test."""
         func_signature = signature(item.func)
         kwargs: dict[str, Any] = dict(item.case_kwargs)
-
-        from protest.di.hints import get_type_hints_compat
 
         type_hints = get_type_hints_compat(item.func)
 

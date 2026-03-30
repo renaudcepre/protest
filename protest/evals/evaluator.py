@@ -38,18 +38,18 @@ import inspect
 from dataclasses import dataclass, field
 from typing import Any, Generic, TypeVar
 
-I = TypeVar("I")
-O = TypeVar("O")
+InputT = TypeVar("InputT")
+OutputT = TypeVar("OutputT")
 
 
 @dataclass
-class EvalContext(Generic[I, O]):
+class EvalContext(Generic[InputT, OutputT]):
     """Context passed to evaluator functions."""
 
     name: str
-    inputs: I
-    output: O
-    expected_output: O | None
+    inputs: InputT
+    output: OutputT
+    expected_output: OutputT | None
     metadata: Any
     duration: float
 
@@ -138,15 +138,15 @@ def extract_scores_from_result(result: Any, evaluator_name: str) -> list[Any]:
             if ann is None or get_origin(ann) is not Annotated:
                 continue
             for meta in get_args(ann)[1:]:
-                if isinstance(meta, type) and issubclass(meta, (Metric, Verdict, Reason)):
+                if isinstance(meta, type) and issubclass(
+                    meta, (Metric, Verdict, Reason)
+                ):
                     scores.append(EvalScore(name=f.name, value=getattr(result, f.name)))
                     break
         return scores
 
     type_name = type(result).__name__
-    raise TypeError(
-        f"Evaluator must return bool or dataclass, got {type_name}"
-    )
+    raise TypeError(f"Evaluator must return bool or dataclass, got {type_name}")
 
 
 def evaluator(fn: Any) -> Any:

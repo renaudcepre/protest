@@ -5,6 +5,7 @@ from itertools import groupby, product
 from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
 from protest.di.decorators import get_fixture_marker, unwrap_fixture
+from protest.di.hints import get_type_hints_compat
 from protest.di.markers import Use
 from protest.di.validation import _extract_from_params
 from protest.entities import FixtureCallable, SuitePath, TestItem, TestRegistration
@@ -18,8 +19,6 @@ if TYPE_CHECKING:
 
 def _extract_use_fixtures(func: Callable[..., Any]) -> list[FixtureCallable]:
     """Extract fixtures referenced via Use() markers in function parameters."""
-    from protest.di.hints import get_type_hints_compat
-
     type_hints = get_type_hints_compat(func)
 
     fixtures: list[FixtureCallable] = []
