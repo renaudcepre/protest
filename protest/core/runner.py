@@ -227,4 +227,11 @@ def _build_eval_case_result(result: TestResult) -> EvalCaseResult:
         expected_output=payload.expected_output,
         case_hash=payload.case_hash,
         eval_hash=payload.eval_hash,
+        task_input_tokens=payload.task_input_tokens,
+        task_output_tokens=payload.task_output_tokens,
+        task_cost=payload.task_cost,
+        judge_call_count=payload.judge_call_count,
+        judge_input_tokens=payload.judge_input_tokens,
+        judge_output_tokens=payload.judge_output_tokens,
+        judge_cost=payload.judge_cost,
     )

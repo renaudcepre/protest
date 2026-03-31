@@ -10,6 +10,36 @@ T = TypeVar("T")
 
 
 @dataclass(frozen=True, slots=True)
+class TaskResult(Generic[T]):
+    """Optional wrapper for eval task return values with usage stats.
+
+    Return this instead of a plain value to report LLM usage for the
+    system under test. ProTest unwraps it transparently — evaluators
+    see the plain output.
+
+    Usage::
+
+        @session.eval(evaluators=[...])
+        async def my_eval(case) -> TaskResult[str]:
+            result = await agent.run(case.inputs)
+            usage = result.usage()
+            return TaskResult(
+                output=result.output,
+                input_tokens=usage.request_tokens,
+                output_tokens=usage.response_tokens,
+                cost=0.003,
+            )
+
+        # Or just return str directly — TaskResult is opt-in.
+    """
+
+    output: T
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cost: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class JudgeResponse(Generic[T]):
     """Return type for Judge.judge() — wraps the output with optional usage stats.
 
@@ -149,6 +179,13 @@ class EvalCaseResult:
     expected_output: Any = None
     case_hash: str = ""
     eval_hash: str = ""
+    task_input_tokens: int = 0
+    task_output_tokens: int = 0
+    task_cost: float = 0.0
+    judge_call_count: int = 0
+    judge_input_tokens: int = 0
+    judge_output_tokens: int = 0
+    judge_cost: float = 0.0
 
     @property
     def numeric_scores(self) -> dict[str, float]:
@@ -228,3 +265,39 @@ class EvalSuiteReport:
 
     def all_score_stats(self) -> list[ScoreStats]:
         return [self.score_stats(n) for n in sorted(self.score_names())]
+
+    @property
+    def total_task_input_tokens(self) -> int:
+        return sum(c.task_input_tokens for c in self.cases)
+
+    @property
+    def total_task_output_tokens(self) -> int:
+        return sum(c.task_output_tokens for c in self.cases)
+
+    @property
+    def total_task_tokens(self) -> int:
+        return self.total_task_input_tokens + self.total_task_output_tokens
+
+    @property
+    def total_task_cost(self) -> float:
+        return sum(c.task_cost for c in self.cases)
+
+    @property
+    def total_judge_calls(self) -> int:
+        return sum(c.judge_call_count for c in self.cases)
+
+    @property
+    def total_judge_input_tokens(self) -> int:
+        return sum(c.judge_input_tokens for c in self.cases)
+
+    @property
+    def total_judge_output_tokens(self) -> int:
+        return sum(c.judge_output_tokens for c in self.cases)
+
+    @property
+    def total_judge_tokens(self) -> int:
+        return self.total_judge_input_tokens + self.total_judge_output_tokens
+
+    @property
+    def total_judge_cost(self) -> float:
+        return sum(c.judge_cost for c in self.cases)

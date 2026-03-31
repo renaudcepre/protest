@@ -53,6 +53,21 @@ def _format_duration(seconds: float) -> str:
     return f"{seconds:.2f}s"
 
 
+def _format_tokens(tokens: int) -> str:
+    """Format token count: 1234 → '1.2k', 45 → '45'."""
+    return f"{tokens / 1000:.1f}k" if tokens >= 1000 else str(tokens)
+
+
+def _format_usage(input_tokens: int, output_tokens: int, cost: float) -> str:
+    """Format usage stats as 'Xk in / Yk out, $0.0042'."""
+    parts: list[str] = []
+    if input_tokens > 0 or output_tokens > 0:
+        parts.append(f"{_format_tokens(input_tokens)} in / {_format_tokens(output_tokens)} out")
+    if cost > 0:
+        parts.append(f"${cost:.4f}")
+    return ", ".join(parts)
+
+
 def _format_eval_scores_inline(result: TestResult) -> str:
     """Format eval scores for inline display (e.g. ' bg_score=0.8 char_id=1.0')."""
     if not result.eval_payload:
@@ -447,6 +462,14 @@ class RichReporter(PluginBase):
         self._print(
             f"  [{color}]Passed: {report.passed_count}/{report.total_count} ({rate_pct:.1f}%)[/]"
         )
+        if report.total_task_tokens > 0 or report.total_task_cost > 0:
+            self._print(f"  [dim]Task: {_format_usage(report.total_task_input_tokens, report.total_task_output_tokens, report.total_task_cost)}[/]")
+        if report.total_judge_calls > 0:
+            judge_parts = [f"{report.total_judge_calls} calls"]
+            usage = _format_usage(report.total_judge_input_tokens, report.total_judge_output_tokens, report.total_judge_cost)
+            if usage:
+                judge_parts.append(usage)
+            self._print(f"  [dim]Judge: {', '.join(judge_parts)}[/]")
 
     def on_session_complete(self, result: SessionResult) -> None:
         has_non_eval_failures = any(not r.is_eval for r in self._failed_results)

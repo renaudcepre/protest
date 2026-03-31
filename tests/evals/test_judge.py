@@ -15,6 +15,7 @@ from protest.evals import (
     Judge,
     JudgeResponse,
     ModelInfo,
+    TaskResult,
     Verdict,
     evaluator,
 )
@@ -352,3 +353,97 @@ class TestJudgeE2E:
         runner = TestRunner(session)
         result = runner.run()
         assert result.success is True
+
+
+# ---------------------------------------------------------------------------
+# TaskResult: SUT usage tracking
+# ---------------------------------------------------------------------------
+
+
+class TestTaskResult:
+    def test_task_result_unwrapped_for_evaluators(self) -> None:
+        """TaskResult is unwrapped — evaluators see the plain output."""
+
+        @evaluator
+        def check_output(ctx: EvalContext) -> bool:
+            return ctx.output == "hello"  # sees str, not TaskResult
+
+        session = EvalSession()
+
+        @session.eval(evaluators=[check_output])
+        def eval_echo(case: Annotated[dict, From(single_case)]) -> TaskResult[str]:
+            return TaskResult(
+                output=case["inputs"],
+                input_tokens=100,
+                output_tokens=50,
+                cost=0.01,
+            )
+
+        runner = TestRunner(session)
+        result = runner.run()
+        assert result.success is True
+
+    def test_task_usage_in_payload(self) -> None:
+        """TaskResult tokens/cost flow through to EvalPayload."""
+
+        @evaluator
+        def always_pass(ctx: EvalContext) -> bool:
+            return True
+
+        session = EvalSession()
+
+        @session.eval(evaluators=[always_pass])
+        def eval_echo(case: Annotated[dict, From(single_case)]) -> TaskResult[str]:
+            return TaskResult(
+                output=case["inputs"],
+                input_tokens=200,
+                output_tokens=80,
+                cost=0.005,
+            )
+
+        results: list[Any] = []
+
+        class Collector(PluginBase):
+            name = "collector"
+
+            def on_test_pass(self, result: Any) -> None:
+                results.append(result)
+
+        session.register_plugin(Collector())
+        runner = TestRunner(session)
+        runner.run()
+        assert len(results) == 1
+        payload = results[0].eval_payload
+        assert payload is not None
+        assert payload.task_input_tokens == 200
+        assert payload.task_output_tokens == 80
+        assert payload.task_cost == pytest.approx(0.005)
+
+    def test_plain_return_has_zero_task_usage(self) -> None:
+        """Plain return (no TaskResult) has zero task usage."""
+
+        @evaluator
+        def always_pass(ctx: EvalContext) -> bool:
+            return True
+
+        session = EvalSession()
+
+        @session.eval(evaluators=[always_pass])
+        def eval_echo(case: Annotated[dict, From(single_case)]) -> str:
+            return case["inputs"]
+
+        results: list[Any] = []
+
+        class Collector(PluginBase):
+            name = "collector"
+
+            def on_test_pass(self, result: Any) -> None:
+                results.append(result)
+
+        session.register_plugin(Collector())
+        runner = TestRunner(session)
+        runner.run()
+        payload = results[0].eval_payload
+        assert payload.task_input_tokens == 0
+        assert payload.task_output_tokens == 0
+        assert payload.task_cost == 0.0

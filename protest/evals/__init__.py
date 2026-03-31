@@ -18,6 +18,7 @@ from protest.evals.types import (
     JudgeResponse,
     ModelInfo,
     ScoreStats,
+    TaskResult,
 )
 
 __all__ = [
@@ -35,6 +36,7 @@ __all__ = [
     "Reason",
     "ScoreStats",
     "ShortCircuit",
+    "TaskResult",
     "Verdict",
     "evaluator",
 ]

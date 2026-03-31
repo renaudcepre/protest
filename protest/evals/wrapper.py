@@ -38,10 +38,24 @@ def make_eval_wrapper(
 
         start = time.perf_counter()
         if asyncio.iscoroutinefunction(func):
-            output = await func(**kwargs)
+            raw_output = await func(**kwargs)
         else:
-            output = func(**kwargs)
+            raw_output = func(**kwargs)
         task_duration = time.perf_counter() - start
+
+        # Unwrap TaskResult if returned
+        from protest.evals.types import TaskResult
+
+        task_input_tokens = 0
+        task_output_tokens = 0
+        task_cost = 0.0
+        if isinstance(raw_output, TaskResult):
+            output = raw_output.output
+            task_input_tokens = raw_output.input_tokens or 0
+            task_output_tokens = raw_output.output_tokens or 0
+            task_cost = raw_output.cost or 0.0
+        else:
+            output = raw_output
 
         all_evaluators = list(evaluators)
         per_case = _extract_per_case_evaluators(kwargs)
@@ -77,6 +91,9 @@ def make_eval_wrapper(
             },
             case_hash=compute_case_hash(inputs, expected),
             eval_hash=compute_eval_hash(all_evaluators),
+            task_input_tokens=task_input_tokens,
+            task_output_tokens=task_output_tokens,
+            task_cost=task_cost,
             judge_call_count=eval_ctx.judge_call_count,
             judge_input_tokens=eval_ctx.judge_input_tokens,
             judge_output_tokens=eval_ctx.judge_output_tokens,
