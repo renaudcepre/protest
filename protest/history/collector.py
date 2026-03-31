@@ -74,7 +74,7 @@ def _git(*args: str) -> str:
 
 def _get_pkg_version(name: str) -> str | None:
     try:
-        from importlib.metadata import version
+        from importlib.metadata import version  # noqa: PLC0415 — inside try/except
 
         return version(name)
     except Exception:

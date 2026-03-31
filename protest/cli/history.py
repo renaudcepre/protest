@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 from typing import Any
+
+from protest.history.storage import clean_dirty, load_history
 
 
 def handle_history_command(argv: list[str]) -> None:
@@ -42,10 +45,6 @@ def handle_history_command(argv: list[str]) -> None:
     )
 
     args = parser.parse_args(argv)
-    from pathlib import Path
-
-    from protest.history.storage import clean_dirty, load_history
-
     history_dir = Path(args.path) if args.path else None
 
     if args.clean_dirty:
@@ -165,12 +164,12 @@ class _RichOutput(_Output):
     """Rich output with colors, tables, panels."""
 
     def __init__(self) -> None:
-        from rich.console import Console
+        from rich.console import Console  # noqa: PLC0415 — optional dep
 
         self.console = Console(highlight=False)
 
     def stats(self, entries: list[dict[str, Any]]) -> None:
-        from rich.table import Table
+        from rich.table import Table  # noqa: PLC0415 — optional dep
 
         suites = _aggregate_suites(entries)
         if not suites:
@@ -230,8 +229,8 @@ class _RichOutput(_Output):
         self.console.print()
 
     def detail(self, entry: dict[str, Any]) -> None:
-        from rich.panel import Panel
-        from rich.text import Text
+        from rich.panel import Panel  # noqa: PLC0415 — optional dep
+        from rich.text import Text  # noqa: PLC0415 — optional dep
 
         kind = "EVAL" if entry.get("evals") else "TEST"
         git = entry.get("git") or {}
@@ -284,8 +283,8 @@ class _RichOutput(_Output):
         )
 
     def compare(self, current: dict[str, Any], previous: dict[str, Any]) -> None:
-        from rich.panel import Panel
-        from rich.text import Text
+        from rich.panel import Panel  # noqa: PLC0415 — optional dep
+        from rich.text import Text  # noqa: PLC0415 — optional dep
 
         cm = _get_display_model(current)
         pm = _get_display_model(previous)

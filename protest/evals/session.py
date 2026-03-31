@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from protest.core.session import ProTestSession
+from protest.evals.types import JudgeInfo
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -43,8 +44,6 @@ class EvalSession(ProTestSession):
         self._eval_model = model
         self._eval_judge_instance: Judge | None = judge
         if judge is not None:
-            from protest.evals.types import JudgeInfo
-
             self._eval_judge = JudgeInfo(name=judge.name, provider=judge.provider)
         else:
             self._eval_judge = None

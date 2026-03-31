@@ -47,7 +47,7 @@ def __getattr__(name: str) -> object:
     # and reporters import protest.evals.types — eagerly importing
     # EvalSession here would create a circular import chain.
     if name == "EvalSession":
-        from protest.evals.session import EvalSession
+        from protest.evals.session import EvalSession  # noqa: PLC0415 — circular import
 
         return EvalSession
     msg = f"module {__name__!r} has no attribute {name!r}"

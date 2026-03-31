@@ -11,11 +11,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from protest.evals.types import EvalCaseResult, EvalScore, EvalSuiteReport
 from protest.plugin import PluginBase
 
 if TYPE_CHECKING:
     from protest.entities.events import TestResult
-    from protest.evals.types import EvalCaseResult, EvalScore
     from protest.plugin import PluginContext
 
 DEFAULT_RESULTS_DIR = Path(".protest") / "results"
@@ -57,7 +57,6 @@ class EvalResultsWriter(PluginBase):
 
     def on_eval_suite_end(self, report: Any) -> None:
         """Print results dir path for the suite."""
-        from protest.evals.types import EvalSuiteReport
 
         if not isinstance(report, EvalSuiteReport):
             return
@@ -68,8 +67,6 @@ class EvalResultsWriter(PluginBase):
 
 def _build_case_result(result: TestResult, passed: bool) -> EvalCaseResult:
     """Build EvalCaseResult from a TestResult with eval_payload."""
-    from protest.evals.types import EvalCaseResult, EvalScore
-
     payload = result.eval_payload
     assert payload is not None
     return EvalCaseResult(

@@ -8,7 +8,13 @@ from typing import TYPE_CHECKING, Any
 
 from protest.entities import SuiteKind
 from protest.history.collector import collect_env_info, collect_git_info
-from protest.history.storage import DEFAULT_HISTORY_DIR, HISTORY_FILE, append_entry
+from protest.history.storage import (
+    DEFAULT_HISTORY_DIR,
+    HISTORY_FILE,
+    append_entry,
+    load_history,
+    load_previous_run,
+)
 from protest.plugin import PluginBase
 
 if TYPE_CHECKING:
@@ -75,8 +81,6 @@ class EvalHistoryPlugin(PluginBase):
 
     def load_entries(self, n: int | None = None) -> list[dict[str, Any]]:
         """Load entries from history file."""
-        from protest.history.storage import load_history
-
         return load_history(history_dir=self._history_dir, n=n, evals_only=True)
 
 
@@ -156,8 +160,6 @@ def _serialize_case(case: EvalCaseResult) -> dict[str, Any]:
     return entry
 
 
-def load_previous_run(history_dir: Any = None) -> dict[str, Any] | None:
+def load_previous_eval_run(history_dir: Any = None) -> dict[str, Any] | None:
     """Load the most recent eval run from history."""
-    from protest.history.storage import load_previous_run as _load
-
-    return _load(history_dir=history_dir, evals_only=True)
+    return load_previous_run(history_dir=history_dir, evals_only=True)

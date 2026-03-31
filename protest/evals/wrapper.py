@@ -18,7 +18,9 @@ from protest.evals.evaluator import (
     ShortCircuit,
     extract_scores_from_result,
 )
-from protest.evals.types import EvalScore
+from protest.evals.hashing import compute_case_hash, compute_eval_hash
+from protest.evals.types import EvalScore, TaskResult
+from protest.exceptions import FixtureError
 
 
 def make_eval_wrapper(
@@ -44,8 +46,6 @@ def make_eval_wrapper(
         task_duration = time.perf_counter() - start
 
         # Unwrap TaskResult if returned
-        from protest.evals.types import TaskResult
-
         task_input_tokens = 0
         task_output_tokens = 0
         task_cost = 0.0
@@ -71,8 +71,6 @@ def make_eval_wrapper(
             task_duration,
             judge=judge,
         )
-
-        from protest.evals.hashing import compute_case_hash, compute_eval_hash
 
         return EvalPayload(
             case_name=case_name,
@@ -203,8 +201,6 @@ async def run_evaluators(
             result = await raw if asyncio.iscoroutine(raw) else raw
             scores.extend(extract_scores_from_result(result, evaluator_name))
         except Exception as exc:
-            from protest.exceptions import FixtureError
-
             raise FixtureError(f"evaluator '{evaluator_name}'", exc) from exc
 
     return scores, ctx
@@ -222,8 +218,6 @@ async def _run_short_circuit(
             raw = ev(ctx)
             result = await raw if asyncio.iscoroutine(raw) else raw
         except Exception as exc:
-            from protest.exceptions import FixtureError
-
             raise FixtureError(f"evaluator '{evaluator_name}'", exc) from exc
         extracted = extract_scores_from_result(result, evaluator_name)
         scores.extend(extracted)

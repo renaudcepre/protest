@@ -36,7 +36,19 @@ import dataclasses
 import functools
 import inspect
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    Generic,
+    TypeVar,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
+
+from protest.evals.hashing import _canonical
+from protest.evals.types import EvalScore
 
 if TYPE_CHECKING:
     from protest.evals.types import Judge
@@ -159,8 +171,6 @@ class ShortCircuit:
 
     def evaluator_identity(self) -> dict[str, Any]:
         """Identity is the ordered list of inner evaluators."""
-        from protest.evals.hashing import _canonical
-
         return {"short_circuit": [_canonical(e) for e in self.evaluators]}
 
 
@@ -186,10 +196,6 @@ def extract_scores_from_result(result: Any, evaluator_name: str) -> list[Any]:
     Raises:
         TypeError: If result is not bool or dataclass.
     """
-    from typing import Annotated, get_args, get_origin, get_type_hints
-
-    from protest.evals.types import EvalScore
-
     if isinstance(result, bool):
         return [EvalScore(name=evaluator_name, value=result)]
 

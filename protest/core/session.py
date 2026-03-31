@@ -8,13 +8,13 @@ if TYPE_CHECKING:
     from types import TracebackType
 
     from protest.compat import Self
-    from protest.core.suite import ProTestSuite
     from protest.entities import FixtureCallable
     from protest.evals.types import JudgeInfo, ModelInfo
     from protest.plugin import PluginBase, PluginContext
 
 from protest.cache.plugin import CachePlugin
 from protest.cache.storage import CacheStorage
+from protest.core.suite import ProTestSuite
 from protest.di.container import FixtureContainer
 from protest.di.decorators import get_fixture_marker, unwrap_fixture
 from protest.entities import (
@@ -29,6 +29,9 @@ from protest.entities import (
     normalize_skip,
     normalize_xfail,
 )
+from protest.evals.history import EvalHistoryPlugin
+from protest.evals.results_writer import EvalResultsWriter
+from protest.evals.wrapper import make_eval_wrapper
 from protest.events.bus import EventBus
 from protest.events.types import Event
 from protest.exceptions import InvalidMaxConcurrencyError
@@ -223,8 +226,6 @@ class ProTestSession:
             async def my_eval(case: Annotated[dict, From(cases)]) -> str:
                 return await run(case["q"])
         """
-        from protest.core.suite import ProTestSuite
-        from protest.evals.wrapper import make_eval_wrapper
 
         def decorator(func: FuncT) -> FuncT:
             suite_name = name or func.__name__
@@ -331,7 +332,9 @@ class ProTestSession:
         for plugin_class in self.default_plugin_classes():
             self.use(plugin_class)
         if self._history:
-            from protest.history.plugin import HistoryPlugin
+            from protest.history.plugin import (  # noqa: PLC0415 — conditional
+                HistoryPlugin,
+            )
 
             self.register_plugin(HistoryPlugin(history_dir=self._history_dir))
 
@@ -378,8 +381,6 @@ class ProTestSession:
 
     def _wire_eval_support(self) -> None:
         """Wire eval history + results writer plugins (no EvalPlugin)."""
-        from protest.evals.history import EvalHistoryPlugin
-        from protest.evals.results_writer import EvalResultsWriter
 
         judge_dict = None
         if self._eval_judge:
@@ -451,7 +452,7 @@ class ProTestSession:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:
-        import time
+        import time  # noqa: PLC0415 — only needed in __aexit__
 
         teardown_start = time.perf_counter()
         set_session_teardown_capture(True)

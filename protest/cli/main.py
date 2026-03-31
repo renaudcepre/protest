@@ -4,10 +4,14 @@ import argparse
 import sys
 from typing import TYPE_CHECKING, Any
 
+from protest.api import collect_tests, list_tags, run_session
+from protest.core.session import ProTestSession
+from protest.loader import LoadError, load_session, parse_target
+from protest.plugin import PluginContext
+from protest.reporting.verbosity import Verbosity
+
 if TYPE_CHECKING:
-    from protest.core.session import ProTestSession
     from protest.entities import TestItem
-    from protest.plugin import PluginContext
 
 HELP_EPILOG = """
 Examples:
@@ -56,9 +60,6 @@ def _handle_tags_command() -> None:
 
 def _list_tags(target: str, app_dir: str, recursive: bool = False) -> None:
     """List all tags in a session."""
-    from protest.api import collect_tests, list_tags
-    from protest.loader import LoadError, load_session
-
     try:
         session = load_session(target, app_dir)
     except LoadError as exc:
@@ -136,7 +137,7 @@ def _handle_live_command() -> None:
     )
     args = parser.parse_args(sys.argv[2:])
 
-    from protest.reporting.web import run_live_server
+    from protest.reporting.web import run_live_server  # noqa: PLC0415 — optional dep
 
     run_live_server(port=args.port)
 
@@ -234,15 +235,15 @@ def _create_run_parser() -> argparse.ArgumentParser:
 
 def _handle_history_command() -> None:
     """Handle 'protest history' subcommand."""
-    from protest.cli.history import handle_history_command
+    from protest.cli.history import (  # noqa: PLC0415 — heavy module
+        handle_history_command,
+    )
 
     handle_history_command(sys.argv[2:])
 
 
 def _handle_run_command(kind_filter: str | None = None) -> None:
     """Handle 'protest run' / 'protest eval' with two-phase parsing."""
-    from protest.loader import LoadError, load_session, parse_target
-
     argv = sys.argv[2:]
 
     # Phase 1: Parse base args to get target
@@ -251,8 +252,6 @@ def _handle_run_command(kind_filter: str | None = None) -> None:
 
     # If --help without target, show full help with all plugin options
     if ("--help" in remaining or "-h" in remaining) and not base_args.target:
-        from protest.core.session import ProTestSession
-
         full_parser = _create_run_parser()
         for plugin_class in ProTestSession.default_plugin_classes():
             plugin_class.add_cli_options(full_parser)
@@ -282,9 +281,6 @@ def _handle_run_command(kind_filter: str | None = None) -> None:
     args = full_parser.parse_args(argv)
 
     # Phase 5: Build context
-    from protest.plugin import PluginContext
-    from protest.reporting.verbosity import Verbosity
-
     effective_verbosity = Verbosity.QUIET if args.quiet else args.verbosity
     ctx_args: dict[str, Any] = {
         **vars(args),
@@ -304,8 +300,6 @@ def run_tests(
     ctx: PluginContext,
     collect_only: bool = False,
 ) -> None:
-    from protest.api import collect_tests, run_session
-
     if collect_only:
         items = collect_tests(session, ctx=ctx)
         print(f"Collected {len(items)} test(s):\n")
