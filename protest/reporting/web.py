@@ -30,12 +30,12 @@ if TYPE_CHECKING:
     )
 
 try:
-    from websockets.asyncio.server import (  # type: ignore[import-not-found]
+    from websockets.asyncio.server import (
         serve as ws_serve,
     )
-    from websockets.datastructures import Headers  # type: ignore[import-not-found]
-    from websockets.http11 import Request, Response  # type: ignore[import-not-found]
-    from websockets.sync.client import (  # type: ignore[import-not-found]
+    from websockets.datastructures import Headers
+    from websockets.http11 import Request, Response
+    from websockets.sync.client import (
         connect as ws_connect,
     )
 except ImportError as err:  # pragma: no cover
