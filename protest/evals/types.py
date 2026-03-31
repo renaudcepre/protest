@@ -4,7 +4,55 @@ from __future__ import annotations
 
 import statistics
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Generic, Protocol, TypeVar, runtime_checkable
+
+T = TypeVar("T")
+
+
+@dataclass(frozen=True, slots=True)
+class JudgeResponse(Generic[T]):
+    """Return type for Judge.judge() — wraps the output with optional usage stats.
+
+    Evaluators never see this: ``ctx.judge()`` unwraps and returns ``output``.
+    ProTest accumulates tokens/cost for history and display.
+
+    Usage::
+
+        return JudgeResponse(
+            output=result.output,
+            input_tokens=usage.request_tokens,
+            output_tokens=usage.response_tokens,
+            cost=0.003,
+        )
+
+        # Or minimal — tokens/cost are optional:
+        return JudgeResponse(output=result.output)
+    """
+
+    output: T
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cost: float | None = None
+
+
+@runtime_checkable
+class Judge(Protocol):
+    """Protocol for LLM judge implementations.
+
+    All configuration (model, temperature, system_prompt, max_tokens)
+    lives in the constructor of the implementation, NOT in this protocol.
+
+    Usage::
+
+        class MyJudge:
+            async def judge(self, prompt: str, output_type: type[T]) -> JudgeResponse[T]:
+                result = await agent.run(prompt)
+                return JudgeResponse(output=result.output, input_tokens=100)
+
+        session = EvalSession(judge=MyJudge())
+    """
+
+    async def judge(self, prompt: str, output_type: type[T]) -> JudgeResponse[T]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +87,13 @@ class JudgeInfo:
     provider: str | None = None
     evaluators: tuple[str, ...] = ()
     extra: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_instance(cls, judge: Judge) -> JudgeInfo:
+        """Extract metadata from a Judge instance (duck-typed)."""
+        name = getattr(judge, "name", None) or type(judge).__name__
+        provider = getattr(judge, "provider", None)
+        return cls(name=str(name), provider=provider)
 
 
 @dataclass(frozen=True, slots=True)

@@ -30,6 +30,10 @@ class EvalPayload:
     scores: dict[str, EvalScoreEntry] = field(default_factory=dict)
     case_hash: str = ""
     eval_hash: str = ""
+    judge_call_count: int = 0
+    judge_input_tokens: int = 0
+    judge_output_tokens: int = 0
+    judge_cost: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)

@@ -166,6 +166,7 @@ class ProTestSuite:
         expected_key: str = "expected",
         tags: list[str] | None = None,
         timeout: float | None = None,
+        judge: Any = None,
     ) -> Callable[[FuncT], FuncT]:
         """Register a scored eval test on this suite."""
 
@@ -174,6 +175,7 @@ class ProTestSuite:
                 func,
                 evaluators or [],
                 expected_key,
+                judge=judge,
             )
             self.test(tags=tags, timeout=timeout, is_eval=True)(wrapper)
             return func

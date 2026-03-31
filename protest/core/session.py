@@ -86,6 +86,7 @@ class ProTestSession:
         self._metadata: dict[str, Any] = dict(metadata) if metadata else {}
         self._eval_model: ModelInfo | None = None  # set by EvalSession
         self._eval_judge: JudgeInfo | None = None  # set by EvalSession
+        self._eval_judge_instance: Any = None  # set by EvalSession
 
     async def resolve_autouse(self) -> None:
         """Resolve all session autouse fixtures at session start."""
@@ -241,6 +242,7 @@ class ProTestSession:
                 func,
                 evaluators or [],
                 expected_key,
+                judge=self._eval_judge_instance,
             )
             suite.test(tags=tags, timeout=timeout, is_eval=True)(wrapper)
             self.add_suite(suite)

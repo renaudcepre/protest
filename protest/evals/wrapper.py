@@ -25,6 +25,7 @@ def make_eval_wrapper(
     func: Any,
     evaluators: list[Any],
     expected_key: str,
+    judge: Any = None,
 ) -> Any:
     """Wrap a function to run evaluators on its return value."""
 
@@ -46,7 +47,7 @@ def make_eval_wrapper(
         per_case = _extract_per_case_evaluators(kwargs)
         all_evaluators.extend(per_case)
 
-        scores = await run_evaluators(
+        scores, eval_ctx = await run_evaluators(
             all_evaluators,
             case_name,
             inputs,
@@ -54,6 +55,7 @@ def make_eval_wrapper(
             expected,
             metadata,
             task_duration,
+            judge=judge,
         )
 
         from protest.evals.hashing import compute_case_hash, compute_eval_hash
@@ -75,6 +77,10 @@ def make_eval_wrapper(
             },
             case_hash=compute_case_hash(inputs, expected),
             eval_hash=compute_eval_hash(all_evaluators),
+            judge_call_count=eval_ctx.judge_call_count,
+            judge_input_tokens=eval_ctx.judge_input_tokens,
+            judge_output_tokens=eval_ctx.judge_output_tokens,
+            judge_cost=eval_ctx.judge_cost,
         )
 
     return eval_wrapper
@@ -155,8 +161,9 @@ async def run_evaluators(
     expected_output: Any,
     metadata: Any,
     duration: float,
-) -> list[EvalScore]:
-    """Run evaluators and convert results to EvalScores."""
+    judge: Any = None,
+) -> tuple[list[EvalScore], EvalContext[Any, Any]]:
+    """Run evaluators and return (scores, ctx with judge stats)."""
     ctx = EvalContext(
         name=case_name,
         inputs=inputs,
@@ -164,6 +171,7 @@ async def run_evaluators(
         expected_output=expected_output,
         metadata=metadata,
         duration=duration,
+        _judge=judge,
     )
 
     scores: list[EvalScore] = []
@@ -182,7 +190,7 @@ async def run_evaluators(
 
             raise FixtureError(f"evaluator '{evaluator_name}'", exc) from exc
 
-    return scores
+    return scores, ctx
 
 
 async def _run_short_circuit(

@@ -9,7 +9,7 @@ from protest.core.session import ProTestSession
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from protest.evals.types import JudgeInfo, ModelInfo
+    from protest.evals.types import Judge, ModelInfo
 
 
 class EvalSession(ProTestSession):
@@ -28,7 +28,7 @@ class EvalSession(ProTestSession):
         self,
         *,
         model: ModelInfo | None = None,
-        judge: JudgeInfo | None = None,
+        judge: Judge | None = None,
         concurrency: int = 1,
         history: bool = True,
         history_dir: Path | None = None,
@@ -41,4 +41,10 @@ class EvalSession(ProTestSession):
             metadata=metadata,
         )
         self._eval_model = model
-        self._eval_judge = judge
+        self._eval_judge_instance: Judge | None = judge
+        if judge is not None:
+            from protest.evals.types import JudgeInfo
+
+            self._eval_judge = JudgeInfo.from_instance(judge)
+        else:
+            self._eval_judge = None

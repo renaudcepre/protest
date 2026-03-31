@@ -36,10 +36,14 @@ import dataclasses
 import functools
 import inspect
 from dataclasses import dataclass, field
-from typing import Any, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
+
+if TYPE_CHECKING:
+    from protest.evals.types import Judge
 
 InputT = TypeVar("InputT")
 OutputT = TypeVar("OutputT")
+T = TypeVar("T")
 
 
 @dataclass
@@ -52,6 +56,51 @@ class EvalContext(Generic[InputT, OutputT]):
     expected_output: OutputT | None
     metadata: Any
     duration: float
+    _judge: Judge | None = field(default=None, repr=False)
+    _judge_call_count: int = field(default=0, repr=False, init=False)
+    _judge_input_tokens: int = field(default=0, repr=False, init=False)
+    _judge_output_tokens: int = field(default=0, repr=False, init=False)
+    _judge_cost: float = field(default=0.0, repr=False, init=False)
+
+    async def judge(self, prompt: str, output_type: type[T]) -> T:
+        """Call the configured LLM judge and return the typed output.
+
+        Tokens and cost from JudgeResponse are accumulated internally
+        and flow to EvalPayload for history/display. The evaluator
+        only sees the unwrapped output.
+
+        Raises RuntimeError if no judge was configured on the session.
+        """
+        if self._judge is None:
+            raise RuntimeError(
+                f"Evaluator for case '{self.name}' called ctx.judge() but no "
+                "judge is configured. Pass judge= to EvalSession()."
+            )
+        self._judge_call_count += 1
+        response = await self._judge.judge(prompt, output_type)
+        if response.input_tokens is not None:
+            self._judge_input_tokens += response.input_tokens
+        if response.output_tokens is not None:
+            self._judge_output_tokens += response.output_tokens
+        if response.cost is not None:
+            self._judge_cost += response.cost
+        return response.output
+
+    @property
+    def judge_call_count(self) -> int:
+        return self._judge_call_count
+
+    @property
+    def judge_input_tokens(self) -> int:
+        return self._judge_input_tokens
+
+    @property
+    def judge_output_tokens(self) -> int:
+        return self._judge_output_tokens
+
+    @property
+    def judge_cost(self) -> float:
+        return self._judge_cost
 
 
 @dataclass
