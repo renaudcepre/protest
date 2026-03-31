@@ -48,7 +48,15 @@ T = TypeVar("T")
 
 @dataclass
 class EvalContext(Generic[InputT, OutputT]):
-    """Context passed to evaluator functions."""
+    """Context passed to evaluator functions.
+
+    Dual role: read-only DTO (inputs, output, expected) + mutable accumulator
+    for judge call stats (tokens, cost, call count). One instance per case,
+    shared sequentially across evaluators, discarded after scoring.
+
+    Note: judge stats accumulate via ctx.judge() side-effects. If evaluators
+    are ever parallelized within a case, the accumulators will need isolation.
+    """
 
     name: str
     inputs: InputT
@@ -148,6 +156,12 @@ class ShortCircuit:
 
     def __init__(self, evaluators: list[Any]) -> None:
         self.evaluators = evaluators
+
+    def evaluator_identity(self) -> dict[str, Any]:
+        """Identity is the ordered list of inner evaluators."""
+        from protest.evals.hashing import _canonical
+
+        return {"short_circuit": [_canonical(e) for e in self.evaluators]}
 
 
 class Metric:
