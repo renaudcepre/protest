@@ -44,7 +44,7 @@ def print(msg: str, *, raw: bool = False) -> None:
 
     # Call handlers directly (sync, bypasses async emit).
     # This ensures messages appear immediately, not after the test.
-    for handler_entry in bus._handlers.get(Event.USER_PRINT, []):  # type: ignore[union-attr]
+    for handler_entry in bus._handlers.get(Event.USER_PRINT, []):  # type: ignore[attr-defined]
         with contextlib.suppress(Exception):
             handler_entry.func((msg, raw))
 

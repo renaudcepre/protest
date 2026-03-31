@@ -5,8 +5,8 @@ from argparse import ArgumentParser
 from pathlib import Path
 from typing import Any
 
-from rich.console import Console  # type: ignore[import-not-found]
-from rich.table import Table  # type: ignore[import-not-found]
+from rich.console import Console
+from rich.table import Table
 from typing_extensions import Self
 
 from protest.entities import (

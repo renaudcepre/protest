@@ -111,8 +111,10 @@ class OutcomeBuilder:
 
     def _build_pass(self, er: TestExecutionResult) -> TestOutcome:
         return TestOutcome(
-            TestResult(**self._base_kwargs(er)), TestCounts(passed=1), Event.TEST_PASS
-        )  # type: ignore[arg-type]
+            TestResult(**self._base_kwargs(er)),  # type: ignore[arg-type]
+            TestCounts(passed=1),
+            Event.TEST_PASS,
+        )
 
     def _build_xpass(self, er: TestExecutionResult) -> TestOutcome:
         kw = self._base_kwargs(er)

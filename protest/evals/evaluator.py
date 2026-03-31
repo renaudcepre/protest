@@ -260,7 +260,7 @@ def evaluator(fn: Any) -> Any:
 def is_async_evaluator(fn: Any) -> bool:
     """Check if an evaluator (or partial thereof) is async."""
     if hasattr(fn, "_is_async_evaluator"):
-        return fn._is_async_evaluator
+        return bool(fn._is_async_evaluator)
     if isinstance(fn, functools.partial):
         return asyncio.iscoroutinefunction(fn.func)
     return asyncio.iscoroutinefunction(fn)

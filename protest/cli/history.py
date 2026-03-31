@@ -447,8 +447,8 @@ def _track_cases(suite: dict[str, Any], cases: dict[str, Any]) -> None:
 
 def _get_display_model(entry: dict[str, Any]) -> str:
     """Get display model: per-suite models if they differ, global otherwise."""
-    suite_models = {
-        sd.get("model")
+    suite_models: set[str] = {
+        sd["model"]
         for sd in entry.get("suites", {}).values()
         if isinstance(sd, dict) and sd.get("model")
     }

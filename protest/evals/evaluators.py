@@ -10,7 +10,7 @@ from __future__ import annotations
 import json as json_module
 import re
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Any
 
 from protest.evals.evaluator import EvalContext, Metric, Verdict, evaluator
 
@@ -45,7 +45,7 @@ class WordOverlapResult:
 
 @evaluator
 def contains_keywords(
-    ctx: EvalContext, keywords: list[str], min_recall: float = 0.0
+    ctx: EvalContext[Any, str], keywords: list[str], min_recall: float = 0.0
 ) -> ContainsKeywordsResult:
     """Check that the output contains expected keywords (case-insensitive)."""
     output_lower = ctx.output.lower()
@@ -59,7 +59,7 @@ def contains_keywords(
 
 
 @evaluator
-def contains_expected(ctx: EvalContext, case_sensitive: bool = False) -> bool:
+def contains_expected(ctx: EvalContext[Any, str], case_sensitive: bool = False) -> bool:
     """Check that the output contains expected_output as a substring."""
     if ctx.expected_output is None:
         return True
@@ -70,7 +70,7 @@ def contains_expected(ctx: EvalContext, case_sensitive: bool = False) -> bool:
 
 @evaluator
 def does_not_contain(
-    ctx: EvalContext, forbidden: list[str], case_sensitive: bool = False
+    ctx: EvalContext[Any, str], forbidden: list[str], case_sensitive: bool = False
 ) -> DoesNotContainResult:
     """Check that the output does not contain forbidden words."""
     output = ctx.output if case_sensitive else ctx.output.lower()
@@ -79,7 +79,7 @@ def does_not_contain(
 
 
 @evaluator
-def not_empty(ctx: EvalContext) -> bool:
+def not_empty(ctx: EvalContext[Any, Any]) -> bool:
     """Check that the output is not empty or whitespace-only."""
     if ctx.output is None:
         return False
@@ -89,7 +89,7 @@ def not_empty(ctx: EvalContext) -> bool:
 
 
 @evaluator
-def max_length(ctx: EvalContext, max_chars: int = 500) -> MaxLengthResult:
+def max_length(ctx: EvalContext[Any, str], max_chars: int = 500) -> MaxLengthResult:
     """Check that the output doesn't exceed a character limit."""
     length = len(ctx.output)
     return MaxLengthResult(
@@ -99,20 +99,20 @@ def max_length(ctx: EvalContext, max_chars: int = 500) -> MaxLengthResult:
 
 
 @evaluator
-def min_length(ctx: EvalContext, min_chars: int = 1) -> bool:
+def min_length(ctx: EvalContext[Any, str], min_chars: int = 1) -> bool:
     """Check that the output meets a minimum length."""
     return len(ctx.output) >= min_chars
 
 
 @evaluator
-def matches_regex(ctx: EvalContext, pattern: str, flags: int = 0) -> bool:
+def matches_regex(ctx: EvalContext[Any, str], pattern: str, flags: int = 0) -> bool:
     """Check that the output matches a regex pattern."""
     return bool(re.search(pattern, ctx.output, flags))
 
 
 @evaluator
 def json_valid(
-    ctx: EvalContext, required_keys: list[str] | None = None
+    ctx: EvalContext[Any, str], required_keys: list[str] | None = None
 ) -> JsonValidResult:
     """Check that the output is valid JSON, optionally with required keys."""
     if required_keys is None:
@@ -131,7 +131,7 @@ def json_valid(
 
 
 @evaluator
-def word_overlap(ctx: EvalContext) -> WordOverlapResult:
+def word_overlap(ctx: EvalContext[Any, str]) -> WordOverlapResult:
     """Compute word overlap between output and expected_output (tracking-only)."""
     if ctx.expected_output is None:
         return WordOverlapResult(overlap=1.0)

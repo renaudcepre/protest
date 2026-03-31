@@ -90,7 +90,7 @@ def load_previous_run(
             continue
         if evals_only and entry.get("evals") is None:
             continue
-        return entry
+        return dict(entry)
     return None
 
 

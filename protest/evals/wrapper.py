@@ -134,7 +134,7 @@ def _extract_case_name(kwargs: dict[str, Any], fallback: str) -> str:
         if _is_case_data(v):
             name = _get(v, "name")
             if name:
-                return name
+                return str(name)
     return fallback
 
 
