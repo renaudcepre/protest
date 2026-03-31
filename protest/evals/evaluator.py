@@ -31,7 +31,6 @@ The framework reads fields by type:
 
 from __future__ import annotations
 
-import asyncio
 import dataclasses
 import functools
 import inspect
@@ -243,7 +242,6 @@ def evaluator(fn: Any) -> Any:
         if has_extra_params and kwargs:
             bound = functools.partial(fn, **kwargs)
             # Preserve async detection on the partial
-            bound._is_async_evaluator = asyncio.iscoroutinefunction(fn)  # type: ignore[attr-defined]
             bound.__name__ = fn.__name__  # type: ignore[attr-defined]
             bound.__qualname__ = fn.__qualname__  # type: ignore[attr-defined]
             return bound
@@ -252,15 +250,4 @@ def evaluator(fn: Any) -> Any:
             return fn
         return fn(*args, **kwargs)
 
-    wrapper._is_evaluator = True  # type: ignore[attr-defined]
-    wrapper._is_async_evaluator = asyncio.iscoroutinefunction(fn)  # type: ignore[attr-defined]
     return wrapper
-
-
-def is_async_evaluator(fn: Any) -> bool:
-    """Check if an evaluator (or partial thereof) is async."""
-    if hasattr(fn, "_is_async_evaluator"):
-        return bool(fn._is_async_evaluator)
-    if isinstance(fn, functools.partial):
-        return asyncio.iscoroutinefunction(fn.func)
-    return asyncio.iscoroutinefunction(fn)
