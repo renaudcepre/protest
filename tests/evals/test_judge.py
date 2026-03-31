@@ -14,14 +14,11 @@ from protest.evals import (
     EvalSession,
     Judge,
     JudgeResponse,
-    ModelInfo,
     TaskResult,
     Verdict,
     evaluator,
 )
-from protest.evals.types import JudgeInfo
 from protest.plugin import PluginBase
-
 
 # ---------------------------------------------------------------------------
 # Fake judge for testing
@@ -31,8 +28,8 @@ from protest.plugin import PluginBase
 class FakeJudge:
     """Minimal Judge implementation for tests."""
 
-    name = "fake-judge"
-    provider = "test"
+    name: str = "fake-judge"
+    provider: str | None = "test"
 
     async def judge(self, prompt: str, output_type: type) -> JudgeResponse:
         if output_type is bool:
@@ -49,7 +46,10 @@ class FakeJudge:
 
 
 class BareJudge:
-    """Judge without name/provider attrs — tests fallback."""
+    """Minimal Judge with required name/provider."""
+
+    name: str = "bare-judge"
+    provider: str | None = None
 
     async def judge(self, prompt: str, output_type: type) -> JudgeResponse:
         return JudgeResponse(output=True)
@@ -73,23 +73,6 @@ class TestJudgeProtocol:
                 return "nope"
 
         assert not isinstance(NotAJudge(), Judge)
-
-
-# ---------------------------------------------------------------------------
-# JudgeInfo.from_instance
-# ---------------------------------------------------------------------------
-
-
-class TestJudgeInfoExtraction:
-    def test_from_instance_with_attrs(self) -> None:
-        info = JudgeInfo.from_instance(FakeJudge())
-        assert info.name == "fake-judge"
-        assert info.provider == "test"
-
-    def test_from_instance_fallback_to_class_name(self) -> None:
-        info = JudgeInfo.from_instance(BareJudge())
-        assert info.name == "BareJudge"
-        assert info.provider is None
 
 
 # ---------------------------------------------------------------------------
@@ -311,9 +294,9 @@ class TestJudgeE2E:
         payload = results[0].eval_payload
         assert payload is not None
         assert payload.judge_call_count == 2
-        assert payload.judge_input_tokens == 20  # 10 per call × 2
-        assert payload.judge_output_tokens == 10  # 5 per call × 2
-        assert payload.judge_cost == pytest.approx(0.002)  # 0.001 per call × 2
+        assert payload.judge_input_tokens == 20  # 10 per call x 2
+        assert payload.judge_output_tokens == 10  # 5 per call x 2
+        assert payload.judge_cost == pytest.approx(0.002)  # 0.001 per call x 2
 
     def test_judge_info_derived_from_instance(self) -> None:
         """EvalSession derives JudgeInfo from Judge instance."""
@@ -335,7 +318,8 @@ class TestJudgeE2E:
             ok: Annotated[bool, Verdict]
 
         class StructuredJudge:
-            name = "structured"
+            name: str = "structured"
+            provider: str | None = None
 
             async def judge(self, prompt: str, output_type: type) -> JudgeResponse:
                 return JudgeResponse(output=output_type(ok=True))

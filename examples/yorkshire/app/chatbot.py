@@ -25,7 +25,7 @@ YORKSHIRE_FACTS = {
 }
 
 
-def yorkshire_chatbot(question: str) -> str:
+def yorkshire_chatbot(question: str) -> str:  # noqa: PLR0912
     """Fake chatbot that answers questions about Yorkshire Terriers.
 
     Simulates a RAG pipeline: keyword matching → fact retrieval → response generation.

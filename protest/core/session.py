@@ -228,10 +228,10 @@ class ProTestSession:
         def decorator(func: FuncT) -> FuncT:
             suite_name = name or func.__name__
             suite_meta: dict[str, Any] = {}
-            resolved_model = model or getattr(self, "_eval_model", None)
+            resolved_model = model or self._eval_model
             if resolved_model:
                 suite_meta["model"] = resolved_model.name
-                suite_meta["provider"] = getattr(resolved_model, "provider", None)
+                suite_meta["provider"] = resolved_model.provider
             suite = ProTestSuite(
                 name=suite_name,
                 tags=list(tags or []),
@@ -384,8 +384,8 @@ class ProTestSession:
         if self._eval_judge:
             judge_dict = {
                 "name": self._eval_judge.name,
-                "provider": getattr(self._eval_judge, "provider", None),
-                "evaluators": list(getattr(self._eval_judge, "evaluators", ())),
+                "provider": self._eval_judge.provider,
+                "evaluators": list(self._eval_judge.evaluators),
             }
 
         history = EvalHistoryPlugin(

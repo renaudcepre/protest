@@ -75,12 +75,18 @@ class Judge(Protocol):
     Usage::
 
         class MyJudge:
+            name = "my-judge"
+            provider = "openai"
+
             async def judge(self, prompt: str, output_type: type[T]) -> JudgeResponse[T]:
                 result = await agent.run(prompt)
                 return JudgeResponse(output=result.output, input_tokens=100)
 
         session = EvalSession(judge=MyJudge())
     """
+
+    name: str
+    provider: str | None
 
     async def judge(self, prompt: str, output_type: type[T]) -> JudgeResponse[T]: ...
 
@@ -94,20 +100,6 @@ class ModelInfo:
     temperature: float | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
-    @classmethod
-    def from_agent(cls, agent: Any) -> ModelInfo:
-        """Extract model info from a pydantic-ai Agent (duck-typed)."""
-        model = getattr(agent, "model", None)
-        if model is None:
-            msg = "Agent has no model configured"
-            raise ValueError(msg)
-        if isinstance(model, str):
-            return cls(name=model)
-        model_name = getattr(model, "model_name", None)
-        if callable(model_name):
-            return cls(name=str(model_name()))
-        return cls(name=str(getattr(model, "name", None) or model))
-
 
 @dataclass(frozen=True, slots=True)
 class JudgeInfo:
@@ -117,13 +109,6 @@ class JudgeInfo:
     provider: str | None = None
     evaluators: tuple[str, ...] = ()
     extra: dict[str, Any] = field(default_factory=dict)
-
-    @classmethod
-    def from_instance(cls, judge: Judge) -> JudgeInfo:
-        """Extract metadata from a Judge instance (duck-typed)."""
-        name = getattr(judge, "name", None) or type(judge).__name__
-        provider = getattr(judge, "provider", None)
-        return cls(name=str(name), provider=provider)
 
 
 @dataclass(frozen=True, slots=True)

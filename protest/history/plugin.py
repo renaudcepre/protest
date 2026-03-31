@@ -13,6 +13,7 @@ from protest.plugin import PluginBase
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from protest.core.session import ProTestSession
     from protest.entities.events import SessionResult, TestResult
     from protest.plugin import PluginContext
 
@@ -36,11 +37,11 @@ class HistoryPlugin(PluginBase):
     def activate(cls, ctx: PluginContext) -> HistoryPlugin | None:
         return None  # Wired explicitly by session
 
-    def setup(self, session: Any) -> None:
-        self._history_enabled = getattr(session, "history", False)
-        self._metadata = dict(getattr(session, "metadata", None) or {})
-        for suite in getattr(session, "suites", []):
-            self._suite_kinds[suite.name] = getattr(suite, "kind", "test")
+    def setup(self, session: ProTestSession) -> None:
+        self._history_enabled = session.history
+        self._metadata = dict(session.metadata)
+        for suite in session.suites:
+            self._suite_kinds[suite.name] = suite.kind
             if not self._default_suite_name or self._default_suite_name == "tests":
                 self._default_suite_name = suite.name
 

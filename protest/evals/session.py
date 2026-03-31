@@ -45,6 +45,6 @@ class EvalSession(ProTestSession):
         if judge is not None:
             from protest.evals.types import JudgeInfo
 
-            self._eval_judge = JudgeInfo.from_instance(judge)
+            self._eval_judge = JudgeInfo(name=judge.name, provider=judge.provider)
         else:
             self._eval_judge = None

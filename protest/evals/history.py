@@ -13,6 +13,7 @@ from protest.plugin import PluginBase
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from protest.core.session import ProTestSession
     from protest.evals.types import EvalCaseResult, EvalSuiteReport, ModelInfo
     from protest.plugin import PluginContext
 
@@ -47,12 +48,12 @@ class EvalHistoryPlugin(PluginBase):
     def activate(cls, ctx: PluginContext) -> EvalHistoryPlugin | None:
         return None  # Wired explicitly by session
 
-    def setup(self, session: Any) -> None:
+    def setup(self, session: ProTestSession) -> None:
         """Collect per-suite metadata from session."""
         self._suite_metadata = {}
-        for suite in getattr(session, "suites", []):
-            if getattr(suite, "kind", "test") == "eval":
-                self._suite_metadata[suite.name] = getattr(suite, "suite_metadata", {})
+        for suite in session.suites:
+            if suite.kind == "eval":
+                self._suite_metadata[suite.name] = suite.suite_metadata
 
     def on_eval_suite_end(self, report: EvalSuiteReport) -> None:
         """Collect suite reports as they arrive."""
