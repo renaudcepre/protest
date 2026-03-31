@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from protest.entities import SuiteKind
 from protest.plugin import PluginBase
 
 if TYPE_CHECKING:
@@ -17,14 +18,14 @@ class KindFilterPlugin(PluginBase):
     name = "kind-filter"
     description = "Filter by suite kind"
 
-    def __init__(self, kind: str) -> None:
+    def __init__(self, kind: SuiteKind) -> None:
         self._kind = kind
 
     @classmethod
     def activate(cls, ctx: PluginContext) -> KindFilterPlugin | None:
         kind = ctx.get("kind_filter")
         if kind:
-            return cls(kind=kind)
+            return cls(kind=SuiteKind(kind))
         return None
 
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
@@ -32,5 +33,5 @@ class KindFilterPlugin(PluginBase):
 
     def _matches(self, item: TestItem) -> bool:
         if item.suite is None:
-            return self._kind == "test"
+            return self._kind == SuiteKind.TEST
         return item.suite.kind == self._kind

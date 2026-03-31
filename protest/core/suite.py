@@ -14,6 +14,7 @@ from protest.entities import (
     FixtureRegistration,
     Retry,
     Skip,
+    SuiteKind,
     SuitePath,
     TestRegistration,
     Xfail,
@@ -49,7 +50,7 @@ class ProTestSuite:
         max_concurrency: int | None = None,
         tags: list[str] | None = None,
         description: str | None = None,
-        kind: str = "test",
+        kind: SuiteKind = SuiteKind.TEST,
         metadata: dict[str, Any] | None = None,
     ) -> None:
         if max_concurrency is not None and max_concurrency < 1:
@@ -76,7 +77,7 @@ class ProTestSuite:
         return self._description
 
     @property
-    def kind(self) -> str:
+    def kind(self) -> SuiteKind:
         return self._kind
 
     @property

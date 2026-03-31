@@ -22,6 +22,7 @@ from protest.entities import (
     FixtureScope,
     Retry,
     Skip,
+    SuiteKind,
     TestRegistration,
     Xfail,
     normalize_retry,
@@ -235,7 +236,7 @@ class ProTestSession:
             suite = ProTestSuite(
                 name=suite_name,
                 tags=list(tags or []),
-                kind="eval",
+                kind=SuiteKind.EVAL,
                 metadata=suite_meta,
             )
             wrapper = make_eval_wrapper(
@@ -372,7 +373,7 @@ class ProTestSession:
                 self.register_plugin(instance)
 
         # Auto-wire eval support if any suite has kind="eval"
-        if any(s.kind == "eval" for s in self._suites):
+        if any(s.kind == SuiteKind.EVAL for s in self._suites):
             self._wire_eval_support()
 
     def _wire_eval_support(self) -> None:

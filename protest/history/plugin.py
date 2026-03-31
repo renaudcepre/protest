@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from protest.core.session import ProTestSession
+    from protest.entities import SuiteKind
     from protest.entities.events import SessionResult, TestResult
     from protest.plugin import PluginContext
 
@@ -28,7 +29,7 @@ class HistoryPlugin(PluginBase):
         self._history_dir = history_dir or DEFAULT_HISTORY_DIR
         self._history_file = self._history_dir / HISTORY_FILE
         self._suites: dict[str, dict[str, dict[str, Any]]] = {}
-        self._suite_kinds: dict[str, str] = {}
+        self._suite_kinds: dict[str, SuiteKind] = {}
         self._default_suite_name: str = "tests"
         self._history_enabled: bool = False
         self._metadata: dict[str, Any] = {}

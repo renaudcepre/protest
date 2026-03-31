@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
+from protest.entities import SuiteKind
 from protest.history.collector import collect_env_info, collect_git_info
 from protest.history.storage import DEFAULT_HISTORY_DIR, HISTORY_FILE, append_entry
 from protest.plugin import PluginBase
@@ -52,7 +53,7 @@ class EvalHistoryPlugin(PluginBase):
         """Collect per-suite metadata from session."""
         self._suite_metadata = {}
         for suite in session.suites:
-            if suite.kind == "eval":
+            if suite.kind == SuiteKind.EVAL:
                 self._suite_metadata[suite.name] = suite.suite_metadata
 
     def on_eval_suite_end(self, report: EvalSuiteReport) -> None:

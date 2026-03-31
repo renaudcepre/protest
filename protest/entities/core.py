@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import TYPE_CHECKING, Any, TypeAlias
 
 if TYPE_CHECKING:
@@ -18,6 +18,13 @@ from protest.entities.suite_path import SuitePath
 from protest.utils import get_callable_name
 
 FixtureCallable: TypeAlias = "Callable[..., Any]"
+
+
+class SuiteKind(StrEnum):
+    """Kind of suite — determines behavior (eval wiring, history, reporting)."""
+
+    TEST = "test"
+    EVAL = "eval"
 
 
 class FixtureScope(Enum):

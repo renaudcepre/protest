@@ -23,6 +23,7 @@ from protest.api import run_session
 from protest.core.collector import Collector
 from protest.core.runner import TestRunner
 from protest.core.suite import ProTestSuite
+from protest.entities import SuiteKind
 from protest.evals import (
     EvalContext,
     EvalSession,
@@ -191,7 +192,7 @@ class TestKindFiltering:
 
     def test_kind_filter_keeps_only_matching(self) -> None:
         test_suite = ProTestSuite("tests")
-        eval_suite = ProTestSuite("evals", kind="eval")
+        eval_suite = ProTestSuite("evals", kind=SuiteKind.EVAL)
 
         session = ProTestSession()
 
@@ -210,7 +211,7 @@ class TestKindFiltering:
         assert len(items) == 2
 
         # Filter to eval only
-        plugin = KindFilterPlugin(kind="eval")
+        plugin = KindFilterPlugin(kind=SuiteKind.EVAL)
         filtered = plugin.on_collection_finish(items)
         assert len(filtered) == 1
         assert filtered[0].suite.kind == "eval"
