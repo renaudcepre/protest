@@ -100,6 +100,7 @@ def _build_entry(
             "total_cases": report.total_count,
             "passed": report.passed_count,
             "failed": report.failed_count,
+            "errored": report.errored_count,
             "pass_rate": round(report.pass_rate, 4),
             "duration": round(report.duration, 2),
             "cases": {c.case_name: _serialize_case(c) for c in report.cases},
@@ -138,6 +139,7 @@ def _build_entry(
 def _serialize_case(case: EvalCaseResult) -> dict[str, Any]:
     entry: dict[str, Any] = {
         "passed": case.passed,
+        "is_error": case.is_error,
         "duration": round(case.duration, 3),
         "scores": {s.name: s.value for s in case.scores if s.is_metric},
         "case_hash": case.case_hash,

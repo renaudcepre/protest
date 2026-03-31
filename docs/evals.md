@@ -286,10 +286,10 @@ A `Judge` is a protocol for LLM-as-judge evaluators. ProTest owns the interface 
 
 ```python
 class Judge(Protocol):
-    async def judge(self, prompt: str, output_type: type[T]) -> T: ...
+    async def judge(self, prompt: str, output_type: type[T]) -> JudgeResponse[T]: ...
 ```
 
-Minimal contract: takes a prompt and a return type, returns a typed result. All configuration (model, temperature, system prompt, max_tokens) lives in your implementation's constructor, not in the protocol.
+Minimal contract: takes a prompt and a return type, returns a `JudgeResponse` wrapping the typed result with optional usage stats. All configuration (model, temperature, system prompt, max_tokens) lives in your implementation's constructor, not in the protocol.
 
 ### Writing a Judge
 
@@ -378,6 +378,39 @@ Each call to `ctx.judge()` is counted. Tokens and cost from `JudgeResponse` are 
 | `judge_cost` | Total cost (user-computed) |
 
 These are available in history, letting you track LLM usage across runs.
+
+## TaskResult (SUT Usage Tracking)
+
+If your eval task calls an LLM, you can report usage by returning `TaskResult` instead of a plain value:
+
+```python
+from protest.evals import TaskResult
+
+@session.eval(evaluators=[my_scorer])
+async def chatbot(case: Annotated[EvalCase, From(cases)]) -> TaskResult[str]:
+    result = await agent.run(case.inputs)
+    usage = result.usage()
+    return TaskResult(
+        output=result.output,
+        input_tokens=usage.request_tokens,
+        output_tokens=usage.response_tokens,
+        cost=usage.request_tokens * 0.10/1e6 + usage.response_tokens * 0.30/1e6,
+    )
+```
+
+This is **opt-in** — returning a plain `str` still works. ProTest unwraps `TaskResult` transparently: evaluators see the plain output, usage stats flow to the reporter and history.
+
+## Usage Display
+
+When task or judge usage data is available, ProTest shows a summary after the eval stats:
+
+```
+  Passed: 16/26 (61.5%)
+  Task: 45.2k in / 27.1k out, $0.0142
+  Judge: 5 calls, 800 in / 400 out, $0.0030
+```
+
+Lines only appear when there is data. No `TaskResult` = no Task line. No judge configured = no Judge line.
 
 ## Evaluator Errors
 

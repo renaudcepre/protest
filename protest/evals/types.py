@@ -186,6 +186,7 @@ class EvalCaseResult:
     judge_input_tokens: int = 0
     judge_output_tokens: int = 0
     judge_cost: float = 0.0
+    is_error: bool = False
 
     @property
     def numeric_scores(self) -> dict[str, float]:
@@ -241,7 +242,11 @@ class EvalSuiteReport:
 
     @property
     def failed_count(self) -> int:
-        return sum(1 for c in self.cases if not c.passed)
+        return sum(1 for c in self.cases if not c.passed and not c.is_error)
+
+    @property
+    def errored_count(self) -> int:
+        return sum(1 for c in self.cases if c.is_error)
 
     @property
     def total_count(self) -> int:

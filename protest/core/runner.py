@@ -234,4 +234,5 @@ def _build_eval_case_result(result: TestResult) -> EvalCaseResult:
         judge_input_tokens=payload.judge_input_tokens,
         judge_output_tokens=payload.judge_output_tokens,
         judge_cost=payload.judge_cost,
+        is_error=result.is_fixture_error,
     )

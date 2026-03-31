@@ -406,9 +406,13 @@ def _aggregate_suites(entries: list[dict[str, Any]]) -> dict[str, dict[str, Any]
                     "score_values": {},
                 }
             s = suites[name]
-            s["n_runs"] += 1
+            errored = data.get("errored", 0)
             total = data.get("total_cases", 0)
             passed = data.get("passed", 0)
+            # Skip error-only runs (fixture crashes) from stats
+            if errored and errored >= total:
+                continue
+            s["n_runs"] += 1
             if total:
                 s["pass_rates"].append(passed / total)
             _track_cases(s, data.get("cases", {}))
@@ -426,6 +430,9 @@ def _track_cases(suite: dict[str, Any], cases: dict[str, Any]) -> None:
     """Track per-case pass/fail and scores for a suite."""
     for cn, cd in cases.items():
         if not isinstance(cd, dict):
+            continue
+        # Skip errored cases (fixture crashes) from stats
+        if cd.get("is_error"):
             continue
         if cn not in suite["cases_seen"]:
             suite["cases_seen"][cn] = {"runs": 0, "fails": 0}
