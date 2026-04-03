@@ -8,13 +8,12 @@ if TYPE_CHECKING:
     from types import TracebackType
 
     from protest.compat import Self
+    from protest.core.suite import ProTestSuite
     from protest.entities import FixtureCallable
-    from protest.evals.types import JudgeInfo, ModelInfo
     from protest.plugin import PluginBase, PluginContext
 
 from protest.cache.plugin import CachePlugin
 from protest.cache.storage import CacheStorage
-from protest.core.suite import ProTestSuite
 from protest.di.container import FixtureContainer
 from protest.di.decorators import get_fixture_marker, unwrap_fixture
 from protest.entities import (
@@ -22,16 +21,12 @@ from protest.entities import (
     FixtureScope,
     Retry,
     Skip,
-    SuiteKind,
     TestRegistration,
     Xfail,
     normalize_retry,
     normalize_skip,
     normalize_xfail,
 )
-from protest.evals.history import EvalHistoryPlugin
-from protest.evals.results_writer import EvalResultsWriter
-from protest.evals.wrapper import make_eval_wrapper
 from protest.events.bus import EventBus
 from protest.events.types import Event
 from protest.exceptions import InvalidMaxConcurrencyError
@@ -88,9 +83,6 @@ class ProTestSession:
         self._history = history
         self._history_dir = history_dir
         self._metadata: dict[str, Any] = dict(metadata) if metadata else {}
-        self._eval_model: ModelInfo | None = None  # set by EvalSession
-        self._eval_judge: JudgeInfo | None = None  # set by EvalSession
-        self._eval_judge_instance: Any = None  # set by EvalSession
 
     async def resolve_autouse(self) -> None:
         """Resolve all session autouse fixtures at session start."""
@@ -203,51 +195,6 @@ class ProTestSession:
                     is_eval=is_eval,
                 )
             )
-            return func
-
-        return decorator
-
-    def eval(
-        self,
-        evaluators: list[Any] | None = None,
-        expected_key: str = "expected",
-        tags: list[str] | None = None,
-        timeout: float | None = None,
-        name: str | None = None,
-        model: Any = None,
-    ) -> Callable[[FuncT], FuncT]:
-        """Register a scored eval test.
-
-        Creates an implicit eval suite named after the function.
-        The decorated function's return value is passed to evaluators.
-        Use with ForEach/From for parametrization::
-
-            @session.eval(evaluators=[my_scorer], model=ModelInfo(name="qwen"))
-            async def my_eval(case: Annotated[dict, From(cases)]) -> str:
-                return await run(case["q"])
-        """
-
-        def decorator(func: FuncT) -> FuncT:
-            suite_name = name or func.__name__
-            suite_meta: dict[str, Any] = {}
-            resolved_model = model or self._eval_model
-            if resolved_model:
-                suite_meta["model"] = resolved_model.name
-                suite_meta["provider"] = resolved_model.provider
-            suite = ProTestSuite(
-                name=suite_name,
-                tags=list(tags or []),
-                kind=SuiteKind.EVAL,
-                metadata=suite_meta,
-            )
-            wrapper = make_eval_wrapper(
-                func,
-                evaluators or [],
-                expected_key,
-                judge=self._eval_judge_instance,
-            )
-            suite.test(tags=tags, timeout=timeout, is_eval=True)(wrapper)
-            self.add_suite(suite)
             return func
 
         return decorator
@@ -374,32 +321,6 @@ class ProTestSession:
             instance = plugin_class.activate(ctx)
             if instance is not None:
                 self.register_plugin(instance)
-
-        # Auto-wire eval support if any suite has kind="eval"
-        if any(s.kind == SuiteKind.EVAL for s in self._suites):
-            self._wire_eval_support()
-
-    def _wire_eval_support(self) -> None:
-        """Wire eval history + results writer plugins (no EvalPlugin)."""
-
-        judge_dict = None
-        if self._eval_judge:
-            judge_dict = {
-                "name": self._eval_judge.name,
-                "provider": self._eval_judge.provider,
-                "evaluators": list(self._eval_judge.evaluators),
-            }
-
-        history = EvalHistoryPlugin(
-            history_dir=self._history_dir,
-            model=self._eval_model,
-            judge=judge_dict,
-            metadata=self._metadata,
-        )
-        self.register_plugin(history)
-
-        writer = EvalResultsWriter(history_dir=self._history_dir)
-        self.register_plugin(writer)
 
     async def __aenter__(self) -> Self:
         self._register_fixtures()

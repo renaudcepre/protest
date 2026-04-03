@@ -22,7 +22,6 @@ from protest.entities import (
     normalize_skip,
     normalize_xfail,
 )
-from protest.evals.wrapper import make_eval_wrapper
 from protest.exceptions import ConcurrencyMismatchError, InvalidMaxConcurrencyError
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
@@ -157,28 +156,6 @@ class ProTestSuite:
                     is_eval=is_eval,
                 )
             )
-            return func
-
-        return decorator
-
-    def eval(
-        self,
-        evaluators: list[Any] | None = None,
-        expected_key: str = "expected",
-        tags: list[str] | None = None,
-        timeout: float | None = None,
-        judge: Any = None,
-    ) -> Callable[[FuncT], FuncT]:
-        """Register a scored eval test on this suite."""
-
-        def decorator(func: FuncT) -> FuncT:
-            wrapper = make_eval_wrapper(
-                func,
-                evaluators or [],
-                expected_key,
-                judge=judge,
-            )
-            self.test(tags=tags, timeout=timeout, is_eval=True)(wrapper)
             return func
 
         return decorator

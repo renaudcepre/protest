@@ -11,13 +11,14 @@ from protest import ForEach, From
 from protest.core.runner import TestRunner
 from protest.evals import (
     EvalContext,
-    EvalSession,
     Judge,
     JudgeResponse,
     TaskResult,
     Verdict,
     evaluator,
 )
+from protest.evals.session import EvalSession
+from protest.evals.suite import EvalSuite
 from protest.plugin import PluginBase
 
 # ---------------------------------------------------------------------------
@@ -227,8 +228,10 @@ class TestJudgeE2E:
             return await ctx.judge("pass this", bool)
 
         session = EvalSession(judge=FakeJudge())
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
 
-        @session.eval(evaluators=[judge_evaluator])
+        @eval_echo_suite.eval(evaluators=[judge_evaluator])
         def eval_echo(case: Annotated[dict, From(single_case)]) -> str:
             return case["inputs"]
 
@@ -244,8 +247,10 @@ class TestJudgeE2E:
             return await ctx.judge("test", bool)
 
         session = EvalSession()  # no judge
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
 
-        @session.eval(evaluators=[needs_judge])
+        @eval_echo_suite.eval(evaluators=[needs_judge])
         def eval_echo(case: Annotated[dict, From(single_case)]) -> str:
             return case["inputs"]
 
@@ -274,8 +279,10 @@ class TestJudgeE2E:
             return r1 and r2
 
         session = EvalSession(judge=FakeJudge())
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
 
-        @session.eval(evaluators=[double_judge])
+        @eval_echo_suite.eval(evaluators=[double_judge])
         def eval_echo(case: Annotated[dict, From(single_case)]) -> str:
             return case["inputs"]
 
@@ -329,8 +336,10 @@ class TestJudgeE2E:
             return await ctx.judge("evaluate this", JudgeVerdict)
 
         session = EvalSession(judge=StructuredJudge())
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
 
-        @session.eval(evaluators=[struct_evaluator])
+        @eval_echo_suite.eval(evaluators=[struct_evaluator])
         def eval_echo(case: Annotated[dict, From(single_case)]) -> str:
             return case["inputs"]
 
@@ -353,8 +362,10 @@ class TestTaskResult:
             return ctx.output == "hello"  # sees str, not TaskResult
 
         session = EvalSession()
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
 
-        @session.eval(evaluators=[check_output])
+        @eval_echo_suite.eval(evaluators=[check_output])
         def eval_echo(case: Annotated[dict, From(single_case)]) -> TaskResult[str]:
             return TaskResult(
                 output=case["inputs"],
@@ -375,8 +386,10 @@ class TestTaskResult:
             return True
 
         session = EvalSession()
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
 
-        @session.eval(evaluators=[always_pass])
+        @eval_echo_suite.eval(evaluators=[always_pass])
         def eval_echo(case: Annotated[dict, From(single_case)]) -> TaskResult[str]:
             return TaskResult(
                 output=case["inputs"],
@@ -411,8 +424,10 @@ class TestTaskResult:
             return True
 
         session = EvalSession()
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
 
-        @session.eval(evaluators=[always_pass])
+        @eval_echo_suite.eval(evaluators=[always_pass])
         def eval_echo(case: Annotated[dict, From(single_case)]) -> str:
             return case["inputs"]
 

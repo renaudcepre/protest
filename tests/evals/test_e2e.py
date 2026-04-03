@@ -1,7 +1,7 @@
 """End-to-end tests for ProTest evals integration.
 
 These tests define the PUBLIC API contract. They test what the user sees:
-- Session setup (EvalSession, @session.eval with ForEach/From)
+- Session setup (EvalSession, EvalSuite + @suite.eval with ForEach/From)
 - CLI behavior (protest run vs protest eval)
 - Output format (scores table, trends, failure messages)
 - History (JSONL format, stats, significance, clean-dirty)
@@ -26,7 +26,6 @@ from protest.core.suite import ProTestSuite
 from protest.entities import SuiteKind
 from protest.evals import (
     EvalContext,
-    EvalSession,
     Metric,
     ModelInfo,
     ShortCircuit,
@@ -46,6 +45,8 @@ from protest.evals.evaluators import (
 )
 from protest.evals.hashing import compute_case_hash, compute_eval_hash
 from protest.evals.results_writer import EvalResultsWriter
+from protest.evals.session import EvalSession
+from protest.evals.suite import EvalSuite
 from protest.evals.types import EvalSuiteReport  # noqa: TC001 — used at runtime
 from protest.filters.kind import KindFilterPlugin
 from protest.history.storage import append_entry, clean_dirty
@@ -103,12 +104,15 @@ basic_cases = ForEach(
 
 
 class TestEvalSession:
-    """EvalSession setup: constructor with model=, @session.eval."""
+    """EvalSession setup: constructor with model=, EvalSuite + @suite.eval."""
 
     def test_add_eval_creates_eval_kind(self) -> None:
         session = EvalSession()
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -129,7 +133,10 @@ class TestEvalSession:
         """Evaluator with bool field: case_fail has matches_expected=False -> fail."""
         session = EvalSession()
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -142,7 +149,10 @@ class TestEvalSession:
     def test_async_task_works(self) -> None:
         session = EvalSession()
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         async def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return await async_echo_task(case["inputs"])
 
@@ -160,7 +170,10 @@ class TestEvalSession:
 
         session = EvalSession()
 
-        @session.eval(evaluators=[async_fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[async_fake_accuracy])
         def eval_echo(case: Annotated[dict, From(single_case)]) -> str:
             return echo_task(case["inputs"])
 
@@ -184,7 +197,10 @@ class TestKindFiltering:
     def test_eval_suite_has_kind_eval(self) -> None:
         session = EvalSession()
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -229,7 +245,10 @@ class TestKindFiltering:
 
         session.add_suite(test_suite)
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -251,7 +270,10 @@ class TestKindFiltering:
 
         session.add_suite(test_suite)
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -286,7 +308,10 @@ class TestEvalOutput:
         session = EvalSession()
         session.register_plugin(ReportCapture())
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -311,7 +336,10 @@ class TestEvalOutput:
         session = EvalSession()
         session.register_plugin(ReportCapture())
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -335,7 +363,10 @@ class TestEvalOutput:
         session = EvalSession()
         session.register_plugin(ErrorCollector())
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -368,7 +399,10 @@ class TestEvalPayloadFlow:
         session = EvalSession()
         session.register_plugin(Collector())
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -400,7 +434,10 @@ class TestEvalPayloadFlow:
         session = EvalSession()
         session.register_plugin(LifecycleCollector())
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -437,7 +474,10 @@ class TestEvalPayloadFlow:
         session = EvalSession()
         session.register_plugin(Collector())
 
-        @session.eval(evaluators=[crashing_evaluator])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[crashing_evaluator])
         def eval_echo(case: Annotated[dict, From(single_case)]) -> str:
             return echo_task(case["inputs"])
 
@@ -483,7 +523,10 @@ class TestHistory:
     def _run_eval(self, tmp_path: Path) -> None:
         session = EvalSession(model=ModelInfo(name="test-model"), history_dir=tmp_path)
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -546,7 +589,10 @@ class TestHistory:
             metadata={"env": "test", "version": "1.0"},
         )
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -610,7 +656,10 @@ class TestCaseHashing:
         """History entries include case_hash and eval_hash per case."""
         session = EvalSession(history_dir=tmp_path)
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -749,7 +798,10 @@ class TestScoringV2:
         session = EvalSession()
         session.register_plugin(Collector())
 
-        @session.eval(evaluators=[not_empty])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[not_empty])
         def eval_echo(case: Annotated[dict, From(single_case)]) -> str:
             return echo_task(case["inputs"])
 
@@ -783,7 +835,10 @@ class TestScoringV2:
         session = EvalSession()
         session.register_plugin(Collector())
 
-        @session.eval(evaluators=[word_overlap])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[word_overlap])
         def eval_echo(case: Annotated[dict, From(single_case)]) -> str:
             return echo_task(case["inputs"])
 
@@ -815,7 +870,10 @@ class TestScoringV2:
         session = EvalSession()
         session.register_plugin(Collector())
 
-        @session.eval(evaluators=[bad_evaluator])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[bad_evaluator])
         def eval_echo(case: Annotated[dict, From(single_case)]) -> str:
             return echo_task(case["inputs"])
 
@@ -844,7 +902,10 @@ class TestShortCircuit:
 
         session = EvalSession()
 
-        @session.eval(evaluators=[ShortCircuit([cheap, expensive])])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[ShortCircuit([cheap, expensive])])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -874,7 +935,10 @@ class TestShortCircuit:
         )
         session = EvalSession()
 
-        @session.eval(evaluators=[ShortCircuit([check_a, check_b])])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[ShortCircuit([check_a, check_b])])
         def eval_echo(case: Annotated[dict, From(single)]) -> str:
             return echo_task(case["inputs"])
 
@@ -899,7 +963,10 @@ class TestResultsFiles:
         writer = EvalResultsWriter(history_dir=tmp_path)
         session.register_plugin(writer)
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -947,7 +1014,7 @@ class TestResultsFiles:
 
 
 class TestMultiDatasetHistory:
-    """Multiple @session.eval calls produce distinct suites in history."""
+    """Multiple EvalSuite + @suite.eval calls produce distinct suites in history."""
 
     def _run_multi(self, tmp_path: Path) -> dict[str, Any]:
         pipeline_cases = ForEach(
@@ -966,11 +1033,17 @@ class TestMultiDatasetHistory:
 
         session = EvalSession(history_dir=tmp_path)
 
-        @session.eval(evaluators=[fake_accuracy])
+        pipeline_suite = EvalSuite("pipeline")
+        session.add_suite(pipeline_suite)
+
+        @pipeline_suite.eval(evaluators=[fake_accuracy])
         def pipeline(case: Annotated[dict, From(pipeline_cases)]) -> str:
             return echo_task(case["inputs"])
 
-        @session.eval(evaluators=[fake_accuracy])
+        ingest_suite = EvalSuite("ingest")
+        session.add_suite(ingest_suite)
+
+        @ingest_suite.eval(evaluators=[fake_accuracy])
         def ingest(case: Annotated[dict, From(ingest_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -996,14 +1069,17 @@ class TestMultiDatasetHistory:
 
 
 class TestEvalTaskFixtures:
-    """@session.eval() peut utiliser des fixtures protest via Use()."""
+    """EvalSuite + @suite.eval() peut utiliser des fixtures protest via Use()."""
 
     def test_task_without_fixtures_still_works(self) -> None:
         # basic_cases has one match (case_pass) and one mismatch (case_fail)
         # fake_accuracy returns matches_expected=False for case_fail -> fail
         session = EvalSession()
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_echo_suite = EvalSuite("eval_echo")
+        session.add_suite(eval_echo_suite)
+
+        @eval_echo_suite.eval(evaluators=[fake_accuracy])
         def eval_echo(case: Annotated[dict, From(basic_cases)]) -> str:
             return echo_task(case["inputs"])
 
@@ -1028,7 +1104,10 @@ class TestEvalTaskFixtures:
         session = EvalSession()
         session.bind(prefix_service)
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_prefixed_suite = EvalSuite("eval_prefixed")
+        session.add_suite(eval_prefixed_suite)
+
+        @eval_prefixed_suite.eval(evaluators=[fake_accuracy])
         async def eval_prefixed(
             case: Annotated[dict, From(single_case)],
             svc: Annotated[str, Use(prefix_service)],
@@ -1063,7 +1142,10 @@ class TestEvalTaskFixtures:
         session = EvalSession()
         session.bind(expensive_resource)
 
-        @session.eval(evaluators=[fake_accuracy])
+        eval_resource_suite = EvalSuite("eval_resource")
+        session.add_suite(eval_resource_suite)
+
+        @eval_resource_suite.eval(evaluators=[fake_accuracy])
         async def eval_resource(
             case: Annotated[dict, From(multi_cases)],
             res: Annotated[str, Use(expensive_resource)],
