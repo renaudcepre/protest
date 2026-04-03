@@ -30,8 +30,8 @@ class EvalSession(ProTestSession):
         session.add_suite(chatbot)
 
         @chatbot.eval(evaluators=[contains_facts])
-        async def chatbot(case: Annotated[dict, From(cases)]) -> str:
-            return await ask(case["q"])
+        async def chatbot(case: Annotated[EvalCase, From(cases)]) -> str:
+            return await ask(case.inputs)
     """
 
     def __init__(

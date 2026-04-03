@@ -15,8 +15,10 @@ ProTest evals use the same infrastructure as tests: fixtures, DI, parallelism, t
 from typing import Annotated
 
 from protest import ForEach, From
-from protest.evals import EvalCase, EvalSession, ModelInfo, evaluator
+from protest.evals import EvalCase, ModelInfo, evaluator
 from protest.evals.evaluators import contains_keywords
+from protest.evals.session import EvalSession
+from protest.evals.suite import EvalSuite
 
 cases = ForEach([
     EvalCase(inputs="Who is Marie?", expected="Marie, Resistance", name="lookup"),
@@ -25,7 +27,10 @@ cases = ForEach([
 
 session = EvalSession(model=ModelInfo(name="gpt-4o-mini"))
 
-@session.eval(evaluators=[contains_keywords(keywords=["Marie"])])
+chatbot_suite = EvalSuite("chatbot")
+session.add_suite(chatbot_suite)
+
+@chatbot_suite.eval(evaluators=[contains_keywords(keywords=["Marie"])])
 async def chatbot(case: Annotated[EvalCase, From(cases)]) -> str:
     return await my_agent(case.inputs)
 ```
@@ -36,7 +41,7 @@ protest eval evals.session:session
 
 ## How It Works
 
-`@session.eval()` wraps a function to run evaluators on its return value:
+`@suite.eval()` wraps a function to run evaluators on its return value:
 
 1. Your function receives case data via `ForEach`/`From` (same as parameterized tests)
 2. It returns the output (string, object, anything)
@@ -48,16 +53,38 @@ The rest of the pipeline — fixtures, DI, parallelism, reporters — works iden
 
 ## EvalSession
 
-`EvalSession` is a session configured for evals. History is enabled by default.
+`EvalSession` is a session configured for evals. History is enabled by default. Model and judge set on the session are propagated as defaults to `EvalSuite` instances added via `session.add_suite()`.
 
 ```python
-from protest.evals import EvalSession, ModelInfo
+from protest.evals import ModelInfo
+from protest.evals.session import EvalSession
 
 session = EvalSession(
-    model=ModelInfo(name="gpt-4o-mini"),    # tracked in history
+    model=ModelInfo(name="gpt-4o-mini"),    # propagated to suites, tracked in history
     concurrency=4,                          # parallel eval cases
     metadata={"version": "1.0"},            # stored in history
 )
+```
+
+## EvalSuite
+
+`EvalSuite` groups eval cases. It's the eval equivalent of `ProTestSuite` — it forces `kind=EVAL` and carries model/judge configuration.
+
+```python
+from protest.evals.suite import EvalSuite
+
+chatbot_suite = EvalSuite("chatbot")
+session.add_suite(chatbot_suite)  # model/judge propagated from session
+
+@chatbot_suite.eval(evaluators=[my_scorer])
+async def chatbot(case: Annotated[EvalCase, From(cases)]) -> str:
+    return await my_agent(case.inputs)
+```
+
+Per-suite model override:
+
+```python
+chatbot_suite = EvalSuite("chatbot", model=ModelInfo(name="mistral-7b"))
 ```
 
 ## EvalCase
@@ -262,7 +289,10 @@ async def pipeline():
 
 session.bind(pipeline)
 
-@session.eval(evaluators=[my_scorer])
+pipeline_suite = EvalSuite("pipeline")
+session.add_suite(pipeline_suite)
+
+@pipeline_suite.eval(evaluators=[my_scorer])
 async def pipeline_eval(
     case: Annotated[EvalCase, From(cases)],
     driver: Annotated[AsyncDriver, Use(pipeline)],
@@ -386,7 +416,7 @@ If your eval task calls an LLM, you can report usage by returning `TaskResult` i
 ```python
 from protest.evals import TaskResult
 
-@session.eval(evaluators=[my_scorer])
+@chatbot_suite.eval(evaluators=[my_scorer])
 async def chatbot(case: Annotated[EvalCase, From(cases)]) -> TaskResult[str]:
     result = await agent.run(case.inputs)
     usage = result.usage()
@@ -424,18 +454,24 @@ If two evaluators return dataclasses with the same field name (e.g. both have `a
 
 ## Multi-Model Sessions
 
-Track which model produced each eval suite's results:
+Track which model produced each eval suite's results. Each `EvalSuite` can have its own model:
 
 ```python
 pipeline_model = ModelInfo(name="qwen-2.5")
 chat_model = ModelInfo(name="mistral-7b")
 
-session = EvalSession(model=pipeline_model)
+session = EvalSession(model=pipeline_model)  # default model
 
-@session.eval(evaluators=[...], name="pipeline", model=pipeline_model)
+pipeline_suite = EvalSuite("pipeline")  # inherits pipeline_model from session
+chatbot_suite = EvalSuite("chatbot", model=chat_model)  # override
+
+session.add_suite(pipeline_suite)
+session.add_suite(chatbot_suite)
+
+@pipeline_suite.eval(evaluators=[...])
 async def pipeline_eval(case, driver) -> str: ...
 
-@session.eval(evaluators=[...], name="chatbot", model=chat_model)
+@chatbot_suite.eval(evaluators=[...])
 async def chatbot_eval(case, deps) -> str: ...
 ```
 

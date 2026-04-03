@@ -133,7 +133,7 @@ class EvalCase:
             EvalCase(inputs="Who is Pierre?", expected="Pierre, arrest"),
         ])
 
-        @session.eval(evaluators=[contains_facts])
+        @suite.eval(evaluators=[contains_facts])
         def my_eval(case: Annotated[EvalCase, From(cases)]) -> str:
             return ask(case.inputs)
     """

@@ -14,6 +14,7 @@ from typing import Any
 
 from protest.entities.events import EvalPayload, EvalScoreEntry
 from protest.evals.evaluator import (
+    EvalCase,
     EvalContext,
     ShortCircuit,
     extract_scores_from_result,
@@ -26,14 +27,13 @@ from protest.exceptions import FixtureError
 def make_eval_wrapper(
     func: Any,
     evaluators: list[Any],
-    expected_key: str,
     judge: Any = None,
 ) -> Any:
     """Wrap a function to run evaluators on its return value."""
 
     @functools.wraps(func)
     async def eval_wrapper(**kwargs: Any) -> EvalPayload:
-        expected = _extract_expected(kwargs, expected_key)
+        expected = _extract_expected(kwargs)
         case_name = _extract_case_name(kwargs, func.__name__)
         inputs = _extract_inputs(kwargs)
         metadata = _extract_metadata(kwargs)
@@ -102,65 +102,51 @@ def make_eval_wrapper(
 
 
 # ---------------------------------------------------------------------------
-# Extract helpers — pull data from case_kwargs (dict or dataclass)
+# Extract helpers — pull EvalCase from kwargs
 # ---------------------------------------------------------------------------
 
 
-def _get(obj: Any, key: str, default: Any = None) -> Any:
-    """Get a value from a dict or dataclass by key/attr name."""
-    if isinstance(obj, dict):
-        return obj.get(key, default)
-    return getattr(obj, key, default)
-
-
-def _is_case_data(v: Any) -> bool:
-    """Check if a value looks like case data (dict or has 'expected'/'q'/'inputs')."""
-    if isinstance(v, dict):
-        return True
-    return hasattr(v, "expected") or hasattr(v, "q") or hasattr(v, "inputs")
-
-
-def _extract_expected(kwargs: dict[str, Any], key: str) -> Any:
+def _find_case(kwargs: dict[str, Any]) -> EvalCase | None:
+    """Find the EvalCase instance in kwargs."""
     for v in kwargs.values():
-        if _is_case_data(v):
-            val = _get(v, key)
-            if val is not None:
-                return val
+        if isinstance(v, EvalCase):
+            return v
     return None
+
+
+def _extract_expected(kwargs: dict[str, Any]) -> Any:
+    case = _find_case(kwargs)
+    if case is None:
+        return None
+    return case.expected
 
 
 def _extract_case_name(kwargs: dict[str, Any], fallback: str) -> str:
-    for v in kwargs.values():
-        if _is_case_data(v):
-            name = _get(v, "name")
-            if name:
-                return str(name)
-    return fallback
+    case = _find_case(kwargs)
+    if case is None or not case.name:
+        return fallback
+    return case.name
 
 
 def _extract_inputs(kwargs: dict[str, Any]) -> Any:
-    for v in kwargs.values():
-        if _is_case_data(v):
-            return _get(v, "inputs") or _get(v, "q") or _get(v, "input")
-    return None
+    case = _find_case(kwargs)
+    if case is None:
+        return None
+    return case.inputs
 
 
 def _extract_metadata(kwargs: dict[str, Any]) -> Any:
-    for v in kwargs.values():
-        if _is_case_data(v):
-            val = _get(v, "metadata")
-            if val is not None:
-                return val
-    return None
+    case = _find_case(kwargs)
+    if case is None:
+        return None
+    return case.metadata or None
 
 
 def _extract_per_case_evaluators(kwargs: dict[str, Any]) -> list[Any]:
-    for v in kwargs.values():
-        if _is_case_data(v):
-            evs = _get(v, "evaluators")
-            if evs:
-                return list(evs)
-    return []
+    case = _find_case(kwargs)
+    if case is None or not case.evaluators:
+        return []
+    return list(case.evaluators)
 
 
 # ---------------------------------------------------------------------------

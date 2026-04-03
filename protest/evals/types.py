@@ -19,8 +19,8 @@ class TaskResult(Generic[T]):
 
     Usage::
 
-        @session.eval(evaluators=[...])
-        async def my_eval(case) -> TaskResult[str]:
+        @suite.eval(evaluators=[...])
+        async def my_eval(case: EvalCase) -> TaskResult[str]:
             result = await agent.run(case.inputs)
             usage = result.usage()
             return TaskResult(

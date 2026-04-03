@@ -25,8 +25,8 @@ class EvalSuite(ProTestSuite):
         session.add_suite(chatbot)
 
         @chatbot.eval(evaluators=[contains_facts])
-        async def chatbot(case: Annotated[dict, From(cases)]) -> str:
-            return await ask(case["q"])
+        async def chatbot(case: Annotated[EvalCase, From(cases)]) -> str:
+            return await ask(case.inputs)
     """
 
     def __init__(
@@ -66,7 +66,6 @@ class EvalSuite(ProTestSuite):
     def eval(
         self,
         evaluators: list[Any] | None = None,
-        expected_key: str = "expected",
         tags: list[str] | None = None,
         timeout: float | None = None,
         judge: Any = None,
@@ -78,7 +77,6 @@ class EvalSuite(ProTestSuite):
             wrapper = make_eval_wrapper(
                 func,
                 evaluators or [],
-                expected_key,
                 judge=resolved_judge,
             )
             self.test(tags=tags, timeout=timeout, is_eval=True)(wrapper)
