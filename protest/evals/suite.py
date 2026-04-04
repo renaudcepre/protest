@@ -1,4 +1,4 @@
-"""EvalSuite — suite dédiée aux evals."""
+"""EvalSuite — eval-dedicated suite with judge and model support."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ FuncT = TypeVar("FuncT", bound="Callable[..., object]")
 
 
 class EvalSuite(ProTestSuite):
-    """Suite dédiée aux evals.
+    """Eval-dedicated suite that forces kind=EVAL and carries judge/model config.
 
     Usage::
 

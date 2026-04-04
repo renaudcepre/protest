@@ -1,4 +1,4 @@
-"""EvalSession — session dédiée aux evals."""
+"""EvalSession — eval-dedicated session with history and default propagation."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 class EvalSession(ProTestSession):
-    """Session dédiée aux evals.
+    """Eval-dedicated session with history enabled by default.
 
     Usage::
 
