@@ -1,10 +1,16 @@
 """Test outcome classification and building."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum, auto
+from typing import TYPE_CHECKING, Any
 
 from protest.entities import SuitePath, TestCounts, TestOutcome, TestResult
 from protest.events.types import Event
+
+if TYPE_CHECKING:
+    from protest.entities.events import EvalPayload
 
 
 class OutcomeType(Enum):
@@ -35,13 +41,16 @@ class TestExecutionResult:
     attempt: int = 1
     max_attempts: int = 1
     previous_errors: tuple[Exception, ...] = ()
+    is_eval: bool = False
+    eval_payload: EvalPayload | None = None
+    log_records: tuple[Any, ...] = ()
 
 
 class OutcomeBuilder:
     """Builds TestOutcome from test execution results."""
 
     def build(self, exec_result: TestExecutionResult) -> TestOutcome:
-        """Build a TestOutcome from execution result by classifying and constructing."""
+        """Build a TestOutcome from execution result."""
         outcome_type = self._classify(exec_result)
 
         match outcome_type:
@@ -59,7 +68,6 @@ class OutcomeBuilder:
                 return self._build_fail(exec_result)
 
     def _classify(self, exec_result: TestExecutionResult) -> OutcomeType:
-        """Classify execution result into outcome type."""
         match (
             exec_result.skip_reason,
             exec_result.error,
@@ -79,91 +87,51 @@ class OutcomeBuilder:
             case _:
                 return OutcomeType.FAIL
 
-    def _build_skip(self, exec_result: TestExecutionResult) -> TestOutcome:
-        result = TestResult(
-            name=exec_result.test_name,
-            node_id=exec_result.node_id,
-            suite_path=exec_result.suite_path,
-            skip_reason=exec_result.skip_reason,
-            timeout=exec_result.timeout,
-            attempt=exec_result.attempt,
-            max_attempts=exec_result.max_attempts,
-            previous_errors=exec_result.previous_errors,
-        )
-        return TestOutcome(result, TestCounts(skipped=1), Event.TEST_SKIP)
+    def _base_kwargs(self, er: TestExecutionResult) -> dict[str, object]:
+        """Common TestResult kwargs from an execution result."""
+        return {
+            "name": er.test_name,
+            "node_id": er.node_id,
+            "suite_path": er.suite_path,
+            "duration": er.duration,
+            "output": er.output,
+            "timeout": er.timeout,
+            "attempt": er.attempt,
+            "max_attempts": er.max_attempts,
+            "previous_errors": er.previous_errors,
+            "is_eval": er.is_eval,
+            "eval_payload": er.eval_payload,
+            "log_records": er.log_records,
+        }
 
-    def _build_pass(self, exec_result: TestExecutionResult) -> TestOutcome:
-        result = TestResult(
-            name=exec_result.test_name,
-            node_id=exec_result.node_id,
-            suite_path=exec_result.suite_path,
-            duration=exec_result.duration,
-            output=exec_result.output,
-            timeout=exec_result.timeout,
-            attempt=exec_result.attempt,
-            max_attempts=exec_result.max_attempts,
-            previous_errors=exec_result.previous_errors,
-        )
-        return TestOutcome(result, TestCounts(passed=1), Event.TEST_PASS)
+    def _build_skip(self, er: TestExecutionResult) -> TestOutcome:
+        kw = self._base_kwargs(er)
+        kw.update(duration=0, output="", skip_reason=er.skip_reason)
+        return TestOutcome(TestResult(**kw), TestCounts(skipped=1), Event.TEST_SKIP)  # type: ignore[arg-type]
 
-    def _build_xpass(self, exec_result: TestExecutionResult) -> TestOutcome:
-        result = TestResult(
-            name=exec_result.test_name,
-            node_id=exec_result.node_id,
-            suite_path=exec_result.suite_path,
-            duration=exec_result.duration,
-            output=exec_result.output,
-            xfail_reason=exec_result.xfail_reason,
-            timeout=exec_result.timeout,
-            attempt=exec_result.attempt,
-            max_attempts=exec_result.max_attempts,
-            previous_errors=exec_result.previous_errors,
+    def _build_pass(self, er: TestExecutionResult) -> TestOutcome:
+        return TestOutcome(
+            TestResult(**self._base_kwargs(er)),  # type: ignore[arg-type]
+            TestCounts(passed=1),
+            Event.TEST_PASS,
         )
-        return TestOutcome(result, TestCounts(xpassed=1), Event.TEST_XPASS)
 
-    def _build_error(self, exec_result: TestExecutionResult) -> TestOutcome:
-        result = TestResult(
-            name=exec_result.test_name,
-            node_id=exec_result.node_id,
-            suite_path=exec_result.suite_path,
-            error=exec_result.error,
-            duration=exec_result.duration,
-            output=exec_result.output,
-            is_fixture_error=True,
-            timeout=exec_result.timeout,
-            attempt=exec_result.attempt,
-            max_attempts=exec_result.max_attempts,
-            previous_errors=exec_result.previous_errors,
-        )
-        return TestOutcome(result, TestCounts(errored=1), Event.TEST_FAIL)
+    def _build_xpass(self, er: TestExecutionResult) -> TestOutcome:
+        kw = self._base_kwargs(er)
+        kw["xfail_reason"] = er.xfail_reason
+        return TestOutcome(TestResult(**kw), TestCounts(xpassed=1), Event.TEST_XPASS)  # type: ignore[arg-type]
 
-    def _build_xfail(self, exec_result: TestExecutionResult) -> TestOutcome:
-        result = TestResult(
-            name=exec_result.test_name,
-            node_id=exec_result.node_id,
-            suite_path=exec_result.suite_path,
-            error=exec_result.error,
-            duration=exec_result.duration,
-            output=exec_result.output,
-            xfail_reason=exec_result.xfail_reason,
-            timeout=exec_result.timeout,
-            attempt=exec_result.attempt,
-            max_attempts=exec_result.max_attempts,
-            previous_errors=exec_result.previous_errors,
-        )
-        return TestOutcome(result, TestCounts(xfailed=1), Event.TEST_XFAIL)
+    def _build_error(self, er: TestExecutionResult) -> TestOutcome:
+        kw = self._base_kwargs(er)
+        kw.update(error=er.error, is_fixture_error=True)
+        return TestOutcome(TestResult(**kw), TestCounts(errored=1), Event.TEST_FAIL)  # type: ignore[arg-type]
 
-    def _build_fail(self, exec_result: TestExecutionResult) -> TestOutcome:
-        result = TestResult(
-            name=exec_result.test_name,
-            node_id=exec_result.node_id,
-            suite_path=exec_result.suite_path,
-            error=exec_result.error,
-            duration=exec_result.duration,
-            output=exec_result.output,
-            timeout=exec_result.timeout,
-            attempt=exec_result.attempt,
-            max_attempts=exec_result.max_attempts,
-            previous_errors=exec_result.previous_errors,
-        )
-        return TestOutcome(result, TestCounts(failed=1), Event.TEST_FAIL)
+    def _build_xfail(self, er: TestExecutionResult) -> TestOutcome:
+        kw = self._base_kwargs(er)
+        kw.update(error=er.error, xfail_reason=er.xfail_reason)
+        return TestOutcome(TestResult(**kw), TestCounts(xfailed=1), Event.TEST_XFAIL)  # type: ignore[arg-type]
+
+    def _build_fail(self, er: TestExecutionResult) -> TestOutcome:
+        kw = self._base_kwargs(er)
+        kw["error"] = er.error
+        return TestOutcome(TestResult(**kw), TestCounts(failed=1), Event.TEST_FAIL)  # type: ignore[arg-type]

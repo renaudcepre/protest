@@ -46,8 +46,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install dependencies
+        run: uv sync --all-extras --group dev
+
       - name: Type check
-        run: uvx mypy --strict protest
+        run: uv run mypy protest
 
   test:
     needs: lint
@@ -103,7 +106,7 @@ jobs:
           files: coverage.xml
           fail_ci_if_error: false
 
-c  docs:
+  docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

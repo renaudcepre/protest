@@ -7,7 +7,7 @@
 @lint:
     ruff format .
     ruff check --fix .
-    mypy --strict protest
+    uv run mypy protest
 
 @fullcheck:
   ruff format --check . && ruff check .  # lint

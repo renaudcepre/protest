@@ -142,6 +142,12 @@ class PluginBase:
     def on_suite_end(self, result: SuiteResult) -> None | Awaitable[None]:
         """Suite ends (after fixture teardown)."""
 
+    def on_eval_suite_end(self, report: Any) -> None | Awaitable[None]:
+        """Eval suite finished — aggregated report with scores/stats."""
+
+    def on_user_print(self, data: Any) -> None | Awaitable[None]:
+        """User-initiated print via protest.console.print()."""
+
     # ─────────────────────────────────────────────────────────────────────
     # Fixture lifecycle
     # ─────────────────────────────────────────────────────────────────────

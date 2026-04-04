@@ -11,7 +11,6 @@ from typing import (
     Any,
     get_args,
     get_origin,
-    get_type_hints,
     overload,
 )
 
@@ -23,6 +22,7 @@ from protest.di.decorators import (
     unwrap_fixture,
 )
 from protest.di.factory import FixtureFactory
+from protest.di.hints import get_type_hints_compat
 from protest.di.markers import Use
 from protest.di.proxy import FixtureErrorWrapper
 from protest.entities import (
@@ -741,8 +741,9 @@ class FixtureContainer:
         """Run exit stack teardown, interruptible by cancellation event.
 
         Returns True if cancelled (should abort), False if completed normally.
-        Teardown runs in a thread pool so sync blocking code doesn't freeze
-        the event loop, allowing us to detect and respond to cancellation.
+        Teardown runs on the SAME event loop as fixture setup — creating a
+        new loop would break async resources (drivers, connections) that hold
+        references to the original loop.
         """
         if interrupt_event is None:
             await exit_stack.__aexit__(exc_type, exc_val, exc_tb)
@@ -751,23 +752,10 @@ class FixtureContainer:
         if interrupt_event.is_set():
             return True
 
-        # Run teardown in thread pool so sync code doesn't block event loop
-        loop = asyncio.get_running_loop()
-
-        def run_sync_teardown() -> None:
-            # Create a new event loop for the thread to run async teardowns
-            new_loop = asyncio.new_event_loop()
-            try:
-                new_loop.run_until_complete(
-                    exit_stack.__aexit__(exc_type, exc_val, exc_tb)
-                )
-            finally:
-                new_loop.close()
-
-        async def run_in_thread() -> None:
-            await loop.run_in_executor(None, run_sync_teardown)
-
-        teardown_task = asyncio.create_task(run_in_thread())
+        # Run teardown on the same loop, race with cancellation
+        teardown_task = asyncio.create_task(
+            exit_stack.__aexit__(exc_type, exc_val, exc_tb)
+        )
         wait_cancel = asyncio.create_task(interrupt_event.wait())
 
         done, _ = await asyncio.wait(
@@ -793,10 +781,7 @@ class FixtureContainer:
         actual_func = unwrap_fixture(func)
         func_signature = signature(actual_func)
 
-        try:
-            type_hints = get_type_hints(actual_func, include_extras=True)
-        except Exception:
-            type_hints = {}
+        type_hints = get_type_hints_compat(actual_func)
 
         dependencies: dict[str, FixtureCallable] = {}
         for param_name, param in func_signature.parameters.items():

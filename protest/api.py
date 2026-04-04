@@ -14,21 +14,27 @@ Example:
         assert True
 
     success = run_session(session)
-
-Note:
-    This module uses lazy imports (PLC0415) to optimize startup time.
-    Users importing `from protest.api import run_session` shouldn't pay
-    the cost of loading the entire framework until they actually call it.
 """
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
+
+from protest.core.collector import Collector
+from protest.core.runner import TestRunner
+from protest.core.suite import (
+    ProTestSuite,  # noqa: TC001 — used at runtime in list_tags
+)
+from protest.events.types import Event
+from protest.filters.keyword import KeywordFilterPlugin
+from protest.filters.suite import SuiteFilterPlugin
+from protest.plugin import PluginBase, PluginContext
+from protest.tags.plugin import TagFilterPlugin
 
 if TYPE_CHECKING:
     from protest.core.session import ProTestSession
     from protest.entities import RunResult, TestItem
-    from protest.plugin import PluginContext
 
 
 def run_session(  # noqa: PLR0913 - public API with many optional params
@@ -69,10 +75,6 @@ def run_session(  # noqa: PLR0913 - public API with many optional params
     Returns:
         RunResult with success status and interrupted flag.
     """
-    from protest.core.runner import (  # noqa: PLC0415 - lazy import for startup perf
-        TestRunner,
-    )
-
     # Apply session-level settings from ctx or params
     if ctx is not None:
         if ctx.get("concurrency") is not None:
@@ -91,10 +93,6 @@ def run_session(  # noqa: PLR0913 - public API with many optional params
 
     # Build context from parameters if not provided
     if ctx is None:
-        from protest.plugin import (  # noqa: PLC0415 - lazy import for startup perf
-            PluginContext,
-        )
-
         ctx = PluginContext(
             args={
                 "last_failed": last_failed,
@@ -136,16 +134,6 @@ def collect_tests(  # noqa: PLR0913 - public API with many optional params
     Returns:
         List of collected TestItem objects.
     """
-    # Lazy imports for startup performance - only load when function is called
-    import asyncio  # noqa: PLC0415
-
-    from protest.core.collector import Collector  # noqa: PLC0415
-    from protest.events.types import Event  # noqa: PLC0415
-    from protest.filters.keyword import KeywordFilterPlugin  # noqa: PLC0415
-    from protest.filters.suite import SuiteFilterPlugin  # noqa: PLC0415
-    from protest.plugin import PluginBase, PluginContext  # noqa: PLC0415
-    from protest.tags.plugin import TagFilterPlugin  # noqa: PLC0415
-
     # Build context from parameters if not provided
     if ctx is None:
         ctx = PluginContext(
@@ -182,10 +170,6 @@ def list_tags(session: ProTestSession) -> set[str]:
     Returns:
         Set of all tag names declared on fixtures, suites, and tests.
     """
-    from protest.core.suite import (  # noqa: PLC0415, TC001 - lazy import for startup perf
-        ProTestSuite,
-    )
-
     all_tags: set[str] = set()
 
     for fixture_reg in session.fixtures:

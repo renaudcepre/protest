@@ -19,6 +19,7 @@ _log_records: ContextVar[list[LogRecord] | None] = ContextVar(
 )
 
 _current_node_id: ContextVar[str | None] = ContextVar("current_node_id", default=None)
+_event_bus_ref: ContextVar[object | None] = ContextVar("event_bus_ref", default=None)
 
 
 @dataclass(slots=True)
@@ -98,6 +99,21 @@ def set_session_teardown_capture(enabled: bool) -> None:
 def get_session_teardown_output() -> str:
     """Get captured session teardown output."""
     return _session_teardown.buffer.getvalue() if _session_teardown.buffer else ""
+
+
+def set_event_bus(bus: object) -> Token[object | None]:
+    """Set event bus reference for console.print() access."""
+    return _event_bus_ref.set(bus)
+
+
+def reset_event_bus(token: Token[object | None]) -> None:
+    """Reset event bus reference."""
+    _event_bus_ref.reset(token)
+
+
+def get_event_bus() -> object | None:
+    """Get current event bus (for console.print)."""
+    return _event_bus_ref.get()
 
 
 class TaskAwareStream:

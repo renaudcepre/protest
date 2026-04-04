@@ -1,11 +1,42 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from protest.entities import FixtureScope, SuitePath
     from protest.events.types import Event
+
+
+@dataclass(frozen=True, slots=True)
+class EvalScoreEntry:
+    """A single score entry from an evaluator."""
+
+    value: float | bool | str
+    passed: bool = True
+    skipped: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class EvalPayload:
+    """Structured payload for eval results, carried on TestResult."""
+
+    case_name: str
+    passed: bool
+    task_duration: float
+    inputs: Any = None
+    output: Any = None
+    expected_output: Any = None
+    scores: dict[str, EvalScoreEntry] = field(default_factory=dict)
+    case_hash: str = ""
+    eval_hash: str = ""
+    task_input_tokens: int = 0
+    task_output_tokens: int = 0
+    task_cost: float = 0.0
+    judge_call_count: int = 0
+    judge_input_tokens: int = 0
+    judge_output_tokens: int = 0
+    judge_cost: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +74,9 @@ class TestResult:
     attempt: int = 1
     max_attempts: int = 1
     previous_errors: tuple[Exception, ...] = ()
+    is_eval: bool = False
+    eval_payload: EvalPayload | None = None
+    log_records: tuple[Any, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

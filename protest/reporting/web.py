@@ -28,14 +28,15 @@ if TYPE_CHECKING:
         TestStartInfo,
         TestTeardownInfo,
     )
+    from protest.evals.types import EvalSuiteReport
 
 try:
-    from websockets.asyncio.server import (  # type: ignore[import-not-found]
+    from websockets.asyncio.server import (
         serve as ws_serve,
     )
-    from websockets.datastructures import Headers  # type: ignore[import-not-found]
-    from websockets.http11 import Request, Response  # type: ignore[import-not-found]
-    from websockets.sync.client import (  # type: ignore[import-not-found]
+    from websockets.datastructures import Headers
+    from websockets.http11 import Request, Response
+    from websockets.sync.client import (
         connect as ws_connect,
     )
 except ImportError as err:  # pragma: no cover
@@ -245,6 +246,33 @@ class WebReporter(PluginBase):
             {"name": info.name, "scope": info.scope, "duration": info.duration},
         )
 
+    def on_eval_suite_end(self, report: EvalSuiteReport) -> None:
+        self._send(
+            "EVAL_SUITE_END",
+            {
+                "suiteName": report.suite_name,
+                "totalCount": report.total_count,
+                "passedCount": report.passed_count,
+                "failedCount": report.failed_count,
+                "passRate": report.pass_rate,
+                "duration": report.duration,
+                "scoreStats": [
+                    {
+                        "name": s.name,
+                        "mean": s.mean,
+                        "median": s.median,
+                        "p5": s.p5,
+                        "p95": s.p95,
+                    }
+                    for s in report.all_score_stats()
+                ],
+                "taskTokens": report.total_task_tokens,
+                "taskCost": report.total_task_cost,
+                "judgeTokens": report.total_judge_tokens,
+                "judgeCost": report.total_judge_cost,
+            },
+        )
+
     def on_suite_end(self, result: SuiteResult) -> None:
         self._send(
             "SUITE_END",
@@ -276,4 +304,29 @@ class WebReporter(PluginBase):
         if include_error and result.error:
             payload["message"] = str(result.error)
             payload["traceback"] = _format_traceback(result.error)
+        if result.is_eval and result.eval_payload:
+            ep = result.eval_payload
+            payload["evalPayload"] = {
+                "caseName": ep.case_name,
+                "passed": ep.passed,
+                "inputs": ep.inputs,
+                "output": ep.output,
+                "expected": ep.expected_output,
+                "scores": {
+                    name: {
+                        "value": entry.value,
+                        "passed": entry.passed,
+                        "skipped": entry.skipped,
+                    }
+                    for name, entry in ep.scores.items()
+                },
+                "taskDuration": ep.task_duration,
+                "taskInputTokens": ep.task_input_tokens,
+                "taskOutputTokens": ep.task_output_tokens,
+                "taskCost": ep.task_cost,
+                "judgeCallCount": ep.judge_call_count,
+                "judgeInputTokens": ep.judge_input_tokens,
+                "judgeOutputTokens": ep.judge_output_tokens,
+                "judgeCost": ep.judge_cost,
+            }
         return payload

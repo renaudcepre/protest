@@ -1,8 +1,11 @@
+import sys
 import traceback
 from pathlib import Path
+from typing import Any
 
 from typing_extensions import Self
 
+from protest.console import strip_markup
 from protest.entities import (
     FixtureInfo,
     HandlerInfo,
@@ -18,6 +21,7 @@ from protest.entities import (
     TestStartInfo,
     TestTeardownInfo,
 )
+from protest.evals.types import EvalSuiteReport
 from protest.plugin import PluginBase, PluginContext
 from protest.reporting.verbosity import Verbosity
 
@@ -57,6 +61,28 @@ def _format_duration(seconds: float) -> str:
     if seconds < 1:
         return f"{seconds * 1000:.0f}ms"
     return f"{seconds:.2f}s"
+
+
+_TOKEN_K_THRESHOLD = 1000
+
+
+def _format_tokens(tokens: int) -> str:
+    return (
+        f"{tokens / _TOKEN_K_THRESHOLD:.1f}k"
+        if tokens >= _TOKEN_K_THRESHOLD
+        else str(tokens)
+    )
+
+
+def _format_usage(input_tokens: int, output_tokens: int, cost: float) -> str:
+    parts: list[str] = []
+    if input_tokens > 0 or output_tokens > 0:
+        parts.append(
+            f"{_format_tokens(input_tokens)} in / {_format_tokens(output_tokens)} out"
+        )
+    if cost > 0:
+        parts.append(f"${cost:.4f}")
+    return ", ".join(parts)
 
 
 class AsciiReporter(PluginBase):
@@ -123,7 +149,7 @@ class AsciiReporter(PluginBase):
             print(f"    -> fixture '{info.name}' setup... ({info.scope.value})")
 
     def on_fixture_setup_done(self, info: FixtureInfo) -> None:
-        if self._verbosity >= Verbosity.FIXTURES:
+        if self._verbosity >= Verbosity.NORMAL:
             print(
                 f"    -> fixture '{info.name}' ready ({_format_duration(info.duration)})"
             )
@@ -140,11 +166,17 @@ class AsciiReporter(PluginBase):
 
     def on_test_setup_done(self, info: TestStartInfo) -> None:
         if self._verbosity >= Verbosity.FIXTURES:
-            print(f"      > {info.name} setup done")
+            self._print_bypass(f"      > {info.name} setup done")
 
     def on_test_teardown_start(self, info: TestTeardownInfo) -> None:
         if self._verbosity >= Verbosity.FIXTURES:
-            print(f"      < {info.name} teardown...")
+            self._print_bypass(f"      < {info.name} teardown...")
+
+    @staticmethod
+    def _print_bypass(msg: str) -> None:
+        stream = getattr(sys.stdout, "_original", sys.stdout)
+        stream.write(msg + "\n")
+        stream.flush()
 
     def on_test_retry(self, info: TestRetryInfo) -> None:
         delay_msg = f", retrying in {info.delay}s" if info.delay > 0 else ""
@@ -249,6 +281,47 @@ class AsciiReporter(PluginBase):
             print("  --- Captured output ---")
             for line in result.output.rstrip().splitlines():
                 print(f"  {line}")
+
+    def on_user_print(self, data: Any) -> None:
+        msg, raw = data
+        text = msg if raw else strip_markup(msg)
+        stream = getattr(sys.stdout, "_original", sys.stdout)
+        stream.write(f"       | {text}\n")
+        stream.flush()
+
+    def on_eval_suite_end(self, report: Any) -> None:
+        if not isinstance(report, EvalSuiteReport):
+            return
+        stats = report.all_score_stats()
+        print()
+        print(f"  Eval: {report.suite_name} ({report.total_count} cases)")
+        if stats:
+            max_name = max(len(s.name) for s in stats)
+            print("  " + "─" * 60)
+            for s in stats:
+                print(
+                    f"    {s.name:<{max_name}}  "
+                    f"mean={s.mean:.2f}  p50={s.median:.2f}  "
+                    f"p5={s.p5:.2f}  p95={s.p95:.2f}"
+                )
+            print("  " + "─" * 60)
+        rate_pct = report.pass_rate * 100
+        print(f"  Passed: {report.passed_count}/{report.total_count} ({rate_pct:.1f}%)")
+        if report.total_task_tokens > 0 or report.total_task_cost > 0:
+            print(
+                f"  Task: {_format_usage(report.total_task_input_tokens, report.total_task_output_tokens, report.total_task_cost)}"
+            )
+        if report.total_judge_calls > 0:
+            judge_parts = [f"{report.total_judge_calls} calls"]
+            usage = _format_usage(
+                report.total_judge_input_tokens,
+                report.total_judge_output_tokens,
+                report.total_judge_cost,
+            )
+            if usage:
+                judge_parts.append(usage)
+            print(f"  Judge: {', '.join(judge_parts)}")
+        print()
 
     def on_session_complete(self, result: SessionResult) -> None:
         if self._failed_results or self._error_results:

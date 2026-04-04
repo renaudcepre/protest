@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from inspect import signature
 from itertools import groupby, product
-from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin, get_type_hints
+from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
 from protest.di.decorators import get_fixture_marker, unwrap_fixture
+from protest.di.hints import get_type_hints_compat
 from protest.di.markers import Use
 from protest.di.validation import _extract_from_params
 from protest.entities import FixtureCallable, SuitePath, TestItem, TestRegistration
@@ -18,10 +19,7 @@ if TYPE_CHECKING:
 
 def _extract_use_fixtures(func: Callable[..., Any]) -> list[FixtureCallable]:
     """Extract fixtures referenced via Use() markers in function parameters."""
-    try:
-        type_hints = get_type_hints(func, include_extras=True)
-    except Exception:
-        type_hints = {}
+    type_hints = get_type_hints_compat(func)
 
     fixtures: list[FixtureCallable] = []
     for param_name in signature(func).parameters:
@@ -164,6 +162,7 @@ class Collector:
                     xfail=test_reg.xfail,
                     timeout=test_reg.timeout,
                     retry=test_reg.retry,
+                    is_eval=test_reg.is_eval,
                 )
             ]
 
@@ -188,6 +187,7 @@ class Collector:
                     xfail=test_reg.xfail,
                     timeout=test_reg.timeout,
                     retry=test_reg.retry,
+                    is_eval=test_reg.is_eval,
                 )
             )
 
