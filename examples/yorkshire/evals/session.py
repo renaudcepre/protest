@@ -15,20 +15,21 @@ from examples.yorkshire.evals.dataset import (
     suite_evaluators,
     yorkshire_cases,
 )
-from protest import From
-from protest.evals import ModelInfo
-from protest.evals.session import EvalSession
+from protest import From, ProTestSession
+from protest.evals import EvalCase, ModelInfo
 from protest.evals.suite import EvalSuite
 
-session = EvalSession(
-    model=ModelInfo(name="yorkshire-chatbot-v1", provider="local"),
+session = ProTestSession(
     metadata={"version": "1.0", "type": "keyword-matching"},
 )
 
-yorkshire_suite = EvalSuite("yorkshire_eval")
+yorkshire_suite = EvalSuite(
+    "yorkshire_eval",
+    model=ModelInfo(name="yorkshire-chatbot-v1", provider="local"),
+)
 session.add_suite(yorkshire_suite)
 
 
 @yorkshire_suite.eval(evaluators=suite_evaluators)
-def yorkshire_eval(case: Annotated[dict, From(yorkshire_cases)]) -> str:
-    return yorkshire_chatbot(case["inputs"])
+def yorkshire_eval(case: Annotated[EvalCase, From(yorkshire_cases)]) -> str:
+    return yorkshire_chatbot(case.inputs)

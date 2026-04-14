@@ -82,7 +82,7 @@ class Judge(Protocol):
                 result = await agent.run(prompt)
                 return JudgeResponse(output=result.output, input_tokens=100)
 
-        session = EvalSession(judge=MyJudge())
+        suite = EvalSuite("chatbot", judge=MyJudge())
     """
 
     name: str

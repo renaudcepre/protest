@@ -93,7 +93,7 @@ class EvalContext(Generic[InputT, OutputT]):
         if self._judge is None:
             raise RuntimeError(
                 f"Evaluator for case '{self.name}' called ctx.judge() but no "
-                "judge is configured. Pass judge= to EvalSession()."
+                "judge is configured. Pass judge= to EvalSuite()."
             )
         self._judge_call_count += 1
         response = await self._judge.judge(prompt, output_type)

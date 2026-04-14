@@ -1,7 +1,7 @@
 """End-to-end tests for ProTest evals integration.
 
 These tests define the PUBLIC API contract. They test what the user sees:
-- Session setup (EvalSession, EvalSuite + @suite.eval with ForEach/From)
+- Session setup (ProTestSession, EvalSuite + @suite.eval with ForEach/From)
 - CLI behavior (protest run vs protest eval)
 - Output format (scores table, trends, failure messages)
 - History (JSONL format, stats, significance, clean-dirty)
@@ -46,7 +46,6 @@ from protest.evals.evaluators import (
 )
 from protest.evals.hashing import compute_case_hash, compute_eval_hash
 from protest.evals.results_writer import EvalResultsWriter
-from protest.evals.session import EvalSession
 from protest.evals.suite import EvalSuite
 from protest.evals.types import EvalSuiteReport  # noqa: TC001 — used at runtime
 from protest.filters.kind import KindFilterPlugin
@@ -104,11 +103,11 @@ basic_cases = ForEach(
 # ---------------------------------------------------------------------------
 
 
-class TestEvalSession:
-    """EvalSession setup: constructor with model=, EvalSuite + @suite.eval."""
+class TestEvalSetup:
+    """Eval setup: ProTestSession + EvalSuite with model=, @suite.eval."""
 
     def test_add_eval_creates_eval_kind(self) -> None:
-        session = EvalSession()
+        session = ProTestSession()
 
         eval_echo_suite = EvalSuite("eval_echo")
         session.add_suite(eval_echo_suite)
@@ -121,18 +120,18 @@ class TestEvalSession:
         assert len(session._suites) > 0
         assert any(s.kind == "eval" for s in session._suites)
 
-    def test_model_set_via_constructor(self) -> None:
-        session = EvalSession(model=ModelInfo(name="test-model"))
-        assert session._eval_model is not None
-        assert session._eval_model.name == "test-model"
+    def test_model_set_via_suite(self) -> None:
+        suite = EvalSuite("eval_echo", model=ModelInfo(name="test-model"))
+        assert suite._model is not None
+        assert suite._model.name == "test-model"
 
     def test_metadata_on_constructor(self) -> None:
-        session = EvalSession(metadata={"env": "test"})
+        session = ProTestSession(metadata={"env": "test"})
         assert session.metadata["env"] == "test"
 
     def test_eval_with_bool_verdict(self) -> None:
         """Evaluator with bool field: case_fail has matches_expected=False -> fail."""
-        session = EvalSession()
+        session = ProTestSession()
 
         eval_echo_suite = EvalSuite("eval_echo")
         session.add_suite(eval_echo_suite)
@@ -148,7 +147,7 @@ class TestEvalSession:
         assert result.success is False
 
     def test_async_task_works(self) -> None:
-        session = EvalSession()
+        session = ProTestSession()
 
         eval_echo_suite = EvalSuite("eval_echo")
         session.add_suite(eval_echo_suite)
@@ -169,7 +168,7 @@ class TestEvalSession:
             ids=lambda c: c.name,
         )
 
-        session = EvalSession()
+        session = ProTestSession()
 
         eval_echo_suite = EvalSuite("eval_echo")
         session.add_suite(eval_echo_suite)
@@ -196,7 +195,7 @@ class TestKindFiltering:
         assert suite.kind == "test"
 
     def test_eval_suite_has_kind_eval(self) -> None:
-        session = EvalSession()
+        session = ProTestSession()
 
         eval_echo_suite = EvalSuite("eval_echo")
         session.add_suite(eval_echo_suite)
@@ -306,7 +305,7 @@ class TestEvalOutput:
             def on_eval_suite_end(self, report: Any) -> None:
                 reports.append(report)
 
-        session = EvalSession()
+        session = ProTestSession()
         session.register_plugin(ReportCapture())
 
         eval_echo_suite = EvalSuite("eval_echo")
@@ -334,7 +333,7 @@ class TestEvalOutput:
             def on_eval_suite_end(self, report: Any) -> None:
                 reports.append(report)
 
-        session = EvalSession()
+        session = ProTestSession()
         session.register_plugin(ReportCapture())
 
         eval_echo_suite = EvalSuite("eval_echo")
@@ -361,7 +360,7 @@ class TestEvalOutput:
                 if result.error:
                     errors.append(str(result.error))
 
-        session = EvalSession()
+        session = ProTestSession()
         session.register_plugin(ErrorCollector())
 
         eval_echo_suite = EvalSuite("eval_echo")
@@ -397,7 +396,7 @@ class TestEvalPayloadFlow:
             def on_test_fail(self, result: Any) -> None:
                 collected.append(result)
 
-        session = EvalSession()
+        session = ProTestSession()
         session.register_plugin(Collector())
 
         eval_echo_suite = EvalSuite("eval_echo")
@@ -432,7 +431,7 @@ class TestEvalPayloadFlow:
             def on_test_teardown_start(self, info: Any) -> None:
                 teardown_ids.append(info.node_id)
 
-        session = EvalSession()
+        session = ProTestSession()
         session.register_plugin(LifecycleCollector())
 
         eval_echo_suite = EvalSuite("eval_echo")
@@ -472,7 +471,7 @@ class TestEvalPayloadFlow:
             ids=lambda c: c.name,
         )
 
-        session = EvalSession()
+        session = ProTestSession()
         session.register_plugin(Collector())
 
         eval_echo_suite = EvalSuite("eval_echo")
@@ -522,9 +521,9 @@ class TestHistory:
     """JSONL history format and querying."""
 
     def _run_eval(self, tmp_path: Path) -> None:
-        session = EvalSession(model=ModelInfo(name="test-model"), history_dir=tmp_path)
+        session = ProTestSession(history_dir=tmp_path)
 
-        eval_echo_suite = EvalSuite("eval_echo")
+        eval_echo_suite = EvalSuite("eval_echo", model=ModelInfo(name="test-model"))
         session.add_suite(eval_echo_suite)
 
         @eval_echo_suite.eval(evaluators=[fake_accuracy])
@@ -585,7 +584,7 @@ class TestHistory:
         assert len(lines) == 2
 
     def test_history_metadata_included(self, tmp_path: Path) -> None:
-        session = EvalSession(
+        session = ProTestSession(
             history_dir=tmp_path,
             metadata={"env": "test", "version": "1.0"},
         )
@@ -655,7 +654,7 @@ class TestCaseHashing:
 
     def test_case_hash_stored_in_history(self, tmp_path: Path) -> None:
         """History entries include case_hash and eval_hash per case."""
-        session = EvalSession(history_dir=tmp_path)
+        session = ProTestSession(history_dir=tmp_path)
 
         eval_echo_suite = EvalSuite("eval_echo")
         session.add_suite(eval_echo_suite)
@@ -796,7 +795,7 @@ class TestScoringV2:
             ids=lambda c: c.name,
         )
 
-        session = EvalSession()
+        session = ProTestSession()
         session.register_plugin(Collector())
 
         eval_echo_suite = EvalSuite("eval_echo")
@@ -833,7 +832,7 @@ class TestScoringV2:
             ids=lambda c: c.name,
         )
 
-        session = EvalSession()
+        session = ProTestSession()
         session.register_plugin(Collector())
 
         eval_echo_suite = EvalSuite("eval_echo")
@@ -868,7 +867,7 @@ class TestScoringV2:
             ids=lambda c: c.name,
         )
 
-        session = EvalSession()
+        session = ProTestSession()
         session.register_plugin(Collector())
 
         eval_echo_suite = EvalSuite("eval_echo")
@@ -901,7 +900,7 @@ class TestShortCircuit:
             call_log.append("expensive")
             return True
 
-        session = EvalSession()
+        session = ProTestSession()
 
         eval_echo_suite = EvalSuite("eval_echo")
         session.add_suite(eval_echo_suite)
@@ -934,7 +933,7 @@ class TestShortCircuit:
         single = ForEach(
             [EvalCase(inputs="x", expected="x", name="c1")], ids=lambda c: c.name
         )
-        session = EvalSession()
+        session = ProTestSession()
 
         eval_echo_suite = EvalSuite("eval_echo")
         session.add_suite(eval_echo_suite)
@@ -960,7 +959,7 @@ class TestResultsFiles:
 
     def _run_eval(self, tmp_path: Path) -> Path:
         results_dir = tmp_path / "results"
-        session = EvalSession()
+        session = ProTestSession()
         writer = EvalResultsWriter(history_dir=tmp_path)
         session.register_plugin(writer)
 
@@ -1032,7 +1031,7 @@ class TestMultiDatasetHistory:
             ids=lambda c: c.name,
         )
 
-        session = EvalSession(history_dir=tmp_path)
+        session = ProTestSession(history_dir=tmp_path)
 
         pipeline_suite = EvalSuite("pipeline")
         session.add_suite(pipeline_suite)
@@ -1075,7 +1074,7 @@ class TestEvalTaskFixtures:
     def test_task_without_fixtures_still_works(self) -> None:
         # basic_cases has one match (case_pass) and one mismatch (case_fail)
         # fake_accuracy returns matches_expected=False for case_fail -> fail
-        session = EvalSession()
+        session = ProTestSession()
 
         eval_echo_suite = EvalSuite("eval_echo")
         session.add_suite(eval_echo_suite)
@@ -1102,7 +1101,7 @@ class TestEvalTaskFixtures:
             ids=lambda c: c.name,
         )
 
-        session = EvalSession()
+        session = ProTestSession()
         session.bind(prefix_service)
 
         eval_prefixed_suite = EvalSuite("eval_prefixed")
@@ -1140,7 +1139,7 @@ class TestEvalTaskFixtures:
             ids=lambda c: c.name,
         )
 
-        session = EvalSession()
+        session = ProTestSession()
         session.bind(expensive_resource)
 
         eval_resource_suite = EvalSuite("eval_resource")

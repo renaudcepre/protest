@@ -14,10 +14,9 @@ ProTest evals use the same infrastructure as tests: fixtures, DI, parallelism, t
 # evals/session.py
 from typing import Annotated
 
-from protest import ForEach, From
+from protest import ForEach, From, ProTestSession
 from protest.evals import EvalCase, ModelInfo, evaluator
 from protest.evals.evaluators import contains_keywords
-from protest.evals.session import EvalSession
 from protest.evals.suite import EvalSuite
 
 cases = ForEach([
@@ -25,9 +24,9 @@ cases = ForEach([
     EvalCase(inputs="What is 2+2?", expected="4", name="math"),
 ])
 
-session = EvalSession(model=ModelInfo(name="gpt-4o-mini"))
+session = ProTestSession()
 
-chatbot_suite = EvalSuite("chatbot")
+chatbot_suite = EvalSuite("chatbot", model=ModelInfo(name="gpt-4o-mini"))
 session.add_suite(chatbot_suite)
 
 @chatbot_suite.eval(evaluators=[contains_keywords(keywords=["Marie"])])
@@ -51,40 +50,20 @@ protest eval evals.session:session
 
 The rest of the pipeline — fixtures, DI, parallelism, reporters — works identically to tests.
 
-## EvalSession
-
-`EvalSession` is a session configured for evals. History is enabled by default. Model and judge set on the session are propagated as defaults to `EvalSuite` instances added via `session.add_suite()`.
-
-```python
-from protest.evals import ModelInfo
-from protest.evals.session import EvalSession
-
-session = EvalSession(
-    model=ModelInfo(name="gpt-4o-mini"),    # propagated to suites, tracked in history
-    concurrency=4,                          # parallel eval cases
-    metadata={"version": "1.0"},            # stored in history
-)
-```
-
 ## EvalSuite
 
-`EvalSuite` groups eval cases. It's the eval equivalent of `ProTestSuite` — it forces `kind=EVAL` and carries model/judge configuration.
+`EvalSuite` groups eval cases. It's the eval equivalent of `ProTestSuite` — it forces `kind=EVAL` and carries model/judge configuration. Model and judge are suite-level config: each suite declares which model produced its results and which judge scores them.
 
 ```python
 from protest.evals.suite import EvalSuite
+from protest.evals import ModelInfo
 
-chatbot_suite = EvalSuite("chatbot")
-session.add_suite(chatbot_suite)  # model/judge propagated from session
+chatbot_suite = EvalSuite("chatbot", model=ModelInfo(name="gpt-4o-mini"))
+session.add_suite(chatbot_suite)
 
 @chatbot_suite.eval(evaluators=[my_scorer])
 async def chatbot(case: Annotated[EvalCase, From(cases)]) -> str:
     return await my_agent(case.inputs)
-```
-
-Per-suite model override:
-
-```python
-chatbot_suite = EvalSuite("chatbot", model=ModelInfo(name="mistral-7b"))
 ```
 
 ## EvalCase
@@ -189,7 +168,7 @@ The threshold (`min_recall`) is a parameter of the evaluator, not a framework co
 
 ### Async (LLM Judge)
 
-Use `ctx.judge()` for structured LLM evaluation (requires `judge=` on `EvalSession`):
+Use `ctx.judge()` for structured LLM evaluation (requires `judge=` on `EvalSuite`):
 
 ```python
 @dataclass
@@ -305,7 +284,7 @@ async def pipeline_eval(
 `ModelInfo` is a **label for history tracking** — it does not configure or route to any model. It records which model produced the results so you can compare runs.
 
 ```python
-session = EvalSession(model=ModelInfo(name="qwen-2.5"))
+suite = EvalSuite("pipeline", model=ModelInfo(name="qwen-2.5"))
 ```
 
 ## Judge
@@ -358,7 +337,8 @@ return JudgeResponse(output=result.output)  # tokens/cost = None, that's fine
 ### Configuring the Judge
 
 ```python
-session = EvalSession(
+suite = EvalSuite(
+    "pipeline",
     model=ModelInfo(name="qwen-2.5"),
     judge=PydanticAIJudge(model="gpt-4o-mini", temperature=0),
 )
@@ -394,7 +374,7 @@ async def simple_judge(ctx: EvalContext) -> bool:
 
 ### No Judge Configured
 
-If an evaluator calls `ctx.judge()` and no judge was passed to `EvalSession`, a `RuntimeError` is raised. This is treated as an **infrastructure error** (not a test failure), same as a fixture crash.
+If an evaluator calls `ctx.judge()` and no judge was passed to `EvalSuite`, a `RuntimeError` is raised. This is treated as an **infrastructure error** (not a test failure), same as a fixture crash.
 
 ### Usage Tracking
 
@@ -457,13 +437,10 @@ If two evaluators return dataclasses with the same field name (e.g. both have `a
 Track which model produced each eval suite's results. Each `EvalSuite` can have its own model:
 
 ```python
-pipeline_model = ModelInfo(name="qwen-2.5")
-chat_model = ModelInfo(name="mistral-7b")
+session = ProTestSession()
 
-session = EvalSession(model=pipeline_model)  # default model
-
-pipeline_suite = EvalSuite("pipeline")  # inherits pipeline_model from session
-chatbot_suite = EvalSuite("chatbot", model=chat_model)  # override
+pipeline_suite = EvalSuite("pipeline", model=ModelInfo(name="qwen-2.5"))
+chatbot_suite = EvalSuite("chatbot", model=ModelInfo(name="mistral-7b"))
 
 session.add_suite(pipeline_suite)
 session.add_suite(chatbot_suite)

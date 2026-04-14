@@ -7,7 +7,7 @@ from typing import Annotated, Any
 
 import pytest
 
-from protest import ForEach, From
+from protest import ForEach, From, ProTestSession
 from protest.core.runner import TestRunner
 from protest.evals import (
     EvalContext,
@@ -17,7 +17,6 @@ from protest.evals import (
     Verdict,
     evaluator,
 )
-from protest.evals.session import EvalSession
 from protest.evals.suite import EvalSuite
 from protest.plugin import PluginBase
 
@@ -210,7 +209,7 @@ class TestEvalContextJudge:
 
 
 # ---------------------------------------------------------------------------
-# E2E: EvalSession with judge
+# E2E: ProTestSession with judge on EvalSuite
 # ---------------------------------------------------------------------------
 
 single_case = ForEach(
@@ -227,8 +226,8 @@ class TestJudgeE2E:
         async def judge_evaluator(ctx: EvalContext) -> bool:
             return await ctx.judge("pass this", bool)
 
-        session = EvalSession(judge=FakeJudge())
-        eval_echo_suite = EvalSuite("eval_echo")
+        session = ProTestSession()
+        eval_echo_suite = EvalSuite("eval_echo", judge=FakeJudge())
         session.add_suite(eval_echo_suite)
 
         @eval_echo_suite.eval(evaluators=[judge_evaluator])
@@ -246,8 +245,8 @@ class TestJudgeE2E:
         async def needs_judge(ctx: EvalContext) -> bool:
             return await ctx.judge("test", bool)
 
-        session = EvalSession()  # no judge
-        eval_echo_suite = EvalSuite("eval_echo")
+        session = ProTestSession()
+        eval_echo_suite = EvalSuite("eval_echo")  # no judge
         session.add_suite(eval_echo_suite)
 
         @eval_echo_suite.eval(evaluators=[needs_judge])
@@ -278,8 +277,8 @@ class TestJudgeE2E:
             r2 = await ctx.judge("pass second", bool)
             return r1 and r2
 
-        session = EvalSession(judge=FakeJudge())
-        eval_echo_suite = EvalSuite("eval_echo")
+        session = ProTestSession()
+        eval_echo_suite = EvalSuite("eval_echo", judge=FakeJudge())
         session.add_suite(eval_echo_suite)
 
         @eval_echo_suite.eval(evaluators=[double_judge])
@@ -305,17 +304,17 @@ class TestJudgeE2E:
         assert payload.judge_output_tokens == 10  # 5 per call x 2
         assert payload.judge_cost == pytest.approx(0.002)  # 0.001 per call x 2
 
-    def test_judge_info_derived_from_instance(self) -> None:
-        """EvalSession derives JudgeInfo from Judge instance."""
-        session = EvalSession(judge=FakeJudge())
-        assert session._eval_judge is not None
-        assert session._eval_judge.name == "fake-judge"
-        assert session._eval_judge.provider == "test"
+    def test_judge_info_derived_from_suite(self) -> None:
+        """EvalSuite derives JudgeInfo from Judge instance."""
+        suite = EvalSuite("eval_echo", judge=FakeJudge())
+        assert suite._judge is not None
+        assert suite._judge.name == "fake-judge"
+        assert suite._judge.provider == "test"
 
     def test_no_judge_no_judge_info(self) -> None:
-        """EvalSession without judge has no JudgeInfo."""
-        session = EvalSession()
-        assert session._eval_judge is None
+        """EvalSuite without judge has no JudgeInfo."""
+        suite = EvalSuite("eval_echo")
+        assert suite._judge is None
 
     def test_judge_with_structured_output(self) -> None:
         """Judge returns structured dataclass via output_type."""
@@ -335,8 +334,8 @@ class TestJudgeE2E:
         async def struct_evaluator(ctx: EvalContext) -> JudgeVerdict:
             return await ctx.judge("evaluate this", JudgeVerdict)
 
-        session = EvalSession(judge=StructuredJudge())
-        eval_echo_suite = EvalSuite("eval_echo")
+        session = ProTestSession()
+        eval_echo_suite = EvalSuite("eval_echo", judge=StructuredJudge())
         session.add_suite(eval_echo_suite)
 
         @eval_echo_suite.eval(evaluators=[struct_evaluator])
@@ -361,7 +360,7 @@ class TestTaskResult:
         def check_output(ctx: EvalContext) -> bool:
             return ctx.output == "hello"  # sees str, not TaskResult
 
-        session = EvalSession()
+        session = ProTestSession()
         eval_echo_suite = EvalSuite("eval_echo")
         session.add_suite(eval_echo_suite)
 
@@ -385,7 +384,7 @@ class TestTaskResult:
         def always_pass(ctx: EvalContext) -> bool:
             return True
 
-        session = EvalSession()
+        session = ProTestSession()
         eval_echo_suite = EvalSuite("eval_echo")
         session.add_suite(eval_echo_suite)
 
@@ -423,7 +422,7 @@ class TestTaskResult:
         def always_pass(ctx: EvalContext) -> bool:
             return True
 
-        session = EvalSession()
+        session = ProTestSession()
         eval_echo_suite = EvalSuite("eval_echo")
         session.add_suite(eval_echo_suite)
 

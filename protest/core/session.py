@@ -27,6 +27,7 @@ from protest.entities import (
     normalize_skip,
     normalize_xfail,
 )
+from protest.evals.results_writer import EvalResultsWriter
 from protest.events.bus import EventBus
 from protest.events.types import Event
 from protest.exceptions import InvalidMaxConcurrencyError
@@ -34,6 +35,7 @@ from protest.execution.capture import set_session_teardown_capture
 from protest.filters.keyword import KeywordFilterPlugin
 from protest.filters.kind import KindFilterPlugin
 from protest.filters.suite import SuiteFilterPlugin
+from protest.history.plugin import HistoryPlugin
 from protest.reporting.ascii import AsciiReporter
 from protest.reporting.ctrf import CTRFReporter
 from protest.reporting.log_file import LogFilePlugin
@@ -59,7 +61,7 @@ class ProTestSession:
     def __init__(
         self,
         concurrency: int = 1,
-        history: bool = False,
+        history: bool = True,
         history_dir: Path | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
@@ -268,6 +270,8 @@ class ProTestSession:
             SuiteFilterPlugin,
             KeywordFilterPlugin,
             KindFilterPlugin,
+            HistoryPlugin,
+            EvalResultsWriter,
             RichReporter,
             AsciiReporter,
             CTRFReporter,
@@ -278,12 +282,6 @@ class ProTestSession:
         """Register all standard ProTest plugins for CLI discovery."""
         for plugin_class in self.default_plugin_classes():
             self.use(plugin_class)
-        if self._history:
-            from protest.history.plugin import (  # noqa: PLC0415 — conditional
-                HistoryPlugin,
-            )
-
-            self.register_plugin(HistoryPlugin(history_dir=self._history_dir))
 
     @property
     def plugin_classes(self) -> list[type[PluginBase]]:

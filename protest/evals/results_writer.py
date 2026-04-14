@@ -34,8 +34,8 @@ class EvalResultsWriter(PluginBase):
         self._run_dirs: dict[str, Path] = {}
 
     @classmethod
-    def activate(cls, ctx: PluginContext) -> EvalResultsWriter | None:
-        return None  # Wired explicitly by session
+    def activate(cls, ctx: PluginContext) -> EvalResultsWriter:
+        return cls(history_dir=ctx.get("history_dir"))
 
     def on_test_pass(self, result: TestResult) -> None:
         self._maybe_write(result, passed=True)
