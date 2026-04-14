@@ -68,7 +68,7 @@ async def chatbot(case: Annotated[EvalCase, From(cases)]) -> str:
 
 ## EvalCase
 
-Typed dataclass for eval case data. Provides IDE autocompletion instead of untyped dicts.
+Typed dataclass for eval case data. All eval cases **must** use `EvalCase` — plain dicts are not supported.
 
 ```python
 from protest.evals import EvalCase
