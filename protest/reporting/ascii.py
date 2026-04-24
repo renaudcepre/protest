@@ -1,5 +1,4 @@
 import logging
-import sys
 import traceback
 from pathlib import Path
 from typing import Any
@@ -23,6 +22,7 @@ from protest.entities import (
     TestTeardownInfo,
 )
 from protest.evals.types import EvalSuiteReport
+from protest.execution.capture import real_stdout
 from protest.plugin import PluginBase, PluginContext
 from protest.reporting.format import (
     format_duration as _format_duration,
@@ -200,7 +200,7 @@ class AsciiReporter(PluginBase):
 
     @staticmethod
     def _print_bypass(msg: str) -> None:
-        stream = getattr(sys.stdout, "_original", sys.stdout)
+        stream = real_stdout()
         stream.write(msg + "\n")
         stream.flush()
 
@@ -320,7 +320,7 @@ class AsciiReporter(PluginBase):
     def on_user_print(self, data: Any) -> None:
         msg, raw = data
         text = msg if raw else strip_markup(msg)
-        stream = getattr(sys.stdout, "_original", sys.stdout)
+        stream = real_stdout()
         stream.write(f"       | {text}\n")
         stream.flush()
 

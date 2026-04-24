@@ -21,10 +21,9 @@ from __future__ import annotations
 
 import contextlib
 import re
-import sys
 
 from protest.events.types import Event
-from protest.execution.capture import get_event_bus
+from protest.execution.capture import get_event_bus, real_stderr
 
 
 def print(msg: str, *, raw: bool = False) -> None:
@@ -52,8 +51,7 @@ def print(msg: str, *, raw: bool = False) -> None:
 def _fallback_print(msg: str, raw: bool) -> None:
     """Fallback when no event bus — write to real stderr (bypassing capture)."""
     text = msg if raw else strip_markup(msg)
-    # sys.stderr may be wrapped by TaskAwareStream — get the original
-    stream = getattr(sys.stderr, "_original", sys.stderr)
+    stream = real_stderr()
     stream.write(text + "\n")
     stream.flush()
 

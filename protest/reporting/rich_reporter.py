@@ -1,5 +1,4 @@
 import logging
-import sys
 import traceback
 from argparse import ArgumentParser
 from pathlib import Path
@@ -25,6 +24,7 @@ from protest.entities import (
     TestTeardownInfo,
 )
 from protest.evals.types import EvalSuiteReport
+from protest.execution.capture import real_stdout
 from protest.plugin import PluginBase, PluginContext
 from protest.reporting.format import (
     format_duration as _format_duration,
@@ -152,7 +152,7 @@ class RichReporter(PluginBase):
 
     def _print_bypass(self, message: str) -> None:
         """Print bypassing capture (for lifecycle messages emitted during tests)."""
-        stream = getattr(sys.stdout, "_original", sys.stdout)
+        stream = real_stdout()
         Console(file=stream, highlight=False).print(message)
 
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
@@ -377,7 +377,7 @@ class RichReporter(PluginBase):
     def on_user_print(self, data: Any) -> None:
         msg, raw = data
         # Write to the real stdout, bypassing capture
-        stream = getattr(sys.stdout, "_original", sys.stdout)
+        stream = real_stdout()
         c = Console(file=stream, highlight=False)
         if raw:
             c.print(msg, markup=False)

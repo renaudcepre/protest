@@ -148,6 +148,25 @@ class TaskAwareStream:
         return getattr(self._original, name)
 
 
+def real_stdout() -> TextIO:
+    """Return the real process stdout, bypassing any active capture wrapper.
+
+    When a run is under capture, `sys.stdout` is a `TaskAwareStream` routing
+    writes into per-test buffers; reporters need to bypass that buffering to
+    write their own output (progress, summary) directly to the terminal.
+    """
+    if isinstance(sys.stdout, TaskAwareStream):
+        return sys.stdout._original
+    return sys.stdout
+
+
+def real_stderr() -> TextIO:
+    """Return the real process stderr, bypassing any active capture wrapper."""
+    if isinstance(sys.stderr, TaskAwareStream):
+        return sys.stderr._original
+    return sys.stderr
+
+
 class TaskAwareLogHandler(logging.Handler):
     def emit(self, record: LogRecord) -> None:
         records = _log_records.get()
