@@ -2,10 +2,57 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import subprocess
+import sys
 from pathlib import Path
-from typing import Any
+from typing import IO, TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+if sys.platform == "win32":
+    import msvcrt
+
+    @contextlib.contextmanager
+    def _exclusive_file_lock(f: IO[Any]) -> Iterator[None]:
+        """Hold an exclusive advisory lock on `f` for the block's duration.
+
+        Windows `msvcrt.locking` cannot lock regions beyond EOF, so we lock
+        a sibling `<path>.lock` file that we ensure always has 1 byte. All
+        writers cooperate on this sibling, so concurrent appends to the
+        main file are serialized.
+        """
+        lock_path = Path(f"{f.name}.lock")
+        with open(lock_path, "a+b") as lf:
+            lf.seek(0, 2)
+            if lf.tell() == 0:
+                lf.write(b"\0")
+                lf.flush()
+            lf.seek(0)
+            msvcrt.locking(lf.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                lf.seek(0)
+                msvcrt.locking(lf.fileno(), msvcrt.LK_UNLCK, 1)
+else:
+    import fcntl
+
+    @contextlib.contextmanager
+    def _exclusive_file_lock(f: IO[Any]) -> Iterator[None]:
+        """Hold an exclusive advisory lock on `f` for the block's duration.
+
+        POSIX `fcntl.flock` locks the file descriptor directly; cross-process
+        callers opening the same path will block until the lock is released.
+        """
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
 
 DEFAULT_HISTORY_DIR = Path(".protest")
 HISTORY_FILE = "history.jsonl"
@@ -64,14 +111,16 @@ def _has_suite_kind(entry: dict[str, Any], kind: str) -> bool:
 def append_entry(path: Path, entry: dict[str, Any]) -> None:
     """Append a single JSON entry to a JSONL file.
 
-    Note: no file locking — concurrent writes from separate processes
-    could corrupt the file. In practice, protest runs are single-process
-    (async workers share the same process). If concurrent CI jobs write
-    to the same history file, consider using separate history_dir per job.
+    Serializes concurrent writes from separate processes sharing the same
+    history file (e.g. a CI matrix) via an exclusive advisory lock:
+    `fcntl.flock` on POSIX, `msvcrt.locking` on a sibling `<path>.lock`
+    file on Windows.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a") as f:
-        f.write(json.dumps(entry, default=str) + "\n")
+    line = json.dumps(entry, default=str) + "\n"
+    with open(path, "a") as f, _exclusive_file_lock(f):
+        f.write(line)
+        f.flush()
 
 
 def load_previous_run(
