@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import statistics
 from dataclasses import dataclass, field
-from typing import Any, Generic, Protocol, TypeVar, runtime_checkable
+from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar, runtime_checkable
+
+if TYPE_CHECKING:
+    from protest.entities.events import TestResult
 
 T = TypeVar("T")
 
@@ -172,6 +175,44 @@ class EvalCaseResult:
     judge_output_tokens: int = 0
     judge_cost: float = 0.0
     is_error: bool = False
+
+    @classmethod
+    def from_test_result(cls, result: TestResult) -> EvalCaseResult:
+        """Build from a `TestResult` carrying an `eval_payload`.
+
+        `passed` is derived from `result.error` and `payload.passed`, so both
+        the runner (post-execution) and the results writer (pass/fail hooks)
+        agree on the same computation.
+        """
+        payload = result.eval_payload
+        if payload is None:
+            raise ValueError(
+                f"Cannot build EvalCaseResult from TestResult without "
+                f"eval_payload (node_id={result.node_id})"
+            )
+        return cls(
+            case_name=payload.case_name or "",
+            node_id=result.node_id,
+            scores=tuple(
+                EvalScore(name=name, value=entry.value)
+                for name, entry in payload.scores.items()
+            ),
+            duration=payload.task_duration,
+            passed=result.error is None and payload.passed,
+            inputs=payload.inputs,
+            output=payload.output,
+            expected_output=payload.expected_output,
+            case_hash=payload.case_hash,
+            eval_hash=payload.eval_hash,
+            task_input_tokens=payload.task_input_tokens,
+            task_output_tokens=payload.task_output_tokens,
+            task_cost=payload.task_cost,
+            judge_call_count=payload.judge_call_count,
+            judge_input_tokens=payload.judge_input_tokens,
+            judge_output_tokens=payload.judge_output_tokens,
+            judge_cost=payload.judge_cost,
+            is_error=result.is_fixture_error,
+        )
 
     @property
     def numeric_scores(self) -> dict[str, float]:

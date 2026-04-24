@@ -17,7 +17,7 @@ from protest.entities import (
     SessionSetupInfo,
     TestCounts,
 )
-from protest.evals.types import EvalCaseResult, EvalScore, EvalSuiteReport
+from protest.evals.types import EvalCaseResult, EvalSuiteReport
 from protest.events.types import Event
 from protest.execution.capture import (
     GlobalCapturePatch,
@@ -76,7 +76,7 @@ class TestRunner:
         if not result.is_eval or result.eval_payload is None:
             return
         suite_name = result.suite_path.root_name if result.suite_path else "evals"
-        case_result = _build_eval_case_result(result)
+        case_result = EvalCaseResult.from_test_result(result)
         self._eval_results.setdefault(suite_name, []).append(case_result)
 
     async def _main_loop(self) -> bool:  # noqa: PLR0915
@@ -204,35 +204,3 @@ class TestRunner:
             duration=sum(c.duration for c in eval_cases),
         )
         await self._session.events.emit(Event.EVAL_SUITE_END, report)
-
-
-def _build_eval_case_result(result: TestResult) -> EvalCaseResult:
-    """Build EvalCaseResult from a TestResult with eval_payload."""
-    payload = result.eval_payload
-    assert payload is not None
-    return EvalCaseResult(
-        case_name=payload.case_name or "",
-        node_id=result.node_id,
-        scores=tuple(
-            EvalScore(
-                name=name,
-                value=entry.value,
-            )
-            for name, entry in payload.scores.items()
-        ),
-        duration=payload.task_duration,
-        passed=not (result.error is not None or not payload.passed),
-        inputs=payload.inputs,
-        output=payload.output,
-        expected_output=payload.expected_output,
-        case_hash=payload.case_hash,
-        eval_hash=payload.eval_hash,
-        task_input_tokens=payload.task_input_tokens,
-        task_output_tokens=payload.task_output_tokens,
-        task_cost=payload.task_cost,
-        judge_call_count=payload.judge_call_count,
-        judge_input_tokens=payload.judge_input_tokens,
-        judge_output_tokens=payload.judge_output_tokens,
-        judge_cost=payload.judge_cost,
-        is_error=result.is_fixture_error,
-    )

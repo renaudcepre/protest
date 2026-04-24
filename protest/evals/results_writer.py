@@ -38,16 +38,16 @@ class EvalResultsWriter(PluginBase):
         return cls(history_dir=ctx.get("history_dir"))
 
     def on_test_pass(self, result: TestResult) -> None:
-        self._maybe_write(result, passed=True)
+        self._maybe_write(result)
 
     def on_test_fail(self, result: TestResult) -> None:
-        self._maybe_write(result, passed=False)
+        self._maybe_write(result)
 
-    def _maybe_write(self, result: TestResult, *, passed: bool) -> None:
+    def _maybe_write(self, result: TestResult) -> None:
         if not result.is_eval or result.eval_payload is None:
             return
         suite_name = result.suite_path.root_name if result.suite_path else "evals"
-        case_result = _build_case_result(result, passed)
+        case_result = EvalCaseResult.from_test_result(result)
         self._write_case_file(case_result, suite_name)
 
     def _write_case_file(self, case_result: EvalCaseResult, suite_name: str) -> None:
@@ -63,30 +63,6 @@ class EvalResultsWriter(PluginBase):
         run_dir = self._run_dirs.get(report.suite_name)
         if run_dir:
             print(f"  Results: {run_dir}")
-
-
-def _build_case_result(result: TestResult, passed: bool) -> EvalCaseResult:
-    """Build EvalCaseResult from a TestResult with eval_payload."""
-    payload = result.eval_payload
-    assert payload is not None
-    return EvalCaseResult(
-        case_name=payload.case_name or "",
-        node_id=result.node_id,
-        scores=tuple(
-            EvalScore(
-                name=name,
-                value=entry.value,
-            )
-            for name, entry in payload.scores.items()
-        ),
-        duration=payload.task_duration,
-        passed=passed,
-        inputs=payload.inputs,
-        output=payload.output,
-        expected_output=payload.expected_output,
-        case_hash=payload.case_hash,
-        eval_hash=payload.eval_hash,
-    )
 
 
 # ---------------------------------------------------------------------------
