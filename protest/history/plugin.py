@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING, Any
 
 from protest.entities import SuiteKind
 from protest.evals.suite import EvalSuite
+from protest.history import storage
 from protest.history.collector import collect_env_info, collect_git_info
 from protest.history.storage import (
-    DEFAULT_HISTORY_DIR,
     HISTORY_FILE,
     append_entry,
     load_previous_run,
@@ -38,7 +38,7 @@ class HistoryPlugin(PluginBase):
     description = "Run history tracking"
 
     def __init__(self, history_dir: Path | None = None) -> None:
-        self._history_dir = history_dir or DEFAULT_HISTORY_DIR
+        self._history_dir = history_dir or storage.DEFAULT_HISTORY_DIR
         self._history_file = self._history_dir / HISTORY_FILE
         # Test data
         self._test_suites: dict[str, dict[str, dict[str, Any]]] = {}
