@@ -1,3 +1,4 @@
+import logging
 import sys
 import traceback
 from pathlib import Path
@@ -23,6 +24,12 @@ from protest.entities import (
 )
 from protest.evals.types import EvalSuiteReport
 from protest.plugin import PluginBase, PluginContext
+from protest.reporting.format import (
+    format_duration as _format_duration,
+)
+from protest.reporting.format import (
+    format_usage as _format_usage,
+)
 from protest.reporting.verbosity import Verbosity
 
 _MIN_NODE_ID_PARTS = 2
@@ -51,38 +58,23 @@ def _format_test_name(result: TestResult, include_suite: bool = False) -> str:
     return name
 
 
-MIN_DURATION_THRESHOLD = 0.001
-
-
-def _format_duration(seconds: float) -> str:
-    """Format duration: ms for fast, s for slow."""
-    if seconds < MIN_DURATION_THRESHOLD:
-        return "<1ms"
-    if seconds < 1:
-        return f"{seconds * 1000:.0f}ms"
-    return f"{seconds:.2f}s"
-
-
-_TOKEN_K_THRESHOLD = 1000
-
-
-def _format_tokens(tokens: int) -> str:
-    return (
-        f"{tokens / _TOKEN_K_THRESHOLD:.1f}k"
-        if tokens >= _TOKEN_K_THRESHOLD
-        else str(tokens)
-    )
-
-
-def _format_usage(input_tokens: int, output_tokens: int, cost: float) -> str:
+def _format_eval_scores_inline(result: TestResult) -> str:
+    """Format eval scores for inline display — ASCII version (no glyphs)."""
+    if not result.eval_payload:
+        return ""
     parts: list[str] = []
-    if input_tokens > 0 or output_tokens > 0:
-        parts.append(
-            f"{_format_tokens(input_tokens)} in / {_format_tokens(output_tokens)} out"
-        )
-    if cost > 0:
-        parts.append(f"${cost:.4f}")
-    return ", ".join(parts)
+    for name, entry in result.eval_payload.scores.items():
+        if entry.skipped:
+            parts.append(f"{name}=skip")
+            continue
+        val = entry.value
+        if isinstance(val, bool):
+            parts.append(f"{name}={'pass' if val else 'fail'}")
+        elif isinstance(val, float):
+            parts.append(f"{name}={val:.2f}")
+        else:
+            parts.append(f"{name}={val}")
+    return f" {' '.join(parts)}" if parts else ""
 
 
 class AsciiReporter(PluginBase):
@@ -91,8 +83,15 @@ class AsciiReporter(PluginBase):
     name = "ascii-reporter"
     description = "Plain ASCII reporter"
 
-    def __init__(self, verbosity: int = 0) -> None:
+    def __init__(
+        self,
+        verbosity: int = 0,
+        show_logs: str | None = None,
+        show_output: bool = False,
+    ) -> None:
         self._verbosity = verbosity
+        self._show_logs = show_logs
+        self._show_output = show_output
         self._is_parallel = False
         self._failed_results: list[TestResult] = []
         self._error_results: list[TestResult] = []
@@ -100,8 +99,35 @@ class AsciiReporter(PluginBase):
     @classmethod
     def activate(cls, ctx: PluginContext) -> Self | None:
         if ctx.get("no_color", False):
-            return cls(verbosity=ctx.get("verbosity", 0))
+            return cls(
+                verbosity=ctx.get("verbosity", 0),
+                show_logs=ctx.get("show_logs"),
+                show_output=ctx.get("show_output", False),
+            )
         return None
+
+    def _print_eval_detail(self, result: TestResult) -> None:
+        """Print eval inputs/output/expected (enabled by --show-output or on failure)."""
+        p = result.eval_payload
+        if not p:
+            return
+        if p.inputs is not None:
+            print(f"    | inputs: {str(p.inputs)[:200]}")
+        if p.output is not None:
+            print(f"    | output: {str(p.output)[:200]}")
+        if p.expected_output is not None:
+            print(f"    | expected: {str(p.expected_output)[:200]}")
+
+    def _maybe_show_logs(self, result: TestResult) -> None:
+        """Show captured log records if --show-logs is active."""
+        if not self._show_logs or not result.log_records:
+            return
+        min_level = getattr(logging, self._show_logs.upper(), logging.INFO)
+        for record in result.log_records:
+            if record.levelno >= min_level:
+                print(
+                    f"    LOG [{record.levelname}] {record.name}: {record.getMessage()}"
+                )
 
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
         self._is_parallel = len(items) > 1
@@ -193,7 +219,11 @@ class AsciiReporter(PluginBase):
             retry_suffix = ""
             if result.max_attempts > 1:
                 retry_suffix = f" [attempt {result.attempt}/{result.max_attempts}]"
-            print(f"  OK {name} ({duration}){retry_suffix}")
+            scores_str = _format_eval_scores_inline(result) if result.is_eval else ""
+            print(f"  OK {name} ({duration}){scores_str}{retry_suffix}")
+            if self._show_output and result.is_eval:
+                self._print_eval_detail(result)
+            self._maybe_show_logs(result)
 
     def on_test_fail(self, result: TestResult) -> None:
         name = _format_test_name(result, include_suite=self._is_parallel)
@@ -216,6 +246,9 @@ class AsciiReporter(PluginBase):
         if result.output:
             for line in result.output.rstrip().splitlines():
                 print(f"    | {line}")
+        if result.is_eval:
+            self._print_eval_detail(result)
+        self._maybe_show_logs(result)
 
     def on_test_skip(self, result: TestResult) -> None:
         if self._verbosity >= Verbosity.NORMAL:
@@ -257,14 +290,16 @@ class AsciiReporter(PluginBase):
         return "".join(lines)
 
     def _print_failure_summary(self) -> None:
-        if self._failed_results:
+        non_eval_failures = [r for r in self._failed_results if not r.is_eval]
+        if non_eval_failures:
             print("\n=== FAILURES ===")
-            for result in self._failed_results:
+            for result in non_eval_failures:
                 self._print_failure_detail(result, is_error=False)
 
-        if self._error_results:
+        non_eval_errors = [r for r in self._error_results if not r.is_eval]
+        if non_eval_errors:
             print("\n=== ERRORS ===")
-            for result in self._error_results:
+            for result in non_eval_errors:
                 self._print_failure_detail(result, is_error=True)
 
     def _print_failure_detail(self, result: TestResult, *, is_error: bool) -> None:
@@ -324,7 +359,9 @@ class AsciiReporter(PluginBase):
         print()
 
     def on_session_complete(self, result: SessionResult) -> None:
-        if self._failed_results or self._error_results:
+        has_non_eval_failures = any(not r.is_eval for r in self._failed_results)
+        has_non_eval_errors = any(not r.is_eval for r in self._error_results)
+        if has_non_eval_failures or has_non_eval_errors:
             self._print_failure_summary()
 
         total = (

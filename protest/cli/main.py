@@ -230,6 +230,21 @@ def _create_run_parser() -> argparse.ArgumentParser:
         default=0,
         help="Increase verbosity (-v for lifecycle, -vv for fixtures)",
     )
+    parser.add_argument(
+        "--show-output",
+        dest="show_output",
+        action="store_true",
+        help="Show eval inputs/output/expected per case",
+    )
+    parser.add_argument(
+        "--show-logs",
+        dest="show_logs",
+        nargs="?",
+        const="INFO",
+        default=None,
+        metavar="LEVEL",
+        help="Show captured log records (default: INFO+)",
+    )
     return parser
 
 

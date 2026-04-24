@@ -26,6 +26,12 @@ from protest.entities import (
 )
 from protest.evals.types import EvalSuiteReport
 from protest.plugin import PluginBase, PluginContext
+from protest.reporting.format import (
+    format_duration as _format_duration,
+)
+from protest.reporting.format import (
+    format_usage as _format_usage,
+)
 from protest.reporting.verbosity import Verbosity
 
 
@@ -40,41 +46,6 @@ def _short_label(name: str, node_id: str) -> str:
 def _format_test_name(result: TestResult) -> str:
     label = _short_label(result.name, result.node_id)
     return label.replace("[", "\\[")
-
-
-MIN_DURATION_THRESHOLD = 0.001
-
-
-def _format_duration(seconds: float) -> str:
-    if seconds < MIN_DURATION_THRESHOLD:
-        return "<1ms"
-    if seconds < 1:
-        return f"{seconds * 1000:.0f}ms"
-    return f"{seconds:.2f}s"
-
-
-_TOKEN_K_THRESHOLD = 1000
-
-
-def _format_tokens(tokens: int) -> str:
-    """Format token count: 1234 → '1.2k', 45 → '45'."""
-    return (
-        f"{tokens / _TOKEN_K_THRESHOLD:.1f}k"
-        if tokens >= _TOKEN_K_THRESHOLD
-        else str(tokens)
-    )
-
-
-def _format_usage(input_tokens: int, output_tokens: int, cost: float) -> str:
-    """Format usage stats as 'Xk in / Yk out, $0.0042'."""
-    parts: list[str] = []
-    if input_tokens > 0 or output_tokens > 0:
-        parts.append(
-            f"{_format_tokens(input_tokens)} in / {_format_tokens(output_tokens)} out"
-        )
-    if cost > 0:
-        parts.append(f"${cost:.4f}")
-    return ", ".join(parts)
 
 
 def _format_eval_scores_inline(result: TestResult) -> str:
@@ -130,21 +101,6 @@ class RichReporter(PluginBase):
             dest="no_color",
             action="store_true",
             help="Disable colors (plain ASCII output)",
-        )
-        group.add_argument(
-            "--show-logs",
-            dest="show_logs",
-            nargs="?",
-            const="INFO",
-            default=None,
-            metavar="LEVEL",
-            help="Show captured log records (default: INFO+)",
-        )
-        group.add_argument(
-            "--show-output",
-            dest="show_output",
-            action="store_true",
-            help="Show eval inputs/output/expected per case",
         )
 
     @classmethod

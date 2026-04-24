@@ -35,9 +35,7 @@ yorkshire_cases = ForEach(
             inputs="What should I feed my Yorkshire Terrier?",
             expected="small breed formula, 2-3 meals",
             metadata={"tags": ["factual", "diet"]},
-            evaluators=[
-                contains_keywords(keywords=["small breed", "meals", "avoid"])
-            ],
+            evaluators=[contains_keywords(keywords=["small breed", "meals", "avoid"])],
         ),
         EvalCase(
             name="exercise_needs",
