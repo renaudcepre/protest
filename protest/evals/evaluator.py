@@ -126,11 +126,15 @@ class EvalContext(Generic[InputT, OutputT]):
 class EvalCase:
     """Typed container for eval case data in ForEach.
 
+    `name` is required: it identifies the case across history, reporting, and
+    file-based output. Two cases sharing a name collide silently in those
+    downstream consumers.
+
     Usage::
 
         cases = ForEach([
-            EvalCase(inputs="Who is Marie?", expected="Marie, Resistance", name="lookup"),
-            EvalCase(inputs="Who is Pierre?", expected="Pierre, arrest"),
+            EvalCase(inputs="Who is Marie?", name="marie_lookup", expected="Marie, Resistance"),
+            EvalCase(inputs="Who is Pierre?", name="pierre_lookup", expected="Pierre, arrest"),
         ])
 
         @suite.eval(evaluators=[contains_facts])
@@ -139,13 +143,20 @@ class EvalCase:
     """
 
     inputs: Any
+    name: str
     expected: Any = None
-    name: str = ""
     evaluators: list[Any] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        if not self.name:
+            raise ValueError(
+                "EvalCase.name must be a non-empty string "
+                "(used for history tracking and case identity)."
+            )
+
     def __repr__(self) -> str:
-        return self.name or f"EvalCase({self.inputs!r})"
+        return self.name
 
 
 class ShortCircuit:

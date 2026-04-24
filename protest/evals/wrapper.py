@@ -124,7 +124,7 @@ def _extract_expected(kwargs: dict[str, Any]) -> Any:
 
 def _extract_case_name(kwargs: dict[str, Any], fallback: str) -> str:
     case = _find_case(kwargs)
-    if case is None or not case.name:
+    if case is None:
         return fallback
     return case.name
 

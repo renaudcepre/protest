@@ -20,8 +20,12 @@ def handle_history_command(argv: list[str]) -> None:
     )
     parser.add_argument("--model", type=str, default=None, help="Filter by model name")
     parser.add_argument("--suite", type=str, default=None, help="Filter by suite name")
-    parser.add_argument("--runs", action="store_true", help="Show run-by-run list")
-    parser.add_argument(
+
+    action_group = parser.add_mutually_exclusive_group()
+    action_group.add_argument(
+        "--runs", action="store_true", help="Show run-by-run list"
+    )
+    action_group.add_argument(
         "--show",
         nargs="?",
         const=0,
@@ -30,11 +34,13 @@ def handle_history_command(argv: list[str]) -> None:
         metavar="N",
         help="Detailed panel for Nth most recent run (0=latest)",
     )
-    parser.add_argument(
+    action_group.add_argument(
         "--compare", action="store_true", help="Compare 2 most recent runs"
     )
-    parser.add_argument("--evals", action="store_true", help="Eval runs only")
-    parser.add_argument("--tests", action="store_true", help="Test runs only")
+
+    kind_group = parser.add_mutually_exclusive_group()
+    kind_group.add_argument("--evals", action="store_true", help="Eval runs only")
+    kind_group.add_argument("--tests", action="store_true", help="Test runs only")
     parser.add_argument(
         "--clean-dirty",
         action="store_true",
@@ -313,6 +319,7 @@ class _RichOutput(_Output):
             ("regressed", "Regressions", "red", "-"),
             ("modified", "Modified", "yellow", "⟳"),
             ("new", "New", "cyan", "*"),
+            ("deleted", "Deleted", "red", "✗"),
         ]
         has_any = False
         for key, label, color, marker in labels:
@@ -485,6 +492,7 @@ def _classify_changes(
         "regressed": [],
         "modified": [],
         "new": [],
+        "deleted": [],
     }
     for name, curr in curr_cases.items():
         prev = prev_cases.get(name)
@@ -498,6 +506,9 @@ def _classify_changes(
             result["fixed"].append(name)
         elif not curr.get("passed") and prev.get("passed"):
             result["regressed"].append(name)
+    for name in prev_cases:
+        if name not in curr_cases:
+            result["deleted"].append(name)
     return result
 
 
@@ -507,6 +518,7 @@ def _print_changes(changes: dict[str, list[str]]) -> None:
         "regressed": ("Regressions", "-"),
         "modified": ("Modified", "⟳"),
         "new": ("New", "*"),
+        "deleted": ("Deleted", "✗"),
     }
     has_any = False
     for key, (label, marker) in labels.items():

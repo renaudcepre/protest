@@ -193,8 +193,8 @@ The judge handles structured output — no text parsing needed. See [Judge](#jud
 Different thresholds per case = different evaluator bindings:
 
 ```python
-EvalCase(inputs="easy lookup", evaluators=[keyword_check(keywords=["paris"], min_recall=0.9)]),
-EvalCase(inputs="hard causal", evaluators=[keyword_check(keywords=["paris"], min_recall=0.3)]),
+EvalCase(name="easy_lookup", inputs="easy lookup", evaluators=[keyword_check(keywords=["paris"], min_recall=0.9)]),
+EvalCase(name="hard_causal", inputs="hard causal", evaluators=[keyword_check(keywords=["paris"], min_recall=0.3)]),
 ```
 
 ### ShortCircuit
@@ -225,7 +225,7 @@ evaluators=[not_empty]
 evaluators=[keyword_check(keywords=["python", "async"], min_recall=0.75)]
 
 # Per-case evaluators (added to suite-level)
-EvalCase(inputs="...", evaluators=[llm_judge(rubric="Check factual accuracy")])
+EvalCase(name="factual_accuracy_case", inputs="...", evaluators=[llm_judge(rubric="Check factual accuracy")])
 ```
 
 ### EvalContext
