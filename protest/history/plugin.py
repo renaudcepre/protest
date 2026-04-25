@@ -12,6 +12,7 @@ from protest.history import storage
 from protest.history.collector import collect_env_info, collect_git_info
 from protest.history.storage import (
     HISTORY_FILE,
+    SCHEMA_VERSION,
     append_entry,
     load_previous_run,
 )
@@ -194,6 +195,7 @@ class HistoryPlugin(PluginBase):
             }
 
         entry: dict[str, Any] = {
+            "schema_version": SCHEMA_VERSION,
             "run_id": str(uuid.uuid4()),
             "timestamp": datetime.now(tz=timezone.utc).isoformat(),
             "git": collect_git_info(),

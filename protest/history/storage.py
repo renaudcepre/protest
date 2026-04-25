@@ -6,6 +6,7 @@ import contextlib
 import json
 import subprocess
 import sys
+import warnings
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any
 
@@ -57,6 +58,35 @@ else:
 DEFAULT_HISTORY_DIR = Path(".protest")
 HISTORY_FILE = "history.jsonl"
 
+# JSONL entry schema version. Bump when the on-disk shape changes in a way
+# that older readers can't transparently handle (new required fields,
+# restructured nesting). Entries written before this was introduced have no
+# `schema_version` key and are treated as version 0 (legacy — best-effort).
+SCHEMA_VERSION = 1
+
+_warned_future_versions: set[int] = set()
+
+
+def _is_future_schema(entry: dict[str, Any]) -> bool:
+    """Return True if the entry was written by a newer protest version.
+
+    Entries with `schema_version > SCHEMA_VERSION` are skipped by readers,
+    with a one-time warning per version (avoids N warnings for N such
+    entries).
+    """
+    version = entry.get("schema_version", 0)
+    if not isinstance(version, int) or version <= SCHEMA_VERSION:
+        return False
+    if version not in _warned_future_versions:
+        _warned_future_versions.add(version)
+        warnings.warn(
+            f"history.jsonl contains entries with schema_version={version}, "
+            f"but this protest supports up to {SCHEMA_VERSION}. "
+            f"Those entries will be skipped. Upgrade protest to read them.",
+            stacklevel=3,
+        )
+    return True
+
 
 def load_history(
     history_dir: Path | None = None,
@@ -76,6 +106,8 @@ def load_history(
         try:
             entry = json.loads(line)
         except json.JSONDecodeError:
+            continue
+        if _is_future_schema(entry):
             continue
         if evals_only and not _has_suite_kind(entry, "eval"):
             continue
@@ -136,6 +168,8 @@ def load_previous_run(
         try:
             entry = json.loads(line)
         except json.JSONDecodeError:
+            continue
+        if _is_future_schema(entry):
             continue
         if evals_only and entry.get("evals") is None:
             continue
