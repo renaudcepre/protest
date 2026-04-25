@@ -31,7 +31,6 @@ def collect_env_info() -> dict[str, Any]:
     return {
         "python_version": platform.python_version(),
         "protest_version": _get_pkg_version("protest"),
-        "pydantic_evals_version": _get_pkg_version("pydantic-evals"),
         "hostname": platform.node(),
         "os": sys.platform,
         "ci": ci_provider is not None,
