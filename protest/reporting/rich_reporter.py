@@ -375,14 +375,16 @@ class RichReporter(PluginBase):
                 self._print(f"[dim]{escaped_line}[/]")
 
     def on_user_print(self, data: Any) -> None:
-        msg, raw = data
+        msg, raw, prefix = data
         # Write to the real stdout, bypassing capture
         stream = real_stdout()
         c = Console(file=stream, highlight=False)
         if raw:
             c.print(msg, markup=False)
-        else:
+        elif prefix:
             c.print(f"[dim]       │[/] {msg}")
+        else:
+            c.print(msg)
 
     def on_eval_suite_end(self, report: Any) -> None:
         if not isinstance(report, EvalSuiteReport):

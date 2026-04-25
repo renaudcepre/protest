@@ -13,6 +13,9 @@ Usage::
     # Raw mode — no markup processing
     console.print("debug: raw bytes here", raw=True)
 
+    # Section mode — no per-test prefix (use for suite/session-level lines)
+    console.print(f"  Results: {run_dir}", prefix=False)
+
 Messages go through the event bus → reporters display them inline.
 If no event bus is available (outside a protest session), falls back to stderr.
 """
@@ -26,7 +29,7 @@ from protest.events.types import Event
 from protest.execution.capture import get_event_bus, real_stderr
 
 
-def print(msg: str, *, raw: bool = False) -> None:
+def print(msg: str, *, raw: bool = False, prefix: bool = True) -> None:
     """Print a message that bypasses test capture.
 
     Goes through the event bus so reporters display it at the right place.
@@ -35,6 +38,9 @@ def print(msg: str, *, raw: bool = False) -> None:
     Args:
         msg: The message to print. Supports Rich markup unless raw=True.
         raw: If True, no markup processing — message passed as-is.
+        prefix: If False, omit the per-test indent/bar prefix. Use for
+            suite-level or session-level lines (e.g. "Results: <dir>") that
+            visually belong outside any single case's output block.
     """
     bus = get_event_bus()
     if bus is None:
@@ -49,7 +55,7 @@ def print(msg: str, *, raw: bool = False) -> None:
     # only caller, and console.print is never invoked from a signal handler.
     for handler_entry in bus._handlers.get(Event.USER_PRINT, []):
         with contextlib.suppress(Exception):
-            handler_entry.func((msg, raw))
+            handler_entry.func((msg, raw, prefix))
 
 
 def _fallback_print(msg: str, raw: bool) -> None:

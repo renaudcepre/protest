@@ -63,7 +63,7 @@ class EvalResultsWriter(PluginBase):
             return
         run_dir = self._run_dirs.get(report.suite_name)
         if run_dir:
-            console.print(f"  Results: {run_dir}")
+            console.print(f"  Results: {run_dir}", prefix=False)
 
 
 # ---------------------------------------------------------------------------

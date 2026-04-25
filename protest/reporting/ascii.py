@@ -318,10 +318,11 @@ class AsciiReporter(PluginBase):
                 print(f"  {line}")
 
     def on_user_print(self, data: Any) -> None:
-        msg, raw = data
+        msg, raw, prefix = data
         text = msg if raw else strip_markup(msg)
         stream = real_stdout()
-        stream.write(f"       | {text}\n")
+        line = f"       | {text}\n" if prefix and not raw else f"{text}\n"
+        stream.write(line)
         stream.flush()
 
     def on_eval_suite_end(self, report: Any) -> None:
