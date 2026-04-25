@@ -104,3 +104,68 @@ class TestConsolePrintPayload:
         captured = self._captured_bus(monkeypatch)
         console.print("[raw]", raw=True)
         assert captured == [("[raw]", True, True)]
+
+
+class TestConsolePrintHandlerErrors:
+    """Handler failures must surface on stderr instead of disappearing.
+
+    Earlier behavior: `contextlib.suppress(Exception)` swallowed any handler
+    raise. A reporter bug (e.g. malformed Rich markup) made `console.print`
+    silently no-op — users assumed the call did nothing.
+    """
+
+    def _bus_with_failing_handler(
+        self, monkeypatch: pytest.MonkeyPatch, exc: Exception
+    ) -> None:
+        bus = MagicMock()
+        handler = MagicMock()
+
+        def boom(_payload: tuple) -> None:
+            raise exc
+
+        handler.func = boom
+        bus._handlers = {Event.USER_PRINT: [handler]}
+        monkeypatch.setattr("protest.console.get_event_bus", lambda: bus)
+
+    def test_handler_exception_is_surfaced_on_stderr(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        stderr = io.StringIO()
+        monkeypatch.setattr("protest.console.real_stderr", lambda: stderr)
+        self._bus_with_failing_handler(monkeypatch, RuntimeError("boom"))
+
+        console.print("anything")
+
+        out = stderr.getvalue()
+        assert "console.print: handler raised" in out
+        assert "RuntimeError" in out
+        assert "boom" in out
+
+    def test_loop_continues_when_real_stderr_itself_fails(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Defense in depth: if logging the error also fails, no cascade."""
+
+        def raising_stderr() -> object:
+            raise OSError("stderr broken")
+
+        monkeypatch.setattr("protest.console.real_stderr", raising_stderr)
+        self._bus_with_failing_handler(monkeypatch, RuntimeError("boom"))
+
+        # Must not raise — the outer suppress() is the last line of defense.
+        console.print("anything")
+
+    def test_successful_handler_does_not_touch_stderr(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        stderr = io.StringIO()
+        monkeypatch.setattr("protest.console.real_stderr", lambda: stderr)
+
+        bus = MagicMock()
+        handler = MagicMock()
+        handler.func = lambda _payload: None  # no-op, no raise
+        bus._handlers = {Event.USER_PRINT: [handler]}
+        monkeypatch.setattr("protest.console.get_event_bus", lambda: bus)
+
+        console.print("ok")
+        assert stderr.getvalue() == ""

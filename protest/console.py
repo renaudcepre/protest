@@ -54,8 +54,17 @@ def print(msg: str, *, raw: bool = False, prefix: bool = True) -> None:
     # that API to users. Kept private here — the framework itself is the
     # only caller, and console.print is never invoked from a signal handler.
     for handler_entry in bus._handlers.get(Event.USER_PRINT, []):
-        with contextlib.suppress(Exception):
+        try:
             handler_entry.func((msg, raw, prefix))
+        except Exception as exc:
+            # Surface handler failures (typically: malformed Rich markup) on
+            # real stderr so users don't conclude `console.print` is silently
+            # broken. Wrapped in suppress() to guarantee the loop continues
+            # even if the fallback write itself raises.
+            with contextlib.suppress(Exception):
+                stream = real_stderr()
+                stream.write(f"console.print: handler raised {exc!r}\n")
+                stream.flush()
 
 
 def _fallback_print(msg: str, raw: bool) -> None:
