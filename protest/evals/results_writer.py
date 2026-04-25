@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from protest import console
 from protest.evals.types import EvalCaseResult, EvalScore, EvalSuiteReport
 from protest.plugin import PluginBase
 
@@ -62,7 +63,7 @@ class EvalResultsWriter(PluginBase):
             return
         run_dir = self._run_dirs.get(report.suite_name)
         if run_dir:
-            print(f"  Results: {run_dir}")
+            console.print(f"  Results: {run_dir}")
 
 
 # ---------------------------------------------------------------------------

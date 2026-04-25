@@ -68,9 +68,18 @@ class EvalSuite(ProTestSuite):
         evaluators: list[Any] | None = None,
         tags: list[str] | None = None,
         timeout: float | None = None,
-        judge: Any = None,
+        judge: Judge | None = None,
     ) -> Callable[[FuncT], FuncT]:
-        """Register a scored eval test on this suite."""
+        """Register a scored eval test on this suite.
+
+        Args:
+            evaluators: Per-eval evaluators, appended to suite-level ones.
+            tags: Tags forwarded to the underlying `@suite.test`.
+            timeout: Per-eval timeout in seconds.
+            judge: Override the suite-level judge for this eval only.
+                Useful when one eval needs a stronger model than the rest
+                of the suite. Falls back to `self.judge` when omitted.
+        """
 
         def decorator(func: FuncT) -> FuncT:
             resolved_judge = judge or self._judge

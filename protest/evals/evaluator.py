@@ -255,9 +255,11 @@ class Evaluator:
         if args and isinstance(args[0], EvalContext):
             merged = {**self._kwargs, **kwargs}
             return self._fn(*args, **merged)
-        if kwargs:
-            return Evaluator(self._fn, {**self._kwargs, **kwargs})
-        return self
+        # Re-binding form (no EvalContext): always returns a fresh clone.
+        # Returning `self` for the no-kwargs case used to make `f is f()`
+        # accidentally true, which surprised users expecting `()` to behave
+        # like an evaluator constructor.
+        return Evaluator(self._fn, {**self._kwargs, **kwargs})
 
     def evaluator_identity(self) -> dict[str, Any]:
         identity: dict[str, Any] = {"fn": self._qualname}

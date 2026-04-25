@@ -2,6 +2,27 @@
 
 Evaluate LLM outputs with scored metrics and historical tracking.
 
+## Contents
+
+- [What is an Eval?](#what-is-an-eval)
+- [Quick Start](#quick-start)
+- [How It Works](#how-it-works)
+- [EvalSuite](#evalsuite)
+- [EvalCase](#evalcase)
+- [Evaluators](#evaluators)
+- [Fixtures](#fixtures)
+- [ModelInfo](#modelinfo)
+- [Judge](#judge)
+- [TaskResult (SUT Usage Tracking)](#taskresult-sut-usage-tracking)
+- [Usage Display](#usage-display)
+- [Evaluator Errors](#evaluator-errors)
+- [Name Collisions](#name-collisions)
+- [Multi-Model Sessions](#multi-model-sessions)
+- [CLI](#cli)
+- [Output](#output)
+- [History](#history)
+- [Progress Output](#progress-output)
+
 ## What is an Eval?
 
 A test produces **pass/fail**. An eval produces **scores** — numeric values (0.0–1.0) that measure output quality. Scores are aggregated across cases, tracked over time, and compared between runs.

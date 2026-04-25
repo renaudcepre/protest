@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import sys
 from typing import TYPE_CHECKING, Any
 
@@ -106,8 +107,8 @@ def main() -> None:
 
     commands: dict[str, Any] = {
         "tags": _handle_tags_command,
-        "run": lambda: _handle_run_command(kind_filter="test"),
-        "eval": lambda: _handle_run_command(kind_filter="eval"),
+        "run": functools.partial(_handle_run_command, kind_filter="test"),
+        "eval": functools.partial(_handle_run_command, kind_filter="eval"),
         "history": _handle_history_command,
         "live": _handle_live_command,
     }

@@ -41,7 +41,8 @@ class FakeJudge:
             )
         if output_type is str:
             return JudgeResponse(output=f"judged: {prompt[:20]}")
-        # For dataclass types, try to construct with defaults
+        # Dataclass fallback: caller must use a dataclass whose fields all
+        # have defaults — no real LLM call to derive values from.
         return JudgeResponse(output=output_type())
 
 

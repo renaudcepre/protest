@@ -44,7 +44,9 @@ class HistoryPlugin(PluginBase):
         # Test data
         self._test_suites: dict[str, dict[str, dict[str, Any]]] = {}
         self._suite_kinds: dict[str, SuiteKind] = {}
-        self._default_suite_name: str = "tests"
+        # Bucket name for tests without a suite_path; resolved during setup
+        # to the first non-eval suite name, or kept as the literal fallback.
+        self._default_suite_name: str | None = None
         # Eval data
         self._eval_reports: dict[str, EvalSuiteReport] = {}
         self._eval_suite_metadata: dict[str, dict[str, Any]] = {}
@@ -74,7 +76,7 @@ class HistoryPlugin(PluginBase):
                         "name": suite.judge.name,
                         "provider": suite.judge.provider,
                     }
-            elif not self._default_suite_name or self._default_suite_name == "tests":
+            elif self._default_suite_name is None:
                 self._default_suite_name = suite.name
 
     # -- Test event handlers --------------------------------------------------
@@ -93,7 +95,7 @@ class HistoryPlugin(PluginBase):
         suite_name = (
             result.suite_path.root_name
             if result.suite_path
-            else self._default_suite_name
+            else (self._default_suite_name or "tests")
         )
         if suite_name not in self._test_suites:
             self._test_suites[suite_name] = {}
