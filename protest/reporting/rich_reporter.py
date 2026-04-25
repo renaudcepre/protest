@@ -34,6 +34,11 @@ from protest.reporting.format import (
 )
 from protest.reporting.verbosity import Verbosity
 
+# Per-run pass-rate thresholds for the eval suite color cue.
+# Strict default — green only if every case passes; yellow above half.
+_PERFECT_PASS_RATE = 1.0
+_PARTIAL_PASS_RATE = 0.5
+
 
 def _short_label(name: str, node_id: str) -> str:
     """name + [case_id] from node_id."""
@@ -416,18 +421,16 @@ class RichReporter(PluginBase):
             self._print(
                 f"  [cyan]Eval: {report.suite_name} ({report.total_count} cases)[/]"
             )
-        full_pass = 100
-        half_pass = 50
-        rate_pct = report.pass_rate * full_pass
+        rate = report.pass_rate
         color = (
             "green"
-            if rate_pct >= full_pass
+            if rate >= _PERFECT_PASS_RATE
             else "yellow"
-            if rate_pct >= half_pass
+            if rate >= _PARTIAL_PASS_RATE
             else "red"
         )
         self._print(
-            f"  [{color}]Passed: {report.passed_count}/{report.total_count} ({rate_pct:.1f}%)[/]"
+            f"  [{color}]Passed: {report.passed_count}/{report.total_count} ({rate * 100:.1f}%)[/]"
         )
         if report.total_task_tokens > 0 or report.total_task_cost > 0:
             self._print(

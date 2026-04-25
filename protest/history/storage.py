@@ -181,6 +181,10 @@ def clean_dirty(history_dir: Path | None = None) -> int:
     """Remove entries where git.dirty=True AND git.commit matches current HEAD.
 
     Returns the number of entries removed.
+
+    The read+write happens under `_exclusive_file_lock` so a concurrent
+    `append_entry` cannot land between our read and our truncate (which
+    would silently drop the new entry).
     """
     path = (history_dir or DEFAULT_HISTORY_DIR) / HISTORY_FILE
     if not path.exists():
@@ -197,22 +201,27 @@ def clean_dirty(history_dir: Path | None = None) -> int:
     except (FileNotFoundError, subprocess.CalledProcessError):
         return 0
 
-    lines = path.read_text().strip().splitlines()
-    kept: list[str] = []
-    removed = 0
+    with open(path, "r+") as f, _exclusive_file_lock(f):
+        f.seek(0)
+        lines = f.read().strip().splitlines()
+        kept: list[str] = []
+        removed = 0
 
-    for line in lines:
-        try:
-            entry = json.loads(line)
-        except json.JSONDecodeError:
-            kept.append(line)
-            continue
-        git = entry.get("git") or {}
-        if git.get("dirty") and git.get("commit") == current_commit:
-            removed += 1
-        else:
-            kept.append(line)
+        for line in lines:
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                kept.append(line)
+                continue
+            git = entry.get("git") or {}
+            if git.get("dirty") and git.get("commit") == current_commit:
+                removed += 1
+            else:
+                kept.append(line)
 
-    if removed:
-        path.write_text("\n".join(kept) + "\n" if kept else "")
+        if removed:
+            f.seek(0)
+            f.truncate()
+            if kept:
+                f.write("\n".join(kept) + "\n")
     return removed
