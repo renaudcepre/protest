@@ -226,10 +226,10 @@ Skip expensive evaluators (LLM judges) when cheap ones already fail:
 from protest.evals import ShortCircuit
 
 evaluators=[
-    not_empty,                                     # always runs
+    not_empty,                                                  # always runs
     ShortCircuit([
-        contains_expected_facts(min_score=0.3),    # 0ms — if fail → stop
-        llm_judge(rubric="factual accuracy"),       # 3s — skipped if above fails
+        contains_keywords(keywords=["paris"], min_recall=0.5),  # 0ms — if fail → stop
+        llm_judge(rubric="factual accuracy"),                   # 3s — skipped if above fails
     ]),
 ]
 ```
@@ -243,7 +243,7 @@ evaluators=[
 evaluators=[not_empty]
 
 # With params → call to bind
-evaluators=[keyword_check(keywords=["python", "async"], min_recall=0.75)]
+evaluators=[contains_keywords(keywords=["python", "async"], min_recall=0.75)]
 
 # Per-case evaluators (added to suite-level)
 EvalCase(name="factual_accuracy_case", inputs="...", evaluators=[llm_judge(rubric="Check factual accuracy")])
