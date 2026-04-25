@@ -223,6 +223,9 @@ class EvalCaseResult:
         return tuple(s for s in self.scores if not s.passed)
 
 
+_MIN_VALUES_FOR_PERCENTILES = 2  # statistics.quantiles requires at least 2 inputs
+
+
 @dataclass(frozen=True, slots=True)
 class ScoreStats:
     """Aggregated statistics for a named score across cases."""
@@ -242,12 +245,23 @@ class ScoreStats:
             return cls(name=name, mean=0, median=0, p5=0, p95=0, min=0, max=0, count=0)
         sv = sorted(values)
         n = len(sv)
+        if n >= _MIN_VALUES_FOR_PERCENTILES:
+            # `quantiles(n=20, method='inclusive')` returns 19 cutpoints that
+            # split the data into 20 equal groups. Index 0 = 5%, index 18 = 95%.
+            # Inclusive method interpolates linearly between adjacent values
+            # and clamps to [min, max] — appropriate for bounded scores.
+            cuts = statistics.quantiles(sv, n=20, method="inclusive")
+            p5_value = cuts[0]
+            p95_value = cuts[18]
+        else:
+            # Single value: percentiles are undefined; fall back to that value.
+            p5_value = p95_value = sv[0]
         return cls(
             name=name,
             mean=statistics.mean(sv),
             median=statistics.median(sv),
-            p5=sv[max(0, int(n * 0.05))],
-            p95=sv[min(n - 1, int(n * 0.95))],
+            p5=p5_value,
+            p95=p95_value,
             min=sv[0],
             max=sv[-1],
             count=n,
