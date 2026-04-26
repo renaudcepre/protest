@@ -93,3 +93,23 @@ class InvalidMaxConcurrencyError(ProTestError):
             f"max_concurrency must be >= 1, got {value}. "
             f"Use None for unlimited concurrency."
         )
+
+
+class MultipleEvalCaseParamsError(ProTestError):
+    """Raised when an eval function declares more than one EvalCase parameter.
+
+    Only one EvalCase per eval is supported: it determines the case identity
+    (name, expected, inputs, metadata, per-case evaluators) used by the
+    runner, history, and reporters. Additional EvalCase parameters would be
+    silently ignored downstream.
+    """
+
+    def __init__(self, func_name: str, param_names: list[str]):
+        params = ", ".join(param_names)
+        super().__init__(
+            f"Eval '{func_name}' declares multiple EvalCase parameters: {params}. "
+            f"Only one EvalCase parameter is supported per eval — it is used "
+            f"for case identity (name), expected output, inputs, metadata, "
+            f"and per-case evaluators. Merge the cases into a single EvalCase, "
+            f"or split into separate evals."
+        )

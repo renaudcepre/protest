@@ -309,7 +309,15 @@ class EvalSuiteReport:
         return ScoreStats.from_values(name, values)
 
     def all_score_stats(self) -> list[ScoreStats]:
-        return [self.score_stats(n) for n in sorted(self.score_names())]
+        # Single pass groups values by score name, avoiding O(n_cases x n_names)
+        # of calling score_stats(n) per name. score_stats(name) is preserved as
+        # a public single-name accessor.
+        by_name: dict[str, list[float]] = {}
+        for c in self.cases:
+            for s in c.scores:
+                if s.is_metric:
+                    by_name.setdefault(s.name, []).append(float(s.value))
+        return [ScoreStats.from_values(n, by_name[n]) for n in sorted(by_name)]
 
     @property
     def total_task_input_tokens(self) -> int:

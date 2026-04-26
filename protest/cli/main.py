@@ -175,11 +175,19 @@ def _create_base_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _create_run_parser() -> argparse.ArgumentParser:
-    """Base parser with core run options. Plugin options added dynamically."""
+def _create_run_parser(
+    *,
+    include_eval_options: bool = False,
+) -> argparse.ArgumentParser:
+    """Base parser with core run options. Plugin options added dynamically.
+
+    `include_eval_options=True` adds eval-only flags (e.g. ``--show-output``).
+    Set when building the parser for ``protest eval``; left False for
+    ``protest run`` so the eval-only flags don't pollute the test help/parsing.
+    """
     parser = argparse.ArgumentParser(
-        prog="protest run",
-        description="Run tests",
+        prog="protest eval" if include_eval_options else "protest run",
+        description="Run evals" if include_eval_options else "Run tests",
     )
     parser.add_argument(
         "target",
@@ -232,12 +240,6 @@ def _create_run_parser() -> argparse.ArgumentParser:
         help="Increase verbosity (-v for lifecycle, -vv for fixtures)",
     )
     parser.add_argument(
-        "--show-output",
-        dest="show_output",
-        action="store_true",
-        help="Show eval inputs/output/expected per case",
-    )
-    parser.add_argument(
         "--show-logs",
         dest="show_logs",
         nargs="?",
@@ -246,6 +248,13 @@ def _create_run_parser() -> argparse.ArgumentParser:
         metavar="LEVEL",
         help="Show captured log records (default: INFO+)",
     )
+    if include_eval_options:
+        parser.add_argument(
+            "--show-output",
+            dest="show_output",
+            action="store_true",
+            help="Show eval inputs/output/expected per case",
+        )
     return parser
 
 
@@ -261,6 +270,7 @@ def _handle_history_command() -> None:
 def _handle_run_command(kind_filter: str | None = None) -> None:
     """Handle 'protest run' / 'protest eval' with two-phase parsing."""
     argv = sys.argv[2:]
+    include_eval_options = kind_filter == "eval"
 
     # Phase 1: Parse base args to get target
     base_parser = _create_base_parser()
@@ -268,14 +278,14 @@ def _handle_run_command(kind_filter: str | None = None) -> None:
 
     # If --help without target, show full help with all plugin options
     if ("--help" in remaining or "-h" in remaining) and not base_args.target:
-        full_parser = _create_run_parser()
+        full_parser = _create_run_parser(include_eval_options=include_eval_options)
         for plugin_class in ProTestSession.default_plugin_classes():
             plugin_class.add_cli_options(full_parser)
         full_parser.parse_args(["--help"])
         return
 
     if not base_args.target:
-        _create_run_parser().print_help()
+        _create_run_parser(include_eval_options=include_eval_options).print_help()
         sys.exit(1)
 
     # Phase 2: Load session and register default plugins
@@ -289,7 +299,7 @@ def _handle_run_command(kind_filter: str | None = None) -> None:
     session.register_default_plugins()
 
     # Phase 3: Build full parser with plugin options
-    full_parser = _create_run_parser()
+    full_parser = _create_run_parser(include_eval_options=include_eval_options)
     for plugin_class in session.plugin_classes:
         plugin_class.add_cli_options(full_parser)
 

@@ -10,8 +10,9 @@ from __future__ import annotations
 import asyncio
 import functools
 import time
-from typing import Any
+from typing import Annotated, Any, get_args, get_origin
 
+from protest.di.hints import get_type_hints_compat
 from protest.entities.events import EvalPayload, EvalScoreEntry
 from protest.evals.evaluator import (
     EvalCase,
@@ -22,7 +23,7 @@ from protest.evals.evaluator import (
 )
 from protest.evals.hashing import compute_case_hash, compute_eval_hash
 from protest.evals.types import EvalScore, TaskResult
-from protest.exceptions import FixtureError
+from protest.exceptions import FixtureError, MultipleEvalCaseParamsError
 
 
 def make_eval_wrapper(
@@ -31,6 +32,8 @@ def make_eval_wrapper(
     judge: Any = None,
 ) -> Any:
     """Wrap a function to run evaluators on its return value."""
+
+    _validate_single_evalcase_param(func)
 
     @functools.wraps(func)
     async def eval_wrapper(**kwargs: Any) -> EvalPayload:
@@ -100,6 +103,38 @@ def make_eval_wrapper(
         )
 
     return eval_wrapper
+
+
+# ---------------------------------------------------------------------------
+# Registration-time validation
+# ---------------------------------------------------------------------------
+
+
+def _validate_single_evalcase_param(func: Any) -> None:
+    """Raise MultipleEvalCaseParamsError if `func` has > 1 EvalCase parameter.
+
+    Runs at decorator time. The runtime contract (`_find_case`) silently
+    picks the first EvalCase in kwargs, which would drop the second one's
+    name/expected/inputs/metadata/per-case evaluators downstream. We catch
+    that here so the failure is loud and pinpoints the offending eval.
+
+    Subclasses of EvalCase count: the runtime uses isinstance(_, EvalCase),
+    so any subclass would trigger the same silent drop.
+    """
+    hints = get_type_hints_compat(func)
+    offending: list[str] = []
+    for param_name, annotation in hints.items():
+        if param_name == "return":
+            continue
+        underlying = (
+            get_args(annotation)[0]
+            if get_origin(annotation) is Annotated
+            else annotation
+        )
+        if isinstance(underlying, type) and issubclass(underlying, EvalCase):
+            offending.append(param_name)
+    if len(offending) > 1:
+        raise MultipleEvalCaseParamsError(func.__name__, offending)
 
 
 # ---------------------------------------------------------------------------
