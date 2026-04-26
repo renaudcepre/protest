@@ -24,6 +24,12 @@ Examples:
   protest run demo:session --collect-only   List tests without running
   protest run demo:session --tag slow   Run tests with 'slow' tag
   protest run demo:session -s           Disable capture (show print output)
+  protest eval demo:session             Run all evaluations
+  protest eval demo:session --show-output  Show inputs/output/expected per case
+  protest history --evals               Show eval suite trends
+  protest history --evals --tail 5      Show last 5 entries
+  protest history --evals --compare     Compare 2 most recent runs
+  protest live                          Start live reporter server
   protest tags list demo:session        List all available tags
 """
 

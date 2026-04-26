@@ -29,7 +29,7 @@ from examples.yorkshire.tests.suites.rate_limited import rate_limited_suite
 from examples.yorkshire.tests.suites.seniors.suite import seniors_suite
 from examples.yorkshire.tests.suites.showcase.suite import showcase_suite
 from protest import From, ProTestSession
-from protest.evals import EvalCase, ModelInfo
+from protest.evals import EvalCase, ModelLabel
 from protest.evals.suite import EvalSuite
 
 session = ProTestSession(concurrency=4, history=True)
@@ -48,7 +48,7 @@ session.add_suite(custom_factory_suite)
 
 yorkshire_suite = EvalSuite(
     "yorkshire_eval",
-    model=ModelInfo(name="yorkshire-chatbot-v1", provider="local"),
+    model=ModelLabel(name="yorkshire-chatbot-v1", provider="local"),
 )
 session.add_suite(yorkshire_suite)
 

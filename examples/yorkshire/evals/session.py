@@ -16,7 +16,7 @@ from examples.yorkshire.evals.dataset import (
     yorkshire_cases,
 )
 from protest import From, ProTestSession
-from protest.evals import EvalCase, ModelInfo
+from protest.evals import EvalCase, ModelLabel
 from protest.evals.suite import EvalSuite
 
 session = ProTestSession(
@@ -25,7 +25,7 @@ session = ProTestSession(
 
 yorkshire_suite = EvalSuite(
     "yorkshire_eval",
-    model=ModelInfo(name="yorkshire-chatbot-v1", provider="local"),
+    model=ModelLabel(name="yorkshire-chatbot-v1", provider="local"),
 )
 session.add_suite(yorkshire_suite)
 

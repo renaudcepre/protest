@@ -10,6 +10,7 @@ from protest.evals.evaluator import (
     Verdict,
     evaluator,
 )
+from protest.evals.suite import EvalSuite
 from protest.evals.types import (
     EvalCaseResult,
     EvalScore,
@@ -17,7 +18,7 @@ from protest.evals.types import (
     Judge,
     JudgeInfo,
     JudgeResponse,
-    ModelInfo,
+    ModelLabel,
     ScoreStats,
     TaskResult,
 )
@@ -27,13 +28,14 @@ __all__ = [
     "EvalCaseResult",
     "EvalContext",
     "EvalScore",
+    "EvalSuite",
     "EvalSuiteReport",
     "Evaluator",
     "Judge",
     "JudgeInfo",
     "JudgeResponse",
     "Metric",
-    "ModelInfo",
+    "ModelLabel",
     "Reason",
     "ScoreStats",
     "ShortCircuit",

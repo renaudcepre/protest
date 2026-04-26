@@ -11,7 +11,7 @@ from protest.evals.wrapper import make_eval_wrapper
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from protest.evals.types import Judge, ModelInfo
+    from protest.evals.types import Judge, ModelLabel
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
 
@@ -33,7 +33,7 @@ class EvalSuite(ProTestSuite):
         self,
         name: str,
         *,
-        model: ModelInfo | None = None,
+        model: ModelLabel | None = None,
         judge: Judge | None = None,
         tags: list[str] | None = None,
         max_concurrency: int | None = None,
@@ -60,7 +60,7 @@ class EvalSuite(ProTestSuite):
         return self._judge
 
     @property
-    def model(self) -> ModelInfo | None:
+    def model(self) -> ModelLabel | None:
         return self._model
 
     def eval(

@@ -98,7 +98,11 @@ class AsciiReporter(PluginBase):
 
     @classmethod
     def activate(cls, ctx: PluginContext) -> Self | None:
-        if ctx.get("no_color", False):
+        # Activate when --no-color was passed, OR when `rich` is not
+        # installed (RichReporter would otherwise leave the run silent).
+        import importlib.util  # noqa: PLC0415 — std lib, kept local for clarity
+
+        if ctx.get("no_color", False) or importlib.util.find_spec("rich") is None:
             return cls(
                 verbosity=ctx.get("verbosity", 0),
                 show_logs=ctx.get("show_logs"),

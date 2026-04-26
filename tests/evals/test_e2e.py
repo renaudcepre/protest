@@ -28,7 +28,7 @@ from protest.evals import (
     EvalCase,
     EvalContext,
     Metric,
-    ModelInfo,
+    ModelLabel,
     ShortCircuit,
     Verdict,
     evaluator,
@@ -121,7 +121,7 @@ class TestEvalSetup:
         assert any(s.kind == "eval" for s in session._suites)
 
     def test_model_set_via_suite(self) -> None:
-        suite = EvalSuite("eval_echo", model=ModelInfo(name="test-model"))
+        suite = EvalSuite("eval_echo", model=ModelLabel(name="test-model"))
         assert suite._model is not None
         assert suite._model.name == "test-model"
 
@@ -523,7 +523,7 @@ class TestHistory:
     def _run_eval(self, tmp_path: Path) -> None:
         session = ProTestSession(history_dir=tmp_path)
 
-        eval_echo_suite = EvalSuite("eval_echo", model=ModelInfo(name="test-model"))
+        eval_echo_suite = EvalSuite("eval_echo", model=ModelLabel(name="test-model"))
         session.add_suite(eval_echo_suite)
 
         @eval_echo_suite.eval(evaluators=[fake_accuracy])

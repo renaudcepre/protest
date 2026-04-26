@@ -1,11 +1,10 @@
+import importlib.util
 import logging
 import traceback
 from argparse import ArgumentParser
 from pathlib import Path
 from typing import Any
 
-from rich.console import Console
-from rich.table import Table
 from typing_extensions import Self
 
 from protest.entities import (
@@ -33,6 +32,15 @@ from protest.reporting.format import (
     format_usage as _format_usage,
 )
 from protest.reporting.verbosity import Verbosity
+
+
+# `rich` is an optional dependency. All `from rich...` imports below are
+# done lazily inside methods so that `import protest` works without it;
+# `RichReporter.activate()` returns None when rich is missing, and
+# `AsciiReporter` takes over via its own activate() check.
+def _rich_available() -> bool:
+    return importlib.util.find_spec("rich") is not None
+
 
 # Per-run pass-rate thresholds for the eval suite color cue.
 # Strict default — green only if every case passes; yellow above half.
@@ -84,6 +92,8 @@ class RichReporter(PluginBase):
         show_logs: str | None = None,
         show_output: bool = False,
     ) -> None:
+        from rich.console import Console  # noqa: PLC0415 — optional dep, lazy
+
         self.console = Console(highlight=False)
         self._verbosity = verbosity
         self._show_logs = show_logs
@@ -111,6 +121,9 @@ class RichReporter(PluginBase):
     @classmethod
     def activate(cls, ctx: PluginContext) -> Self | None:
         if ctx.get("no_color", False):
+            return None
+        if not _rich_available():
+            # `rich` is an optional dependency; AsciiReporter takes over.
             return None
         return cls(
             verbosity=ctx.get("verbosity", 0),
@@ -157,6 +170,8 @@ class RichReporter(PluginBase):
 
     def _print_bypass(self, message: str) -> None:
         """Print bypassing capture (for lifecycle messages emitted during tests)."""
+        from rich.console import Console  # noqa: PLC0415 — optional dep, lazy
+
         stream = real_stdout()
         Console(file=stream, highlight=False).print(message)
 
@@ -380,6 +395,8 @@ class RichReporter(PluginBase):
                 self._print(f"[dim]{escaped_line}[/]")
 
     def on_user_print(self, data: Any) -> None:
+        from rich.console import Console  # noqa: PLC0415 — optional dep, lazy
+
         msg, raw, prefix = data
         # Write to the real stdout, bypassing capture
         stream = real_stdout()
@@ -394,6 +411,8 @@ class RichReporter(PluginBase):
     def on_eval_suite_end(self, report: Any) -> None:
         if not isinstance(report, EvalSuiteReport):
             return
+        from rich.table import Table  # noqa: PLC0415 — optional dep, lazy
+
         stats = report.all_score_stats()
         self._print("")
         if stats:

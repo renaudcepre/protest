@@ -23,7 +23,11 @@ from protest.evals.evaluator import (
 )
 from protest.evals.hashing import compute_case_hash, compute_eval_hash
 from protest.evals.types import EvalScore, TaskResult
-from protest.exceptions import FixtureError, MultipleEvalCaseParamsError
+from protest.exceptions import (
+    FixtureError,
+    MultipleEvalCaseParamsError,
+    ScoreNameCollisionError,
+)
 
 
 def make_eval_wrapper(
@@ -75,6 +79,18 @@ def make_eval_wrapper(
             task_duration,
             judge=judge,
         )
+
+        # Detect score-name collisions across evaluators. EvalPayload.scores
+        # is a dict keyed by name; duplicates would silently overwrite each
+        # other downstream. Fail loud so the user can rename the field.
+        seen: set[str] = set()
+        duplicates: list[str] = []
+        for s in scores:
+            if s.name in seen and s.name not in duplicates:
+                duplicates.append(s.name)
+            seen.add(s.name)
+        if duplicates:
+            raise ScoreNameCollisionError(case_name, duplicates)
 
         return EvalPayload(
             case_name=case_name,

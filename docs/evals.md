@@ -11,7 +11,7 @@ Evaluate LLM outputs with scored metrics and historical tracking.
 - [EvalCase](#evalcase)
 - [Evaluators](#evaluators)
 - [Fixtures](#fixtures)
-- [ModelInfo](#modelinfo)
+- [ModelLabel](#modelinfo)
 - [Judge](#judge)
 - [TaskResult (SUT Usage Tracking)](#taskresult-sut-usage-tracking)
 - [Usage Display](#usage-display)
@@ -36,7 +36,7 @@ ProTest evals use the same infrastructure as tests: fixtures, DI, parallelism, t
 from typing import Annotated
 
 from protest import ForEach, From, ProTestSession
-from protest.evals import EvalCase, ModelInfo, evaluator
+from protest.evals import EvalCase, ModelLabel, evaluator
 from protest.evals.evaluators import contains_keywords
 from protest.evals.suite import EvalSuite
 
@@ -47,7 +47,7 @@ cases = ForEach([
 
 session = ProTestSession()
 
-chatbot_suite = EvalSuite("chatbot", model=ModelInfo(name="gpt-4o-mini"))
+chatbot_suite = EvalSuite("chatbot", model=ModelLabel(name="gpt-4o-mini"))
 session.add_suite(chatbot_suite)
 
 @chatbot_suite.eval(evaluators=[contains_keywords(keywords=["Marie"])])
@@ -77,9 +77,9 @@ The rest of the pipeline — fixtures, DI, parallelism, reporters — works iden
 
 ```python
 from protest.evals.suite import EvalSuite
-from protest.evals import ModelInfo
+from protest.evals import ModelLabel
 
-chatbot_suite = EvalSuite("chatbot", model=ModelInfo(name="gpt-4o-mini"))
+chatbot_suite = EvalSuite("chatbot", model=ModelLabel(name="gpt-4o-mini"))
 session.add_suite(chatbot_suite)
 
 @chatbot_suite.eval(evaluators=[my_scorer])
@@ -342,16 +342,12 @@ async def pipeline_eval(
     return await query(driver, case.inputs)
 ```
 
-## ModelInfo
+## ModelLabel
 
-!!! warning "ModelInfo does NOT configure a model"
-
-    Despite the name, `ModelInfo` is a **passive label** for history tracking. It does not route requests, set a temperature, pick a provider, or otherwise touch any LLM. The actual model wiring happens inside *your* task function (or the agent / SDK it calls). `ModelInfo` exists solely so `protest history` can attribute results to a specific model and compare runs side-by-side.
-
-`ModelInfo` records which model produced the results so you can compare runs.
+`ModelLabel` is a **passive label** that ProTest stores in the history alongside each run, so you can attribute results to a specific model and compare runs side-by-side. It does not route requests, set a temperature, pick a provider, or otherwise touch any LLM — the actual model wiring happens inside *your* task function (or the agent / SDK it calls).
 
 ```python
-suite = EvalSuite("pipeline", model=ModelInfo(name="qwen-2.5"))
+suite = EvalSuite("pipeline", model=ModelLabel(name="qwen-2.5"))
 ```
 
 ## Judge
@@ -406,7 +402,7 @@ return JudgeResponse(output=result.output)  # tokens/cost = None, that's fine
 ```python
 suite = EvalSuite(
     "pipeline",
-    model=ModelInfo(name="qwen-2.5"),
+    model=ModelLabel(name="qwen-2.5"),
     judge=PydanticAIJudge(model="gpt-4o-mini", temperature=0),
 )
 ```
@@ -497,7 +493,34 @@ If an evaluator raises an exception (e.g. LLM judge timeout), the case is marked
 
 ## Name Collisions
 
-If two evaluators return dataclasses with the same field name (e.g. both have `accuracy`), the runner prefixes with the evaluator name when it detects a conflict: `llm_judge.accuracy`, `fact_check.accuracy`.
+Each `Verdict` / `Metric` / `Reason` field name from a dataclass evaluator
+becomes a key in the per-case score dict (and in the history file). **Names
+must be unique across all evaluators that run on the same case.**
+
+If two evaluators emit a score under the same name (e.g. both have a
+`detail` field), ProTest raises `ScoreNameCollisionError` at runtime so the
+collision is loud instead of silently overwriting the duplicate. Rename the
+colliding field — typically by prefixing with the evaluator's concept:
+
+```python
+@dataclass
+class SummaryShape:
+    summary_well_formed: Annotated[bool, Verdict]
+    summary_detail: Annotated[str, Reason] = ""        # not just "detail"
+
+@dataclass
+class CategoryMatch:
+    category_matches: Annotated[bool, Verdict]
+    category_match_detail: Annotated[str, Reason] = ""  # not just "detail"
+```
+
+Why no auto-prefix? An evaluator's score name is what users grep for in
+history, scripts, and the markdown artifacts. Auto-prefixing would mean the
+same evaluator's `accuracy` field changes name (`fact_check.accuracy` vs
+plain `accuracy`) depending on which other evaluators are wired in alongside
+it — silently breaking downstream consumers when a new evaluator is added.
+Failing loud and asking you to pick a stable, unique name keeps the score
+identifiers stable across configurations.
 
 ## Multi-Model Sessions
 
@@ -506,8 +529,8 @@ Track which model produced each eval suite's results. Each `EvalSuite` can have 
 ```python
 session = ProTestSession()
 
-pipeline_suite = EvalSuite("pipeline", model=ModelInfo(name="qwen-2.5"))
-chatbot_suite = EvalSuite("chatbot", model=ModelInfo(name="mistral-7b"))
+pipeline_suite = EvalSuite("pipeline", model=ModelLabel(name="qwen-2.5"))
+chatbot_suite = EvalSuite("chatbot", model=ModelLabel(name="mistral-7b"))
 
 session.add_suite(pipeline_suite)
 session.add_suite(chatbot_suite)

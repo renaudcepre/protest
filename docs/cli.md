@@ -13,6 +13,8 @@ protest <command> [options] <target>
 | Command | Description |
 |---------|-------------|
 | `run` | Run tests |
+| `eval` | Run evaluations |
+| `history` | Browse run history (tests and evals) |
 | `live` | Start live reporter server |
 | `tags list` | List tags in a session |
 
@@ -273,6 +275,167 @@ protest run tests:session -k user -x
 # Check everything still works
 protest run tests:session
 ```
+
+---
+
+## protest eval
+
+Run evaluations from a session.
+
+`protest eval` is the eval-suite counterpart of `protest run`. It shares
+the same target format, filters, capture flags and reporting options as
+`run`; the differences are listed below.
+
+### Syntax
+
+```bash
+protest eval <target> [options]
+```
+
+### Options
+
+`protest eval` accepts every option from `protest run` (see above:
+`-n/--concurrency`, `--collect-only`, `-x/--exitfirst`, `-s/--no-capture`,
+`-q/--quiet`, `-v/--verbose`, `--show-logs`, `-t/--tag`, `--no-tag`,
+`-k/--keyword`, `--lf`, `--cache-clear`, `--no-color`, `--ctrf-output`,
+`--no-log-file`, `--app-dir`), plus one eval-only flag:
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--show-output` | Print `inputs` / `output` / `expected` for **every** case (failed cases always print these). | off |
+
+### Examples
+
+```bash
+# Run all evals in a session
+protest eval evals.session:session
+
+# One specific suite
+protest eval evals.session:session::helpdesk_struct
+
+# One ticket by name
+protest eval evals.session:session -k T001
+
+# All cases tagged "cat:hardware"
+protest eval evals.session:session --tag cat:hardware
+
+# Re-run only the cases that failed last time
+protest eval evals.session:session --lf
+
+# Show the input/output of every case (not just failures)
+protest eval evals.session:session --show-output
+```
+
+### Output
+
+Each case prints one line:
+
+```
+✓   classify_ticket_struct[T011] (2ms) category_is_allowed=✓ summary_keyword_recall=1.00 …
+```
+
+After every suite, an aggregate-stats table summarizes the `Metric`
+fields across cases (mean / p50 / p5 / p95). `Verdict` and `Reason`
+fields don't appear in this table — only numeric `Metric` fields do.
+
+Per-case markdown artifacts are written to
+`.protest/results/<suite>_<timestamp>/<case-id>.md`, with the full
+input, output, expected, and per-evaluator scores.
+
+---
+
+## protest history
+
+Browse persisted run history (tests and evals).
+
+Every run appends one entry to `.protest/history.jsonl`; `protest history`
+queries that file with various views.
+
+### Syntax
+
+```bash
+protest history [view] [filters]
+```
+
+Exactly one view is shown at a time. The view defaults to a per-suite
+trend table when no flag is given.
+
+### View flags (mutually exclusive)
+
+| Flag | Description |
+|------|-------------|
+| _(none)_ | Per-suite trend table: pass-rate trend + score arrows |
+| `--runs` | Run-by-run pass rates, most recent first |
+| `--show [N]` | Detailed panel for the Nth most recent run (`0` = latest, default) |
+| `--compare` | Compare the two most recent runs of the same model |
+
+### Filters (apply to all views)
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--tail N`, `-n N` | Limit to the N most recent entries | 10 |
+| `--evals` | Show eval runs only | _all kinds_ |
+| `--tests` | Show test runs only | _all kinds_ |
+| `--model NAME` | Filter by `ModelLabel.name` | _all_ |
+| `--suite NAME` | Filter by suite name | _all_ |
+| `--clean-dirty` | Remove entries from runs made on a dirty working tree | off |
+| `--path DIR` | Use a custom history directory | `.protest/` |
+
+### Reading `--compare`
+
+`--compare` reports four kinds of change between the two most recent
+runs of the same model:
+
+| Marker | Label | Meaning |
+|--------|-------|---------|
+| `+` | Fixed | Case was failing in the previous run, passes now |
+| `-` | Regressions | Case was passing in the previous run, fails now |
+| `⟳` | Modified | Case is recognizable (same name) but its content changed |
+| `*` | New | Case did not exist in the previous run |
+| `✗` | Deleted | Case existed in the previous run, gone now |
+
+The `Modified` line tells you **what** changed by suffixing the case
+name:
+
+- `T001 (case modified)` — `inputs` or `expected` changed (`case_hash`
+  diff)
+- `T001 (scoring modified)` — only the evaluator configuration changed
+  (`eval_hash` diff). Inputs and expected output are intact; you've
+  edited an evaluator or its parameters.
+
+### Examples
+
+```bash
+# Per-suite trend across last 10 runs (default view)
+protest history --evals
+
+# Run-by-run breakdown of the last 5 eval runs
+protest history --evals --runs --tail 5
+
+# Detailed panel for the most recent run
+protest history --evals --show
+
+# Detailed panel for the run before that (1 = next-most-recent)
+protest history --evals --show 1
+
+# Compare the two most recent runs
+protest history --evals --compare
+
+# Filter to one model across all views
+protest history --evals --model qwen-2.5
+
+# Drop runs made on a dirty working tree before any view
+protest history --evals --clean-dirty
+```
+
+### Notes
+
+- When the project is not a git repo, the per-run commit / dirty
+  columns display `?`. `--clean-dirty` is a no-op in that case.
+- `--evals` and `--tests` are mutually exclusive; omit both to see
+  every kind.
+- Per-case detail (input, output, expected, evaluator scores) lives in
+  `.protest/results/`, not in the history file.
 
 ---
 

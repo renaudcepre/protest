@@ -95,7 +95,7 @@ class Judge(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
-class ModelInfo:
+class ModelLabel:
     """Metadata about the model being evaluated."""
 
     name: str
