@@ -112,16 +112,17 @@ cases = ForEach([
 
 The runtime reads case data via attribute access (`case.expected`, `case.metadata`, `case.evaluators`), not by string key. A plain dict would compile fine but blow up at runtime, and you'd lose the IDE refactor/Ctrl+Click affordances. Making `EvalCase` a typed dataclass surfaces typos at import time and keeps the contract one obvious place — same trade-off as `Annotated[T, Use(fn)]` over pytest's name-based fixture lookup.
 
-### Tags via `metadata={"tags": [...]}`
+### Per-case `tags`
 
-Per-case tags piggyback on the `metadata` dict under the reserved key `"tags"`. They flow through the test collector and become first-class on the resulting `TestItem`, so `protest eval --tag slow` works out of the box.
+`EvalCase.tags` is a first-class field. Tags flow through the test collector and become first-class on the resulting `TestItem`, so `protest eval --tag slow` works out of the box. Use `metadata` for any other free-form annotation the framework should ignore.
 
 ```python
 EvalCase(
     inputs="Long doc to summarize…",
     expected="…",
     name="long_doc_case",
-    metadata={"tags": ["slow", "summarization"]},
+    tags=["slow", "summarization"],
+    metadata={"source_dataset": "v3"},  # opaque to the framework
 )
 ```
 

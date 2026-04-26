@@ -1,8 +1,8 @@
-"""Tests for `EvalCase.metadata['tags']` → `TestItem.tags` wiring.
+"""Tests for `EvalCase.tags` → `TestItem.tags` wiring.
 
-Verifies that tags declared on an `EvalCase` via `metadata={'tags': [...]}`
-are merged into the resulting `TestItem.tags` set, so that the
-`TagFilterPlugin` (which filters on `TestItem.tags`) can honor them.
+Verifies that tags declared on an `EvalCase` via `tags=[...]` are merged
+into the resulting `TestItem.tags` set, so that the `TagFilterPlugin`
+(which filters on `TestItem.tags`) can honor them.
 
 Eval functions are defined at module level to avoid `get_type_hints()`
 resolution issues that occur with nested function definitions.
@@ -19,21 +19,19 @@ from protest.evals.suite import EvalSuite
 from protest.tags.plugin import TagFilterPlugin
 
 # Module-level case sources so `get_type_hints()` can resolve Annotated args.
-_single_tagged = [EvalCase(inputs="x", name="c1", metadata={"tags": ["safety"]})]
-_multi_tagged = [
-    EvalCase(inputs="x", name="c1", metadata={"tags": ["safety", "factual"]})
-]
+_single_tagged = [EvalCase(inputs="x", name="c1", tags=["safety"])]
+_multi_tagged = [EvalCase(inputs="x", name="c1", tags=["safety", "factual"])]
 _mixed_cases = [
-    EvalCase(inputs="x", name="c1", metadata={"tags": ["safety"]}),
-    EvalCase(inputs="y", name="c2", metadata={"tags": ["factual"]}),
+    EvalCase(inputs="x", name="c1", tags=["safety"]),
+    EvalCase(inputs="y", name="c2", tags=["factual"]),
     EvalCase(inputs="z", name="c3"),
 ]
 _no_tags_metadata = [
     EvalCase(inputs="x", name="c1", metadata={"other": "value"}),
 ]
 _filter_cases = [
-    EvalCase(inputs="a", name="c_safety", metadata={"tags": ["safety"]}),
-    EvalCase(inputs="b", name="c_factual", metadata={"tags": ["factual"]}),
+    EvalCase(inputs="a", name="c_safety", tags=["safety"]),
+    EvalCase(inputs="b", name="c_factual", tags=["factual"]),
 ]
 
 
@@ -73,7 +71,8 @@ class TestCaseTagsMergedIntoItemTags:
         assert "safety" not in by_name["c2"].tags
         assert by_name["c3"].tags == set()
 
-    def test_case_without_tags_metadata_ok(self) -> None:
+    def test_case_with_metadata_only_has_no_tags(self) -> None:
+        """`metadata` is user-free: no key (including 'tags') is interpreted."""
         items = _collect(_no_tags_metadata)
         assert items[0].tags == set()
 

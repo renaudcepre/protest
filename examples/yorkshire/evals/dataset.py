@@ -18,7 +18,7 @@ yorkshire_cases = ForEach(
             name="weight_question",
             inputs="How much does a Yorkshire Terrier weigh?",
             expected="2-3 kg",
-            metadata={"tags": ["factual", "size"]},
+            tags=["factual", "size"],
             evaluators=[
                 contains_keywords(keywords=["2-3 kg", "teacup", "mini", "standard"])
             ],
@@ -27,21 +27,21 @@ yorkshire_cases = ForEach(
             name="grooming_basics",
             inputs="How often should I brush my Yorkie?",
             expected="daily brushing for long coats",
-            metadata={"tags": ["factual", "grooming"]},
+            tags=["factual", "grooming"],
             evaluators=[contains_keywords(keywords=["daily", "brushing", "long"])],
         ),
         EvalCase(
             name="diet_advice",
             inputs="What should I feed my Yorkshire Terrier?",
             expected="small breed formula, 2-3 meals",
-            metadata={"tags": ["factual", "diet"]},
+            tags=["factual", "diet"],
             evaluators=[contains_keywords(keywords=["small breed", "meals", "avoid"])],
         ),
         EvalCase(
             name="exercise_needs",
             inputs="How much exercise does a Yorkie need?",
             expected="30 minutes daily",
-            metadata={"tags": ["factual", "exercise"]},
+            tags=["factual", "exercise"],
             evaluators=[contains_keywords(keywords=["30 minutes", "walk"])],
         ),
         # --- Temperament ---
@@ -49,7 +49,7 @@ yorkshire_cases = ForEach(
             name="personality",
             inputs="What is the temperament of a Yorkshire Terrier?",
             expected="bold, confident, affectionate",
-            metadata={"tags": ["factual", "temperament"]},
+            tags=["factual", "temperament"],
             evaluators=[
                 contains_keywords(keywords=["bold", "confident", "affectionate"])
             ],
@@ -59,14 +59,14 @@ yorkshire_cases = ForEach(
             name="puppy_care",
             inputs="How do I care for a Yorkshire puppy?",
             expected="extra care, socialization",
-            metadata={"tags": ["factual", "puppies"]},
+            tags=["factual", "puppies"],
             evaluators=[contains_keywords(keywords=["12 months", "socialization"])],
         ),
         EvalCase(
             name="senior_care",
             inputs="My Yorkie is getting old, what should I change?",
             expected="adjust exercise, more vet visits",
-            metadata={"tags": ["factual", "seniors"]},
+            tags=["factual", "seniors"],
             evaluators=[contains_keywords(keywords=["senior", "exercise", "vet"])],
         ),
         # --- Hallucination checks ---
@@ -74,7 +74,7 @@ yorkshire_cases = ForEach(
             name="no_cat_advice",
             inputs="Tell me about Yorkshire Terrier health",
             expected="dental problems, patellar luxation",
-            metadata={"tags": ["safety"]},
+            tags=["safety"],
             evaluators=[
                 does_not_contain(forbidden=["cat", "feline", "persian"]),
                 contains_keywords(keywords=["dental", "health"]),
@@ -84,7 +84,7 @@ yorkshire_cases = ForEach(
             name="no_made_up_breeds",
             inputs="What jobs can a Yorkie do?",
             expected="therapy dogs, companions",
-            metadata={"tags": ["safety"]},
+            tags=["safety"],
             evaluators=[
                 does_not_contain(forbidden=["labrador", "golden retriever", "poodle"]),
                 contains_keywords(keywords=["therapy", "companion"]),
@@ -95,14 +95,14 @@ yorkshire_cases = ForEach(
             name="unknown_topic",
             inputs="What is the GDP of France?",
             expected="I'm not sure",
-            metadata={"tags": ["edge_case"]},
+            tags=["edge_case"],
             evaluators=[contains_keywords(keywords=["not sure", "specialize"])],
         ),
         EvalCase(
             name="empty_question",
             inputs="",
             expected="I'm not sure",
-            metadata={"tags": ["edge_case"]},
+            tags=["edge_case"],
             evaluators=[contains_keywords(keywords=["not sure"])],
         ),
         # --- Known weak spot (chatbot doesn't know about training treats) ---
@@ -110,7 +110,7 @@ yorkshire_cases = ForEach(
             name="training_treats",
             inputs="What treats are best for training a Yorkie?",
             expected="small soft treats, positive reinforcement",
-            metadata={"tags": ["factual", "training"]},
+            tags=["factual", "training"],
             evaluators=[
                 contains_keywords(keywords=["treats", "small", "soft", "reward"])
             ],

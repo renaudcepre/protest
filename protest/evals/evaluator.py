@@ -146,6 +146,7 @@ class EvalCase:
     name: str
     expected: Any = None
     evaluators: list[Any] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:

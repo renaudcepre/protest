@@ -179,10 +179,8 @@ class Collector:
 
             item_tags = tags.copy()
             for value in combination:
-                if isinstance(value, EvalCase):
-                    case_tags = value.metadata.get("tags")
-                    if case_tags:
-                        item_tags.update(case_tags)
+                if isinstance(value, EvalCase) and value.tags:
+                    item_tags.update(value.tags)
 
             items.append(
                 TestItem(
