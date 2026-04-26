@@ -181,7 +181,11 @@ class TestExecutor:
                             timeout=item.timeout,
                         )
                     except asyncio.TimeoutError:
-                        raise asyncio.TimeoutError(
+                        # Raise the builtin TimeoutError, not asyncio.TimeoutError.
+                        # On Python 3.11+ they are aliases, but on 3.10 they are
+                        # distinct classes and reporters/tests check isinstance
+                        # against the builtin.
+                        raise TimeoutError(
                             f"Test exceeded timeout of {item.timeout}s"
                         ) from None
                 else:
