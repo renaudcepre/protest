@@ -61,14 +61,20 @@ def _format_test_name(result: TestResult) -> str:
     return label.replace("[", "\\[")
 
 
-def _format_eval_scores_inline(result: TestResult) -> str:
-    """Format eval scores for inline display (e.g. ' bg_score=0.8 char_id=1.0')."""
+def _format_eval_scores_inline(result: TestResult, short: bool = False) -> str:
+    """Format eval scores for inline display (e.g. ' bg_score=0.8 char_id=1.0').
+
+    When `short=True`, only failing/skipped scores are shown — passing scores
+    are hidden to keep the output readable on large suites.
+    """
     if not result.eval_payload:
         return ""
     parts = []
     for name, entry in result.eval_payload.scores.items():
         if entry.skipped:
             parts.append(f"{name}=⊘")
+            continue
+        if short and entry.passed:
             continue
         val = entry.value
         if isinstance(val, bool):
@@ -91,6 +97,7 @@ class RichReporter(PluginBase):
         verbosity: int = 0,
         show_logs: str | None = None,
         show_output: bool = False,
+        short: bool = False,
     ) -> None:
         from rich.console import Console  # noqa: PLC0415 — optional dep, lazy
 
@@ -98,6 +105,7 @@ class RichReporter(PluginBase):
         self._verbosity = verbosity
         self._show_logs = show_logs
         self._show_output = show_output
+        self._short = short
         self._failed_results: list[TestResult] = []
         self._error_results: list[TestResult] = []
 
@@ -129,6 +137,7 @@ class RichReporter(PluginBase):
             verbosity=ctx.get("verbosity", 0),
             show_logs=ctx.get("show_logs"),
             show_output=ctx.get("show_output", False),
+            short=ctx.get("short", False),
         )
 
     def _print(self, message: str) -> None:
@@ -265,7 +274,11 @@ class RichReporter(PluginBase):
                 retry_suffix = (
                     f" [dim]\\[attempt {result.attempt}/{result.max_attempts}][/]"
                 )
-            scores_str = _format_eval_scores_inline(result) if result.is_eval else ""
+            scores_str = (
+                _format_eval_scores_inline(result, short=self._short)
+                if result.is_eval
+                else ""
+            )
             self._print(
                 f"   [green]✓[/]   {name} [dim]({duration})[/]{scores_str}{retry_suffix}"
             )

@@ -261,6 +261,12 @@ def _create_run_parser(
             action="store_true",
             help="Show eval inputs/output/expected per case",
         )
+        parser.add_argument(
+            "--short",
+            dest="short",
+            action="store_true",
+            help="Compact eval output: only print scores that failed per case",
+        )
     return parser
 
 

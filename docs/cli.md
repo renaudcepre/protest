@@ -349,37 +349,42 @@ input, output, expected, and per-evaluator scores.
 Browse persisted run history (tests and evals).
 
 Every run appends one entry to `.protest/history.jsonl`; `protest history`
-queries that file with various views.
+queries that file via sub-commands.
 
 ### Syntax
 
 ```bash
-protest history [view] [filters]
+protest history <subcommand> [filters]
 ```
 
-Exactly one view is shown at a time. The view defaults to a per-suite
-trend table when no flag is given.
+If no sub-command is given, `list` runs by default — so
+`protest history --tail 5` is equivalent to
+`protest history list --tail 5`.
 
-### View flags (mutually exclusive)
+### Sub-commands
 
-| Flag | Description |
-|------|-------------|
-| _(none)_ | Per-suite trend table: pass-rate trend + score arrows |
-| `--runs` | Run-by-run pass rates, most recent first |
-| `--show [N]` | Detailed panel for the Nth most recent run (`0` = latest, default) |
-| `--compare` | Compare the two most recent runs of the same model |
+| Sub-command | Description |
+|-------------|-------------|
+| `list` | Per-suite trend table: pass-rate trend + score arrows. **Default** when no sub-command is given. |
+| `runs` | Run-by-run pass rates, most recent first. |
+| `show [N]` | Detailed panel for the Nth most recent run (`N=0` = latest, the default). |
+| `compare` | Compare the two most recent runs of the same model. |
+| `clean` | Remove entries from runs made on a dirty working tree. **Dry-run by default** — pass `--apply` to actually modify the file. |
 
-### Filters (apply to all views)
+### Filters (shared by every sub-command)
 
 | Flag | Description | Default |
 |------|-------------|---------|
 | `--tail N`, `-n N` | Limit to the N most recent entries | 10 |
 | `--evals` | Show eval runs only | _all kinds_ |
 | `--tests` | Show test runs only | _all kinds_ |
-| `--model NAME` | Filter by `ModelLabel.name` | _all_ |
-| `--suite NAME` | Filter by suite name | _all_ |
-| `--clean-dirty` | Remove entries from runs made on a dirty working tree | off |
+| `--model NAME` | Keep only suites whose `ModelLabel.name` matches | _all_ |
+| `--suite NAME` | Keep only the suite with this name | _all_ |
 | `--path DIR` | Use a custom history directory | `.protest/` |
+
+`--model` and `--suite` filter at the **suite level**: a run that
+contains *several* suites with different models keeps the entry alive,
+with non-matching suites pruned out of the displayed view.
 
 ### Reading `--compare`
 
@@ -406,32 +411,35 @@ name:
 ### Examples
 
 ```bash
-# Per-suite trend across last 10 runs (default view)
+# Per-suite trend across last 10 eval runs (default sub-command: list)
 protest history --evals
 
 # Run-by-run breakdown of the last 5 eval runs
-protest history --evals --runs --tail 5
+protest history runs --evals --tail 5
 
-# Detailed panel for the most recent run
-protest history --evals --show
+# Detailed panel for the most recent eval run
+protest history show --evals
 
 # Detailed panel for the run before that (1 = next-most-recent)
-protest history --evals --show 1
+protest history show 1 --evals
 
-# Compare the two most recent runs
-protest history --evals --compare
+# Compare the two most recent runs of the same model
+protest history compare --evals
 
-# Filter to one model across all views
-protest history --evals --model qwen-2.5
+# Filter to one model — only suites with this model are shown
+protest history list --evals --model qwen-2.5
 
-# Drop runs made on a dirty working tree before any view
-protest history --evals --clean-dirty
+# Preview which entries `clean` would remove (no file changes)
+protest history clean --evals
+
+# Actually remove dirty entries
+protest history clean --apply
 ```
 
 ### Notes
 
 - When the project is not a git repo, the per-run commit / dirty
-  columns display `?`. `--clean-dirty` is a no-op in that case.
+  columns display `?`. `clean` is a no-op in that case.
 - `--evals` and `--tests` are mutually exclusive; omit both to see
   every kind.
 - Per-case detail (input, output, expected, evaluator scores) lives in

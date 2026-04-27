@@ -1,12 +1,12 @@
 """Tests for `protest history` CLI argument parsing.
 
-Covers mutually-exclusive flag groups:
-- Action: `--runs` / `--show` / `--compare`
-- Kind:   `--evals` / `--tests`
+The CLI uses sub-commands (`list`, `runs`, `show`, `compare`, `clean`).
+`list` is the implicit default when no sub-command is given. Each sub-command
+shares a common filter parser (`--tail`, `--model`, `--suite`, `--evals`/
+`--tests`, `--path`); `--evals` and `--tests` remain mutually exclusive.
 
-`handle_history_command(argv)` triggers `SystemExit(2)` from argparse when a
-mutex is violated. Tests assert both the exit code and the stderr message
-mentioning the conflicting flag.
+`handle_history_command(argv)` triggers `SystemExit(2)` from argparse on a
+parsing error, and `SystemExit(0)` on a clean (possibly empty-history) run.
 """
 
 from __future__ import annotations
@@ -22,42 +22,14 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-class TestActionMutex:
-    """`--runs`, `--show`, `--compare` cannot be combined."""
-
-    @pytest.mark.parametrize(
-        ("argv", "expected_flag"),
-        [
-            (["--runs", "--compare"], "--compare"),
-            (["--compare", "--runs"], "--runs"),
-            (["--runs", "--show", "0"], "--show"),
-            (["--show", "0", "--runs"], "--runs"),
-            (["--show", "1", "--compare"], "--compare"),
-            (["--compare", "--show", "1"], "--show"),
-        ],
-    )
-    def test_mutex_violation_exits_with_error(
-        self,
-        argv: list[str],
-        expected_flag: str,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        with pytest.raises(SystemExit) as exc_info:
-            handle_history_command(argv)
-        assert exc_info.value.code == 2
-        stderr = capsys.readouterr().err
-        assert "not allowed with argument" in stderr
-        assert expected_flag in stderr
-
-
 class TestKindMutex:
-    """`--evals` and `--tests` cannot be combined."""
+    """`--evals` and `--tests` cannot be combined within a sub-command."""
 
     @pytest.mark.parametrize(
         "argv",
         [
-            ["--evals", "--tests"],
-            ["--tests", "--evals"],
+            ["list", "--evals", "--tests"],
+            ["runs", "--tests", "--evals"],
         ],
     )
     def test_mutex_violation_exits_with_error(
@@ -72,49 +44,74 @@ class TestKindMutex:
         assert "not allowed with argument" in stderr
 
 
-class TestMutexIndependence:
-    """Flags from different groups can be combined freely."""
+class TestSubcommandsAccepted:
+    """Each sub-command parses cleanly with shared filters."""
 
     @pytest.mark.parametrize(
-        "action_flags",
+        "argv",
         [
-            ["--runs"],
-            ["--compare"],
-            ["--show", "0"],
+            ["list"],
+            ["runs"],
+            ["show"],
+            ["show", "0"],
+            ["compare"],
+            ["clean"],
+            ["list", "--evals"],
+            ["list", "--tests"],
+            ["runs", "--tail", "5"],
+            ["show", "1", "--model", "gpt-4"],
+            ["compare", "--suite", "my_suite"],
         ],
     )
-    @pytest.mark.parametrize("kind_flag", ["--evals", "--tests"])
-    def test_cross_group_combinations_parse_cleanly(
+    def test_subcommand_parses_with_empty_history(
         self,
-        action_flags: list[str],
-        kind_flag: str,
+        argv: list[str],
         tmp_path: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        argv = [*action_flags, kind_flag, "--path", str(tmp_path)]
+        full_argv = [*argv, "--path", str(tmp_path)]
         with pytest.raises(SystemExit) as exc_info:
-            handle_history_command(argv)
+            handle_history_command(full_argv)
+        # Empty history exits 0 with "No history found." (or similar).
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
         assert "not allowed with argument" not in captured.err
 
 
-class TestHelpShowsMutex:
-    """`--help` output surfaces both mutex groups in usage line."""
+class TestImplicitListDefault:
+    """`protest history` with no sub-command falls back to `list`."""
 
-    def test_help_output_shows_action_and_kind_groups(
-        self, capsys: pytest.CaptureFixture[str]
+    def test_no_subcommand_runs_list(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
+        with pytest.raises(SystemExit) as exc_info:
+            handle_history_command(["--path", str(tmp_path)])
+        assert exc_info.value.code == 0
+
+    def test_no_subcommand_with_only_filter_runs_list(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # `protest history --tail 5 --path X` should be parsed as the
+        # implicit `list --tail 5 --path X`, not as a parser error.
+        with pytest.raises(SystemExit) as exc_info:
+            handle_history_command(["--tail", "5", "--path", str(tmp_path)])
+        assert exc_info.value.code == 0
+
+
+class TestHelpOutput:
+    """`--help` lists the sub-commands."""
+
+    def test_help_lists_subcommands(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit) as exc_info:
             handle_history_command(["--help"])
         assert exc_info.value.code == 0
         stdout = capsys.readouterr().out
-        assert "[--runs | --show [N] | --compare]" in stdout
-        assert "[--evals | --tests]" in stdout
+        for cmd in ("list", "runs", "show", "compare", "clean"):
+            assert cmd in stdout
 
 
 class TestRunsOrderRecentFirst:
-    """`--runs` lists most-recent run first (git log convention).
+    """`runs` lists most-recent run first (git log convention).
 
     Storage returns entries oldest→newest; the CLI must reverse for display
     so #1 maps to the newest run, matching `git stash list` / `git log`.
@@ -148,7 +145,7 @@ class TestRunsOrderRecentFirst:
                 ("2026-04-25T12:00:00", "newabcd"),
             ],
         )
-        handle_history_command(["--runs", "--path", str(tmp_path)])
+        handle_history_command(["runs", "--path", str(tmp_path)])
         stdout = capsys.readouterr().out
         # #1 is newest, #3 is oldest.
         assert stdout.index("#1") < stdout.index("#2") < stdout.index("#3")
@@ -158,3 +155,27 @@ class TestRunsOrderRecentFirst:
         # And #1 lines up with the newest commit, not the oldest.
         newest_line = next(line for line in stdout.splitlines() if "#1" in line)
         assert "newabcd" in newest_line
+
+
+class TestCleanDryRun:
+    """`clean` is dry-run by default; `--apply` to actually modify the file."""
+
+    def test_clean_default_is_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        # Empty history is the simplest case — both modes should report
+        # "No dirty entries to clean." without touching anything.
+        with pytest.raises(SystemExit) as exc_info:
+            handle_history_command(["clean", "--path", str(tmp_path)])
+        assert exc_info.value.code == 0
+        out = capsys.readouterr().out
+        assert "No dirty entries to clean." in out
+
+    def test_clean_apply_flag_accepted(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        with pytest.raises(SystemExit) as exc_info:
+            handle_history_command(["clean", "--apply", "--path", str(tmp_path)])
+        assert exc_info.value.code == 0
+        out = capsys.readouterr().out
+        assert "No dirty entries to clean." in out

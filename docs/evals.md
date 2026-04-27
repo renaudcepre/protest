@@ -29,6 +29,19 @@ A test produces **pass/fail**. An eval produces **scores** — numeric values (0
 
 ProTest evals use the same infrastructure as tests: fixtures, DI, parallelism, tags. An eval is a test that returns a value, scored by evaluators.
 
+!!! tip "First-run expectations: don't expect 100% green"
+
+    Unlike tests, evals are **expected to have failing cases** — that's
+    the signal you're measuring. `protest eval` still exits 1 when any
+    case fails a `Verdict` (so CI surfaces regressions), but the
+    failures are not bugs, they're data points. The aggregate-stats
+    table and `protest history` are designed for this — you watch the
+    metrics drift over time, and use `--compare` to flag actual
+    regressions between runs. If you want a CI gate that only fails on
+    infrastructure errors (fixture / evaluator crashes) and not on
+    case-level scoring, run `protest eval || true` followed by
+    `protest history --compare` to assert no regression.
+
 ## Quick Start
 
 ```python
@@ -38,7 +51,7 @@ from typing import Annotated
 from protest import ForEach, From, ProTestSession
 from protest.evals import EvalCase, ModelLabel, evaluator
 from protest.evals.evaluators import contains_keywords
-from protest.evals.suite import EvalSuite
+from protest.evals import EvalSuite
 
 cases = ForEach([
     EvalCase(inputs="Who is Marie?", expected="Marie, Resistance", name="lookup"),
@@ -76,7 +89,7 @@ The rest of the pipeline — fixtures, DI, parallelism, reporters — works iden
 `EvalSuite` groups eval cases. It's the eval equivalent of `ProTestSuite` — it forces `kind=EVAL` and carries model/judge configuration. Model and judge are suite-level config: each suite declares which model produced its results and which judge scores them.
 
 ```python
-from protest.evals.suite import EvalSuite
+from protest.evals import EvalSuite
 from protest.evals import ModelLabel
 
 chatbot_suite = EvalSuite("chatbot", model=ModelLabel(name="gpt-4o-mini"))
@@ -134,6 +147,28 @@ protest eval evals.session:session --no-tag slow
 ## Evaluators
 
 An evaluator is a function decorated with `@evaluator` that receives an `EvalContext` and returns a verdict.
+
+!!! info "If your eval task returns a non-string output"
+
+    The built-in evaluators (`contains_keywords`, `not_empty`, `max_length`,
+    `matches_regex`, `json_valid`, `word_overlap`) assume `ctx.output` is a
+    string and call methods like `.lower()` on it. They drop in cleanly for
+    summarization, chatbot replies, single-string completions, etc.
+
+    For a structured output (`dict`, `dataclass`, `pydantic.BaseModel`, list
+    of objects, …), the path is to write **custom evaluators** that
+    pick the field they care about. A typical pattern:
+
+    ```python
+    @evaluator
+    def category_matches_expected(ctx: EvalContext) -> CategoryMatch:
+        expected = (ctx.expected_output or {}).get("category")
+        actual = ctx.output.get("category")
+        return CategoryMatch(category_matches=(expected == actual), ...)
+    ```
+
+    See *Structured Evaluator* below and *EvalContext* for the data
+    you can read off `ctx`.
 
 ### Return Types
 

@@ -31,3 +31,29 @@ ProTest automatically uses [Rich](https://rich.readthedocs.io/) for better termi
 ```bash
 uv add rich
 ```
+
+## IDE / type checker setup
+
+ProTest ships a `py.typed` marker, so Pyright, mypy and Pylance pick up
+its type hints once it is installed in the project's virtual env.
+
+If your editor reports `Import "protest" could not be resolved`, point
+your type checker at the right interpreter:
+
+- **VS Code / Pylance**: open the command palette → *Python: Select
+  Interpreter* → choose `.venv/bin/python` (the one `uv` created).
+- **Pyright (CLI/standalone)**: add a `pyrightconfig.json` next to your
+  `pyproject.toml`:
+
+  ```json
+  {
+    "venvPath": ".",
+    "venv": ".venv"
+  }
+  ```
+
+- **mypy**: run via `uv run mypy ...` so it inherits the same
+  interpreter, or set `python_executable` in `mypy.ini`.
+
+Once configured, no extra stub package or plugin is needed — protest
+exposes its own types directly.

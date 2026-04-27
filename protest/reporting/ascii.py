@@ -58,14 +58,20 @@ def _format_test_name(result: TestResult, include_suite: bool = False) -> str:
     return name
 
 
-def _format_eval_scores_inline(result: TestResult) -> str:
-    """Format eval scores for inline display — ASCII version (no glyphs)."""
+def _format_eval_scores_inline(result: TestResult, short: bool = False) -> str:
+    """Format eval scores for inline display — ASCII version (no glyphs).
+
+    When `short=True`, only failing/skipped scores are shown — passing scores
+    are hidden to keep the output readable on large suites.
+    """
     if not result.eval_payload:
         return ""
     parts: list[str] = []
     for name, entry in result.eval_payload.scores.items():
         if entry.skipped:
             parts.append(f"{name}=skip")
+            continue
+        if short and entry.passed:
             continue
         val = entry.value
         if isinstance(val, bool):
@@ -88,10 +94,12 @@ class AsciiReporter(PluginBase):
         verbosity: int = 0,
         show_logs: str | None = None,
         show_output: bool = False,
+        short: bool = False,
     ) -> None:
         self._verbosity = verbosity
         self._show_logs = show_logs
         self._show_output = show_output
+        self._short = short
         self._is_parallel = False
         self._failed_results: list[TestResult] = []
         self._error_results: list[TestResult] = []
@@ -107,6 +115,7 @@ class AsciiReporter(PluginBase):
                 verbosity=ctx.get("verbosity", 0),
                 show_logs=ctx.get("show_logs"),
                 show_output=ctx.get("show_output", False),
+                short=ctx.get("short", False),
             )
         return None
 
@@ -223,7 +232,11 @@ class AsciiReporter(PluginBase):
             retry_suffix = ""
             if result.max_attempts > 1:
                 retry_suffix = f" [attempt {result.attempt}/{result.max_attempts}]"
-            scores_str = _format_eval_scores_inline(result) if result.is_eval else ""
+            scores_str = (
+                _format_eval_scores_inline(result, short=self._short)
+                if result.is_eval
+                else ""
+            )
             print(f"  OK {name} ({duration}){scores_str}{retry_suffix}")
             if self._show_output and result.is_eval:
                 self._print_eval_detail(result)

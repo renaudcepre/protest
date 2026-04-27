@@ -107,22 +107,57 @@ def load_history(
             entry = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if _is_future_schema(entry):
-            continue
-        if evals_only and not _has_suite_kind(entry, "eval"):
-            continue
-        if tests_only and not _has_suite_kind(entry, "test"):
-            continue
-        if model and (entry.get("evals") or {}).get("model") != model:
-            continue
-        if suite and suite not in entry.get("suites", {}):
-            continue
-        entries.append(entry)
+        filtered = _apply_entry_filters(
+            entry,
+            evals_only=evals_only,
+            tests_only=tests_only,
+            model=model,
+            suite=suite,
+        )
+        if filtered is not None:
+            entries.append(filtered)
 
     entries.sort(key=lambda e: e.get("timestamp", ""))
     if n is not None:
         entries = entries[-n:]
     return entries
+
+
+def _apply_entry_filters(
+    entry: dict[str, Any],
+    *,
+    evals_only: bool,
+    tests_only: bool,
+    model: str | None,
+    suite: str | None,
+) -> dict[str, Any] | None:
+    """Apply CLI filters to a single history entry.
+
+    Returns the (possibly suite-pruned) entry to keep, or None to drop it.
+    `--model` / `--suite` operate at the suite level: any suite in the run
+    that matches keeps the entry alive, with non-matching suites pruned out.
+    """
+    if _is_future_schema(entry):
+        return None
+    if evals_only and not _has_suite_kind(entry, "eval"):
+        return None
+    if tests_only and not _has_suite_kind(entry, "test"):
+        return None
+    if model is None and suite is None:
+        return entry
+
+    kept_suites: dict[str, Any] = {}
+    for sname, sdata in entry.get("suites", {}).items():
+        if not isinstance(sdata, dict):
+            continue
+        if model is not None and sdata.get("model") != model:
+            continue
+        if suite is not None and sname != suite:
+            continue
+        kept_suites[sname] = sdata
+    if not kept_suites:
+        return None
+    return {**entry, "suites": kept_suites}
 
 
 def _has_suite_kind(entry: dict[str, Any], kind: str) -> bool:
@@ -177,6 +212,47 @@ def load_previous_run(
     return None
 
 
+def _current_git_head() -> str | None:
+    """Return the current HEAD short SHA, or None when not in a git repo."""
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"],  # noqa: S607
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=True,
+        ).stdout.strip()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+
+
+def is_dirty_entry(entry: dict[str, Any], current_commit: str | None) -> bool:
+    """Return True if `entry` was produced on a dirty working tree at HEAD."""
+    if not current_commit:
+        return False
+    git = entry.get("git") or {}
+    return bool(git.get("dirty")) and git.get("commit") == current_commit
+
+
+def count_dirty_entries(history_dir: Path | None = None) -> int:
+    """Count entries `clean_dirty()` would remove (without touching the file)."""
+    path = (history_dir or DEFAULT_HISTORY_DIR) / HISTORY_FILE
+    if not path.exists():
+        return 0
+    current_commit = _current_git_head()
+    if not current_commit:
+        return 0
+    count = 0
+    for line in path.read_text().strip().splitlines():
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if is_dirty_entry(entry, current_commit):
+            count += 1
+    return count
+
+
 def clean_dirty(history_dir: Path | None = None) -> int:
     """Remove entries where git.dirty=True AND git.commit matches current HEAD.
 
@@ -190,15 +266,8 @@ def clean_dirty(history_dir: Path | None = None) -> int:
     if not path.exists():
         return 0
 
-    try:
-        current_commit = subprocess.run(
-            ["git", "rev-parse", "HEAD"],  # noqa: S607
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=True,
-        ).stdout.strip()
-    except (FileNotFoundError, subprocess.CalledProcessError):
+    current_commit = _current_git_head()
+    if not current_commit:
         return 0
 
     with open(path, "r+") as f, _exclusive_file_lock(f):
@@ -213,8 +282,7 @@ def clean_dirty(history_dir: Path | None = None) -> int:
             except json.JSONDecodeError:
                 kept.append(line)
                 continue
-            git = entry.get("git") or {}
-            if git.get("dirty") and git.get("commit") == current_commit:
+            if is_dirty_entry(entry, current_commit):
                 removed += 1
             else:
                 kept.append(line)

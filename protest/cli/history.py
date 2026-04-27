@@ -7,59 +7,84 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from protest.history.storage import clean_dirty, load_history
+from protest.history.storage import clean_dirty, count_dirty_entries, load_history
+
+
+def _make_common_parser() -> argparse.ArgumentParser:
+    """Filters shared by every `protest history` sub-command."""
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument(
+        "--tail",
+        "-n",
+        type=int,
+        default=10,
+        help="Limit to the N most recent entries (default: 10)",
+    )
+    common.add_argument("--model", type=str, default=None, help="Filter by model name")
+    common.add_argument("--suite", type=str, default=None, help="Filter by suite name")
+    kind_group = common.add_mutually_exclusive_group()
+    kind_group.add_argument("--evals", action="store_true", help="Eval runs only")
+    kind_group.add_argument("--tests", action="store_true", help="Test runs only")
+    common.add_argument(
+        "--path",
+        type=str,
+        default=None,
+        help="History directory (default: .protest/)",
+    )
+    return common
 
 
 def handle_history_command(argv: list[str]) -> None:
-    """Entry point for `protest history`."""
+    """Entry point for `protest history`.
+
+    Sub-commands:
+
+    - ``list`` (default): per-suite trend table.
+    - ``runs``: run-by-run pass rates, most recent first.
+    - ``show [N]``: detailed panel for the Nth most recent run (0=latest).
+    - ``compare``: compare the two most recent runs.
+    - ``clean``: remove entries from runs made on a dirty working tree
+      (dry-run by default; pass ``--apply`` to actually modify the file).
+    """
     parser = argparse.ArgumentParser(
-        prog="protest history", description="Browse run history"
+        prog="protest history",
+        description="Browse run history",
     )
-    parser.add_argument(
-        "--tail", "-n", type=int, default=10, help="Number of entries (default: 10)"
-    )
-    parser.add_argument("--model", type=str, default=None, help="Filter by model name")
-    parser.add_argument("--suite", type=str, default=None, help="Filter by suite name")
+    sub = parser.add_subparsers(dest="action")
+    common = _make_common_parser()
 
-    action_group = parser.add_mutually_exclusive_group()
-    action_group.add_argument(
-        "--runs", action="store_true", help="Show run-by-run list"
-    )
-    action_group.add_argument(
-        "--show",
-        nargs="?",
-        const=0,
+    sub.add_parser("list", parents=[common], help="Per-suite trend (default)")
+    sub.add_parser("runs", parents=[common], help="Run-by-run breakdown")
+    show_p = sub.add_parser("show", parents=[common], help="Detailed panel for one run")
+    show_p.add_argument(
+        "nth",
         type=int,
-        default=None,
-        metavar="N",
-        help="Detailed panel for Nth most recent run (0=latest)",
+        nargs="?",
+        default=0,
+        help="Nth most recent run (0=latest, default: 0)",
     )
-    action_group.add_argument(
-        "--compare", action="store_true", help="Compare 2 most recent runs"
-    )
-
-    kind_group = parser.add_mutually_exclusive_group()
-    kind_group.add_argument("--evals", action="store_true", help="Eval runs only")
-    kind_group.add_argument("--tests", action="store_true", help="Test runs only")
-    parser.add_argument(
-        "--clean-dirty",
+    sub.add_parser("compare", parents=[common], help="Compare 2 most recent runs")
+    clean_p = sub.add_parser("clean", parents=[common], help="Remove dirty entries")
+    clean_p.add_argument(
+        "--apply",
         action="store_true",
-        help="Remove runs with uncommitted changes on current commit.",
-    )
-    parser.add_argument(
-        "--path", type=str, default=None, help="History directory (default: .protest/)"
+        help="Actually modify the history file (default: dry-run, no changes).",
     )
 
+    # Default to `list` when no sub-command is given (so users can still
+    # write `protest history --tail 5` without typing `list`).
+    # `--help` / `-h` go to the parent so users see the sub-command list,
+    # not list-specific options.
+    if not argv:
+        argv = ["list"]
+    elif argv[0].startswith("-") and argv[0] not in ("--help", "-h"):
+        argv = ["list", *argv]
     args = parser.parse_args(argv)
+
     history_dir = Path(args.path) if args.path else None
 
-    if args.clean_dirty:
-        removed = clean_dirty(history_dir=history_dir)
-        print(
-            f"Removed {removed} dirty entries."
-            if removed
-            else "No dirty entries to clean."
-        )
+    if args.action == "clean":
+        _run_clean(history_dir=history_dir, apply=args.apply)
         sys.exit(0)
 
     entries = load_history(
@@ -73,21 +98,47 @@ def handle_history_command(argv: list[str]) -> None:
         print("No history found.")
         sys.exit(0)
 
+    # Apply --tail to entries before any aggregation so the trend view
+    # actually narrows to the requested window (otherwise the per-suite
+    # trend would still cover the full file even with --tail).
+    entries = entries[-args.tail :]
+    _dispatch_view(args.action, getattr(args, "nth", 0), entries)
+
+
+def _run_clean(history_dir: Path | None, *, apply: bool) -> None:
+    if apply:
+        removed = clean_dirty(history_dir=history_dir)
+        print(
+            f"Removed {removed} dirty entries."
+            if removed
+            else "No dirty entries to clean."
+        )
+        return
+    count = count_dirty_entries(history_dir=history_dir)
+    if count:
+        print(
+            f"Would remove {count} dirty entries. "
+            f"Re-run with --apply to actually modify the history file."
+        )
+    else:
+        print("No dirty entries to clean.")
+
+
+def _dispatch_view(action: str, nth: int, entries: list[dict[str, Any]]) -> None:
     out = _get_output()
-    if args.compare:
+    if action == "compare":
         if len(entries) < 2:
             print("Need at least 2 runs to compare.")
             sys.exit(1)
         out.compare(entries[-1], entries[-2])
-    elif args.show is not None:
-        idx = args.show
-        if idx >= len(entries):
+    elif action == "show":
+        if nth >= len(entries):
             print(f"Only {len(entries)} entries available.")
             sys.exit(1)
-        out.detail(entries[-(idx + 1)])
-    elif args.runs:
-        out.runs(entries[-args.tail :])
-    else:
+        out.detail(entries[-(nth + 1)])
+    elif action == "runs":
+        out.runs(entries)
+    else:  # "list" (default)
         out.stats(entries)
 
 
