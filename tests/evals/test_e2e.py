@@ -717,14 +717,14 @@ class TestBuiltinEvaluators:
 
     def test_contains_keywords(self) -> None:
         e = contains_keywords(keywords=["hello", "world"])
-        result = e(self._make_ctx("Hello World"))
+        result = e.run(self._make_ctx("Hello World"))
         assert result.keyword_recall == 1.0
         assert result.all_keywords_present is True
 
     def test_contains_keywords_default_requires_all(self) -> None:
         """Default `min_recall=1.0` means strict: missing one → verdict False."""
         e = contains_keywords(keywords=["hello", "world"])
-        result = e(self._make_ctx("Only hello here"))
+        result = e.run(self._make_ctx("Only hello here"))
         assert result.keyword_recall == 0.5
         assert result.all_keywords_present is False
 
@@ -736,38 +736,38 @@ class TestBuiltinEvaluators:
         Now `recall >= min_recall` applies uniformly.
         """
         e = contains_keywords(keywords=["alpha", "beta"], min_recall=0.0)
-        result = e(self._make_ctx("nothing matches"))
+        result = e.run(self._make_ctx("nothing matches"))
         assert result.keyword_recall == 0.0
         assert result.all_keywords_present is True
 
     def test_contains_keywords_threshold_at_exact_value(self) -> None:
         """Verdict passes when recall equals the threshold exactly."""
         e = contains_keywords(keywords=["alpha", "beta"], min_recall=0.5)
-        result = e(self._make_ctx("only alpha here"))
+        result = e.run(self._make_ctx("only alpha here"))
         assert result.keyword_recall == 0.5
         assert result.all_keywords_present is True
 
     def test_contains_keywords_threshold_just_below(self) -> None:
         """Verdict fails when recall is below the threshold."""
         e = contains_keywords(keywords=["alpha", "beta", "gamma"], min_recall=0.5)
-        result = e(self._make_ctx("only alpha"))
+        result = e.run(self._make_ctx("only alpha"))
         assert abs(result.keyword_recall - 1 / 3) < 1e-9
         assert result.all_keywords_present is False
 
     def test_contains_expected(self) -> None:
         e = contains_expected
-        assert e(self._make_ctx("Hello World", "world")) is True
-        assert e(self._make_ctx("Hello", "world")) is False
+        assert e.run(self._make_ctx("Hello World", "world")) is True
+        assert e.run(self._make_ctx("Hello", "world")) is False
 
     def test_does_not_contain(self) -> None:
         e = does_not_contain(forbidden=["cat", "dog"])
-        assert e(self._make_ctx("Yorkshire")).no_forbidden_words is True
-        assert e(self._make_ctx("I like cats")).no_forbidden_words is False
+        assert e.run(self._make_ctx("Yorkshire")).no_forbidden_words is True
+        assert e.run(self._make_ctx("I like cats")).no_forbidden_words is False
 
     def test_not_empty(self) -> None:
-        assert not_empty(self._make_ctx("hello")) is True
-        assert not_empty(self._make_ctx("")) is False
-        assert not_empty(self._make_ctx("   ")) is False
+        assert not_empty.run(self._make_ctx("hello")) is True
+        assert not_empty.run(self._make_ctx("")) is False
+        assert not_empty.run(self._make_ctx("   ")) is False
 
     def test_not_empty_handles_sized_containers(self) -> None:
         """Sized containers: empty -> False, non-empty -> True.
@@ -779,63 +779,63 @@ class TestBuiltinEvaluators:
         # Helper accepts Any at runtime; type hint is just a default.
         ctx_empty_list: Any = self._make_ctx("")
         ctx_empty_list.output = []
-        assert not_empty(ctx_empty_list) is False
+        assert not_empty.run(ctx_empty_list) is False
 
         ctx_nonempty_list: Any = self._make_ctx("")
         ctx_nonempty_list.output = [1, 2]
-        assert not_empty(ctx_nonempty_list) is True
+        assert not_empty.run(ctx_nonempty_list) is True
 
         ctx_empty_dict: Any = self._make_ctx("")
         ctx_empty_dict.output = {}
-        assert not_empty(ctx_empty_dict) is False
+        assert not_empty.run(ctx_empty_dict) is False
 
         ctx_nonempty_dict: Any = self._make_ctx("")
         ctx_nonempty_dict.output = {"a": 1}
-        assert not_empty(ctx_nonempty_dict) is True
+        assert not_empty.run(ctx_nonempty_dict) is True
 
         ctx_empty_set: Any = self._make_ctx("")
         ctx_empty_set.output = set()
-        assert not_empty(ctx_empty_set) is False
+        assert not_empty.run(ctx_empty_set) is False
 
     def test_not_empty_unsized_objects_still_pass(self) -> None:
         """Non-Sized values (int, float, dataclass): always True (kept as-is)."""
         ctx_int: Any = self._make_ctx("")
         ctx_int.output = 42
-        assert not_empty(ctx_int) is True
+        assert not_empty.run(ctx_int) is True
 
         ctx_zero: Any = self._make_ctx("")
         ctx_zero.output = 0  # 0 is not None, not Sized — still passes.
-        assert not_empty(ctx_zero) is True
+        assert not_empty.run(ctx_zero) is True
 
     def test_max_length(self) -> None:
         e = max_length(max_chars=5)
-        result = e(self._make_ctx("hi"))
+        result = e.run(self._make_ctx("hi"))
         assert result.within_limit is True
-        result = e(self._make_ctx("this is too long"))
+        result = e.run(self._make_ctx("this is too long"))
         assert result.within_limit is False
 
     def test_min_length(self) -> None:
-        assert min_length(min_chars=3)(self._make_ctx("hello")) is True
-        assert min_length(min_chars=10)(self._make_ctx("hi")) is False
+        assert min_length(min_chars=3).run(self._make_ctx("hello")) is True
+        assert min_length(min_chars=10).run(self._make_ctx("hi")) is False
 
     def test_matches_regex(self) -> None:
         e = matches_regex(pattern=r"\d{3}-\d{4}")
-        assert e(self._make_ctx("Call 555-1234")) is True
-        assert e(self._make_ctx("no numbers")) is False
+        assert e.run(self._make_ctx("Call 555-1234")) is True
+        assert e.run(self._make_ctx("no numbers")) is False
 
     def test_json_valid(self) -> None:
         e = json_valid(required_keys=["name"])
-        result = e(self._make_ctx('{"name": "Rex"}'))
+        result = e.run(self._make_ctx('{"name": "Rex"}'))
         assert result.valid_json is True
         assert result.has_required_keys is True
-        result = e(self._make_ctx("not json"))
+        result = e.run(self._make_ctx("not json"))
         assert result.valid_json is False
 
     def test_word_overlap(self) -> None:
         e = word_overlap
-        assert e(self._make_ctx("hello world", "hello world")).overlap == 1.0
-        assert e(self._make_ctx("hello there", "hello world")).overlap == 0.5
-        assert e(self._make_ctx("foo", "hello world")).overlap == 0.0
+        assert e.run(self._make_ctx("hello world", "hello world")).overlap == 1.0
+        assert e.run(self._make_ctx("hello there", "hello world")).overlap == 0.5
+        assert e.run(self._make_ctx("foo", "hello world")).overlap == 0.0
 
 
 # ---------------------------------------------------------------------------

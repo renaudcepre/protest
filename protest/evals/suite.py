@@ -9,8 +9,9 @@ from protest.entities import SuiteKind
 from protest.evals.wrapper import make_eval_wrapper
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
+    from protest.evals.evaluator import Evaluator, ShortCircuit
     from protest.evals.types import Judge, ModelLabel
 
 FuncT = TypeVar("FuncT", bound="Callable[..., object]")
@@ -65,7 +66,7 @@ class EvalSuite(ProTestSuite):
 
     def eval(
         self,
-        evaluators: list[Any] | None = None,
+        evaluators: Sequence[Evaluator | ShortCircuit] | None = None,
         tags: list[str] | None = None,
         timeout: float | None = None,
         judge: Judge | None = None,
@@ -83,9 +84,12 @@ class EvalSuite(ProTestSuite):
 
         def decorator(func: FuncT) -> FuncT:
             resolved_judge = judge or self._judge
+            evals_list: list[Evaluator | ShortCircuit] = (
+                list(evaluators) if evaluators else []
+            )
             wrapper = make_eval_wrapper(
                 func,
-                evaluators or [],
+                evals_list,
                 judge=resolved_judge,
             )
             self.test(tags=tags, timeout=timeout, is_eval=True)(wrapper)

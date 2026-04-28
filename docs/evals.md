@@ -146,7 +146,7 @@ protest eval evals.session:session --no-tag slow
 
 ## Evaluators
 
-An evaluator is a function decorated with `@evaluator` that receives an `EvalContext` and returns a verdict.
+An evaluator is a function decorated with `@evaluator` that receives an `EvalContext` and returns a verdict. The decorator is mandatory: passing a plain function in `evaluators=[...]` raises `TypeError` at registration. The wrapping is what gives the evaluator its identity (used for hashing, history, reporting) and a typed `run(ctx)` method — there's no implicit conversion.
 
 !!! info "If your eval task returns a non-string output"
 

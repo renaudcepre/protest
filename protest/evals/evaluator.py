@@ -1,22 +1,29 @@
-"""Evaluator primitives — functions, not classes.
+"""Evaluator primitives.
 
-An evaluator is a callable that receives an EvalContext and returns a score.
-The @evaluator decorator adds partial-application ergonomics:
+An evaluator is a function decorated with ``@evaluator`` that receives an
+``EvalContext`` and returns a verdict. The decorator wraps the function in an
+``Evaluator`` instance that carries identity (for hashing/history) and exposes
+two distinct entry points:
+
+- ``ev(keyword=value, ...)`` — bind params, return a new ``Evaluator``
+- ``ev.run(ctx)`` — execute against an ``EvalContext`` (called by the framework)
+
+Plain callables are not accepted in ``evaluators=[...]``; use ``@evaluator``::
 
     @evaluator
     def contains_keywords(ctx: EvalContext, keywords: list[str]) -> ContainsKeywordsResult:
         found = sum(1 for k in keywords if k.lower() in ctx.output.lower())
         return ContainsKeywordsResult(keyword_recall=found / len(keywords), ...)
 
-    # Bind params → returns a callable(ctx) via functools.partial
+    # Bind params → returns a fresh Evaluator with kwargs frozen in.
     evaluators=[contains_keywords(keywords=["paris", "france"])]
 
-    # No params → use directly
+    # No params → use the bare Evaluator directly.
     @evaluator
     def not_empty(ctx: EvalContext) -> bool:
         return bool(ctx.output.strip())
 
-Async evaluators are supported:
+Async evaluators are supported::
 
     @evaluator
     async def llm_judge(ctx: EvalContext, model: str = "haiku") -> bool:
@@ -155,6 +162,7 @@ class EvalCase:
                 "EvalCase.name must be a non-empty string "
                 "(used for history tracking and case identity)."
             )
+        validate_evaluators(self.evaluators)
 
     def __repr__(self) -> str:
         return self.name
@@ -177,12 +185,47 @@ class ShortCircuit:
         ]
     """
 
-    def __init__(self, evaluators: list[Any]) -> None:
+    def __init__(self, evaluators: list[Evaluator]) -> None:
+        validate_evaluators(evaluators, _inside_short_circuit=True)
         self.evaluators = evaluators
 
     def evaluator_identity(self) -> dict[str, Any]:
         """Identity is the ordered list of inner evaluators."""
         return {"short_circuit": [_canonical(e) for e in self.evaluators]}
+
+
+def validate_evaluators(
+    items: list[Any], *, _inside_short_circuit: bool = False
+) -> None:
+    """Reject anything that isn't a registered Evaluator (or ShortCircuit).
+
+    ``@evaluator`` is the only sanctioned path to producing an evaluator. Plain
+    callables used to be accepted, which forced a runtime ``isinstance`` dispatch
+    in the executor and made the evaluators list type effectively ``list[Any]``.
+    Failing loud at registration moves the error to the boundary and lets
+    downstream code work on a uniform ``Evaluator | ShortCircuit`` Union.
+    """
+    for item in items:
+        if isinstance(item, Evaluator):
+            continue
+        if isinstance(item, ShortCircuit) and not _inside_short_circuit:
+            continue
+        if _inside_short_circuit and isinstance(item, ShortCircuit):
+            raise TypeError(
+                "ShortCircuit cannot nest another ShortCircuit; "
+                "flatten the inner evaluators into the outer group."
+            )
+        if callable(item):
+            raise TypeError(
+                f"{item!r} is a plain callable, not an Evaluator. "
+                "Wrap it with @evaluator (from protest.evals) so it carries "
+                "identity, hashing, and a typed run() method."
+            )
+        raise TypeError(
+            f"Expected Evaluator or ShortCircuit, got {type(item).__name__}. "
+            "Only objects produced by @evaluator (or ShortCircuit groups) "
+            "are accepted in evaluators=[...]."
+        )
 
 
 class Metric:
@@ -232,10 +275,14 @@ def extract_scores_from_result(result: Any, evaluator_name: str) -> list[Any]:
 class Evaluator:
     """A configured evaluator — callable with identity for hashing.
 
-    Created by the ``@evaluator`` decorator. Supports two calling modes:
+    Created by the ``@evaluator`` decorator. Two distinct entry points:
 
-    1. ``ev(ctx)`` — evaluate directly (first arg is EvalContext)
-    2. ``ev(keyword=value, ...)`` — bind params, return a new Evaluator
+    - ``ev(keyword=value, ...)`` — bind params, return a new Evaluator
+    - ``ev.run(ctx)`` — execute against an EvalContext
+
+    Splitting these avoids the "callable that does two things based on the
+    type of arg[0]" anti-pattern: each method has a single, monomorphic
+    signature that type checkers can read without overload gymnastics.
     """
 
     __slots__ = ("_fn", "_kwargs", "_name", "_qualname")
@@ -252,15 +299,14 @@ class Evaluator:
     def name(self) -> str:
         return self._name
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        if args and isinstance(args[0], EvalContext):
-            merged = {**self._kwargs, **kwargs}
-            return self._fn(*args, **merged)
-        # Re-binding form (no EvalContext): always returns a fresh clone.
-        # Returning `self` for the no-kwargs case used to make `f is f()`
-        # accidentally true, which surprised users expecting `()` to behave
-        # like an evaluator constructor.
+    def __call__(self, **kwargs: Any) -> Evaluator:
+        # Re-binding form: always returns a fresh clone. Returning `self`
+        # for the no-kwargs case used to make `f is f()` accidentally true,
+        # which surprised users expecting `()` to behave like a constructor.
         return Evaluator(self._fn, {**self._kwargs, **kwargs})
+
+    def run(self, ctx: EvalContext[Any, Any], /) -> Any:
+        return self._fn(ctx, **self._kwargs)
 
     def evaluator_identity(self) -> dict[str, Any]:
         identity: dict[str, Any] = {"fn": self._qualname}
@@ -276,5 +322,11 @@ class Evaluator:
 
 
 def evaluator(fn: Callable[..., Any]) -> Evaluator:
-    """Turn a function into a ProTest evaluator."""
+    """Turn a function into a ProTest evaluator.
+
+    The decorator is the only sanctioned way to produce an object that
+    ``evaluators=[...]`` will accept. Plain callables are rejected at
+    registration so the executor can rely on a uniform Union type instead
+    of dispatching at runtime.
+    """
     return Evaluator(fn)

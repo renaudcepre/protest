@@ -20,6 +20,7 @@ from protest.evals.evaluator import (
     Evaluator,
     ShortCircuit,
     extract_scores_from_result,
+    validate_evaluators,
 )
 from protest.evals.hashing import compute_case_hash, compute_eval_hash
 from protest.evals.types import EvalScore, TaskResult
@@ -32,12 +33,13 @@ from protest.exceptions import (
 
 def make_eval_wrapper(
     func: Any,
-    evaluators: list[Any],
+    evaluators: list[Evaluator | ShortCircuit],
     judge: Any = None,
 ) -> Any:
     """Wrap a function to run evaluators on its return value."""
 
     _validate_single_evalcase_param(func)
+    validate_evaluators(evaluators)
 
     @functools.wraps(func)
     async def eval_wrapper(**kwargs: Any) -> EvalPayload:
@@ -207,7 +209,7 @@ def _extract_per_case_evaluators(kwargs: dict[str, Any]) -> list[Any]:
 
 
 async def run_evaluators(
-    evaluators: list[Any],
+    evaluators: list[Evaluator | ShortCircuit],
     case_name: str,
     inputs: Any,
     output: Any,
@@ -216,7 +218,12 @@ async def run_evaluators(
     duration: float,
     judge: Any = None,
 ) -> tuple[list[EvalScore], EvalContext[Any, Any]]:
-    """Run evaluators and return (scores, ctx with judge stats)."""
+    """Run evaluators and return (scores, ctx with judge stats).
+
+    Callers must have validated the list (Evaluator | ShortCircuit only) at the
+    boundary; the loop below trusts the Union and uses isinstance solely to
+    narrow it — the only legitimate isinstance kept in this module.
+    """
     ctx = EvalContext(
         name=case_name,
         inputs=inputs,
@@ -233,40 +240,35 @@ async def run_evaluators(
             scores.extend(await _run_short_circuit(ev.evaluators, ctx))
             continue
 
-        evaluator_name = ev.name if isinstance(ev, Evaluator) else type(ev).__name__
         try:
-            raw = ev(ctx)
+            raw = ev.run(ctx)
             result = await raw if asyncio.iscoroutine(raw) else raw
-            scores.extend(extract_scores_from_result(result, evaluator_name))
+            scores.extend(extract_scores_from_result(result, ev.name))
         except Exception as exc:
-            raise FixtureError(f"evaluator '{evaluator_name}'", exc) from exc
+            raise FixtureError(f"evaluator '{ev.name}'", exc) from exc
 
     return scores, ctx
 
 
 async def _run_short_circuit(
-    evaluators: list[Any],
+    evaluators: list[Evaluator],
     ctx: EvalContext[Any, Any],
 ) -> list[EvalScore]:
     """Run evaluators in order, stop at first Verdict=False."""
     scores: list[EvalScore] = []
     for i, ev in enumerate(evaluators):
-        evaluator_name = ev.name if isinstance(ev, Evaluator) else type(ev).__name__
         try:
-            raw = ev(ctx)
+            raw = ev.run(ctx)
             result = await raw if asyncio.iscoroutine(raw) else raw
         except Exception as exc:
-            raise FixtureError(f"evaluator '{evaluator_name}'", exc) from exc
-        extracted = extract_scores_from_result(result, evaluator_name)
+            raise FixtureError(f"evaluator '{ev.name}'", exc) from exc
+        extracted = extract_scores_from_result(result, ev.name)
         scores.extend(extracted)
         if any(s.is_verdict and not s.passed for s in extracted):
             # Mark remaining evaluators as skipped
             for skipped_ev in evaluators[i + 1 :]:
-                skipped_name = (
-                    skipped_ev.name
-                    if isinstance(skipped_ev, Evaluator)
-                    else type(skipped_ev).__name__
+                scores.append(
+                    EvalScore(name=skipped_ev.name, value=False, skipped=True)
                 )
-                scores.append(EvalScore(name=skipped_name, value=False, skipped=True))
             break
     return scores
