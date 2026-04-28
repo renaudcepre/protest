@@ -157,6 +157,72 @@ class TestRunsOrderRecentFirst:
         assert "newabcd" in newest_line
 
 
+class TestCompareRefusesMixedModels:
+    """`compare` must not silently diff across models — would cause false regressions.
+
+    When the two most recent runs each contain suites with several distinct
+    `ModelLabel.name`s (e.g. `rules_v1` + `rules_v2` in a multi-model
+    session), aplatting the cases by name conflates contexts: a case-id that
+    passes under one model and fails under the other shows up as a phantom
+    regression. The CLI rejects this and asks the user to disambiguate via
+    `--model NAME` or `--suite NAME`.
+    """
+
+    def _seed_two_model_run(self, tmp_path: Path, run_id: str, ts: str) -> None:
+        path = tmp_path / HISTORY_FILE
+        append_entry(
+            path,
+            {
+                "schema_version": 1,
+                "run_id": run_id,
+                "timestamp": ts,
+                "git": {"commit_short": run_id},
+                "suites": {
+                    "helpdesk_v1": {
+                        "kind": "eval",
+                        "model": "rules_v1",
+                        "passed": 9,
+                        "total_cases": 18,
+                        "cases": {"T010": {"passed": False, "case_hash": "h1"}},
+                    },
+                    "helpdesk_v2": {
+                        "kind": "eval",
+                        "model": "rules_v2",
+                        "passed": 11,
+                        "total_cases": 18,
+                        "cases": {"T010": {"passed": True, "case_hash": "h1"}},
+                    },
+                },
+            },
+        )
+
+    def test_compare_rejects_mixed_models_without_filter(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        self._seed_two_model_run(tmp_path, "aaa1111", "2026-04-27T10:00:00")
+        self._seed_two_model_run(tmp_path, "bbb2222", "2026-04-27T11:00:00")
+        with pytest.raises(SystemExit) as exc_info:
+            handle_history_command(["compare", "--evals", "--path", str(tmp_path)])
+        assert exc_info.value.code == 1
+        out = capsys.readouterr().out
+        assert "multiple models" in out
+        assert "rules_v1" in out and "rules_v2" in out
+        assert "--model" in out
+
+    def test_compare_with_model_filter_succeeds(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        self._seed_two_model_run(tmp_path, "aaa1111", "2026-04-27T10:00:00")
+        self._seed_two_model_run(tmp_path, "bbb2222", "2026-04-27T11:00:00")
+        # `--model rules_v1` prunes helpdesk_v2 out of each entry, leaving
+        # a single-model comparison that should succeed (no false regression).
+        handle_history_command(
+            ["compare", "--evals", "--model", "rules_v1", "--path", str(tmp_path)]
+        )
+        out = capsys.readouterr().out
+        assert "multiple models" not in out
+
+
 class TestCleanDryRun:
     """`clean` is dry-run by default; `--apply` to actually modify the file."""
 

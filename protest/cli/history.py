@@ -130,6 +130,19 @@ def _dispatch_view(action: str, nth: int, entries: list[dict[str, Any]]) -> None
         if len(entries) < 2:
             print("Need at least 2 runs to compare.")
             sys.exit(1)
+        # Refuse to compare across multiple models silently. When two runs
+        # contain suites with several distinct model labels (e.g. rules_v1
+        # and rules_v2 in the same multi-model session), the case-name diff
+        # would conflate the two contexts and emit phantom regressions.
+        # Force the user to disambiguate via --model NAME or --suite NAME.
+        models = _models_in_entries([entries[-1], entries[-2]])
+        if len(models) > 1:
+            print(
+                "Cannot compare runs that contain multiple models: "
+                f"{sorted(models)}. Pass --model NAME to compare runs of "
+                "the same model, or --suite NAME to focus on one suite."
+            )
+            sys.exit(1)
         out.compare(entries[-1], entries[-2])
     elif action == "show":
         if nth >= len(entries):
@@ -140,6 +153,18 @@ def _dispatch_view(action: str, nth: int, entries: list[dict[str, Any]]) -> None
         out.runs(entries)
     else:  # "list" (default)
         out.stats(entries)
+
+
+def _models_in_entries(entries: list[dict[str, Any]]) -> set[str]:
+    """Collect distinct, non-empty model labels across the given entries."""
+    models: set[str] = set()
+    for entry in entries:
+        for sdata in entry.get("suites", {}).values():
+            if isinstance(sdata, dict):
+                model = sdata.get("model")
+                if model:
+                    models.add(model)
+    return models
 
 
 # ---------------------------------------------------------------------------

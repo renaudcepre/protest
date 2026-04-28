@@ -27,8 +27,9 @@ Examples:
   protest eval demo:session             Run all evaluations
   protest eval demo:session --show-output  Show inputs/output/expected per case
   protest history --evals               Show eval suite trends
-  protest history --evals --tail 5      Show last 5 entries
-  protest history --evals --compare     Compare 2 most recent runs
+  protest history runs --evals          Run-by-run breakdown
+  protest history compare --evals       Compare 2 most recent runs
+  protest history clean                 Preview removable dirty entries
   protest live                          Start live reporter server
   protest tags list demo:session        List all available tags
 """
