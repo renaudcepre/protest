@@ -14,7 +14,7 @@ Run only evals:
 from typing import Annotated
 
 from examples.yorkshire.app.chatbot import yorkshire_chatbot
-from examples.yorkshire.evals.dataset import suite_evaluators, yorkshire_cases
+from examples.yorkshire.evals.cases import suite_evaluators, yorkshire_cases
 from examples.yorkshire.tests.fixtures import (
     configure_kennel_logging,
     kennel,

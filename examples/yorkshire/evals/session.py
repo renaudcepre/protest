@@ -11,7 +11,7 @@ Run with:
 from typing import Annotated
 
 from examples.yorkshire.app.chatbot import yorkshire_chatbot
-from examples.yorkshire.evals.dataset import (
+from examples.yorkshire.evals.cases import (
     suite_evaluators,
     yorkshire_cases,
 )

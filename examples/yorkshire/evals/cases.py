@@ -1,4 +1,4 @@
-"""Dataset for the Yorkshire chatbot evals."""
+"""Eval cases for the Yorkshire chatbot."""
 
 from __future__ import annotations
 
