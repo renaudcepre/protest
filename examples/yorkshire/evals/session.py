@@ -5,7 +5,7 @@ Run with:
     protest eval examples.yorkshire.evals.session:session -n 4
     protest eval examples.yorkshire.evals.session:session --tag safety
     protest eval examples.yorkshire.evals.session:session --last-failed
-    protest history --evals --show
+    protest history show --evals
 """
 
 from typing import Annotated

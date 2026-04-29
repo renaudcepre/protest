@@ -40,7 +40,7 @@ ProTest evals use the same infrastructure as tests: fixtures, DI, parallelism, t
     regressions between runs. If you want a CI gate that only fails on
     infrastructure errors (fixture / evaluator crashes) and not on
     case-level scoring, run `protest eval || true` followed by
-    `protest history --compare` to assert no regression.
+    `protest history compare` to assert no regression.
 
 ## Quick Start
 
@@ -578,7 +578,7 @@ async def pipeline_eval(case, driver) -> str: ...
 async def chatbot_eval(case, deps) -> str: ...
 ```
 
-`protest history --runs` shows the model per suite:
+`protest history runs` shows the model per suite:
 
 ```
 #1   2026-03-28T09:14  57/81 (70%)  cb6f7bc
@@ -658,17 +658,17 @@ Eval results are persisted as JSONL in `.protest/history.jsonl`. Track trends ac
 
 ```bash
 # Run list with per-suite breakdown
-protest history --evals --runs
+protest history runs --evals
 
 # Detailed view of latest run
-protest history --evals --show
+protest history show --evals
 
 # Compare last two runs (fixed/regressed/new)
 # Requires --model NAME if your history mixes multiple model labels
 # (e.g. one suite per rules version) — comparing across labels is rejected
 # to avoid phantom regressions where a case "fails" only because the two
 # runs being diffed used different models.
-protest history --evals --compare --model rules_v1
+protest history compare --evals --model rules_v1
 ```
 
 ### Integrity Hashes
@@ -678,7 +678,7 @@ Each case in history carries two hashes:
 - **`case_hash`** — hash of inputs + expected output. Changes when the test data changes.
 - **`eval_hash`** — hash of evaluators. Changes when the scoring criteria change.
 
-`protest history --compare` uses these hashes to detect modified cases vs regressions. If a case's `eval_hash` changed between runs, it's reported as "scoring modified" rather than a real regression.
+`protest history compare` uses these hashes to detect modified cases vs regressions. If a case's `eval_hash` changed between runs, it's reported as "scoring modified" rather than a real regression.
 
 ## Progress Output
 
