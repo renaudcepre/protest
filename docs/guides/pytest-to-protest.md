@@ -4,13 +4,13 @@ This guide helps you migrate existing pytest test suites to ProTest. It covers t
 
 ## Philosophy Shift
 
-| pytest                                      | ProTest                                              |
-|---------------------------------------------|------------------------------------------------------|
-| Convention-based (discover `test_*.py`)     | Explicit structure (Suites, Sessions)                |
-| Global fixtures via conftest.py             | Explicit binding with `suite.bind()`                 |
-| Implicit dependency injection               | Explicit DI with `Annotated[T, Use(fixture)]`        |
-| Parametrize with `@pytest.mark.parametrize` | Parametrize with `ForEach` + `From`                  |
-| Scope via `@pytest.fixture(scope=...)`      | Scope via binding: `session.bind()` / `suite.bind()` |
+| pytest | ProTest |
+|--------|---------|
+| Convention-based (discover `test_*.py`) | Explicit structure (Suites, Sessions) |
+| Global fixtures via conftest.py | Explicit binding with `suite.bind()` |
+| Implicit dependency injection | Explicit DI with `Annotated[T, Use(fixture)]` |
+| Parametrize with `@pytest.mark.parametrize` | Parametrize with `ForEach` + `From` |
+| Scope via `@pytest.fixture(scope=...)` | Scope via binding: `session.bind()` / `suite.bind()` |
 
 ## Quick Reference
 
@@ -482,3 +482,4 @@ protest run myapp.tests.session:session --lf
 6. **Replace `@pytest.mark.parametrize`** with `ForEach` + `From`
 7. **Replace built-ins** (`tmp_path`, `caplog`, `mocker`)
 8. **Update CI/CD** to use `protest run` command
+9. 

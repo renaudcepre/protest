@@ -72,11 +72,11 @@ Use case: Isolated state per test, unique IDs, temporary files.
 
 ## Summary
 
-| Binding            | Scope   | Caching                          |
-|--------------------|---------|----------------------------------|
-| `session.bind(fn)` | SESSION | One instance for entire session  |
-| `suite.bind(fn)`   | SUITE   | One instance per suite execution |
-| No binding         | TEST    | Fresh instance per test          |
+| Binding | Scope | Caching |
+|---------|-------|---------|
+| `session.bind(fn)` | SESSION | One instance for entire session |
+| `suite.bind(fn)` | SUITE | One instance per suite execution |
+| No binding | TEST | Fresh instance per test |
 
 ## Teardown with yield
 
@@ -102,11 +102,11 @@ Teardown runs in reverse order (LIFO). If multiple fixtures are used, the last o
 
 A fixture can only depend on fixtures with equal or wider scope:
 
-| Fixture Scope | Can Depend On                      |
-|---------------|------------------------------------|
-| Session       | Session only                       |
-| Suite         | Session, parent suites, same suite |
-| Test          | Anything                           |
+| Fixture Scope | Can Depend On |
+|---------------|---------------|
+| Session | Session only |
+| Suite | Session, parent suites, same suite |
+| Test | Anything |
 
 Violating this raises `ScopeMismatchError`:
 
@@ -144,7 +144,6 @@ This works transitively: if fixture A depends on fixture B with tag "x", tests u
 ## Limiting Concurrent Access with max_concurrency
 
 Some fixtures wrap resources that have limited concurrent access:
-
 - Rate-limited APIs (e.g., max 2 requests/second)
 - Connection pools with fixed capacity
 - License-restricted resources

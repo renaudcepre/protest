@@ -38,8 +38,7 @@ Key points:
 - Call the factory with `await` — it's always async
 - Each call can pass different arguments
 
-> **Warning: Factory calls are always async**, even if the factory function itself is `def` (not `async def`). This means your test **must** be `async def` if it calls a factory. Internally, `FixtureFactory.__call__` is async because it
-> uses `asyncio.Lock` for thread-safe caching.
+> **Warning: Factory calls are always async**, even if the factory function itself is `def` (not `async def`). This means your test **must** be `async def` if it calls a factory. Internally, `FixtureFactory.__call__` is async because it uses `asyncio.Lock` for thread-safe caching.
 
 ### Common Mistake: Calling a Factory From a Sync Test
 

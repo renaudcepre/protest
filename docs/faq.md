@@ -33,7 +33,6 @@ user_suite = ProTestSuite("User")
 def user():
     return User("alice")
 
-
 user_suite.bind(user)  # SUITE scope
 
 
@@ -99,18 +98,12 @@ If fixtures could use `From()`, you'd get hidden cartesian products:
 @fixture
 def db(engine: Annotated[str, From(ENGINES)]):  # 3 engines
     ...
-
-
 session.bind(db)
-
 
 @fixture
 def user(role: Annotated[str, From(ROLES)], db: ...):  # 2 roles
     ...
-
-
 session.bind(user)
-
 
 @session.test()
 def test_perms(method: Annotated[str, From(METHODS)], user: ...):  # 4 methods
@@ -157,7 +150,6 @@ async def test_ffmpeg_conversion() -> None:
 ```
 
 The `Shell` helper:
-
 - Runs subprocesses with isolated pipes (no fd sharing issues)
 - Automatically prints output for ProTest to capture
 - Works safely with concurrent tests (`-n 4`)
@@ -173,4 +165,3 @@ async def test_pipeline() -> None:
 ```
 
 See `examples/subprocess_capture/session.py` for complete examples and [Built-ins](core-concepts/builtins.md#shell) for full API.
-

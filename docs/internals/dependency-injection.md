@@ -30,11 +30,11 @@ ProTestSession
 
 ### Binding → Scope Mapping
 
-| Binding            | Scope   | Internal `scope_path`                    |
-|--------------------|---------|------------------------------------------|
-| `session.bind(fn)` | Session | `None`                                   |
-| `suite.bind(fn)`   | Suite   | `suite.full_path` (e.g., `"API::Users"`) |
-| No binding         | Test    | `"<test_scope>"`                         |
+| Binding              | Scope   | Internal `scope_path`                    |
+|----------------------|---------|------------------------------------------|
+| `session.bind(fn)`   | Session | `None`                                   |
+| `suite.bind(fn)`     | Suite   | `suite.full_path` (e.g., `"API::Users"`) |
+| No binding           | Test    | `"<test_scope>"`                         |
 
 ### Nested Suite Paths
 
@@ -99,11 +99,11 @@ resolve(fixture_func)
 
 ### Three Cache Levels
 
-| Scope   | Where Cached                                    | Lifetime         |
-|---------|-------------------------------------------------|------------------|
+| Scope   | Where Cached                            | Lifetime         |
+|---------|-----------------------------------------|------------------|
 | Session | `FixtureContainer._registry[func].cached_value` | Entire session   |
 | Suite   | `FixtureContainer._path_caches[path][func]`     | While suite runs |
-| Test    | `TestExecutionContext._cache[func]`             | Single test      |
+| Test    | `TestExecutionContext._cache[func]`     | Single test      |
 
 Resolution is thread-safe. Concurrent tests requesting the same session fixture will
 wait for the first resolution to complete, then share the cached value.
@@ -240,3 +240,4 @@ class FixtureDurationPlugin(PluginBase):
 - [Factories](../core-concepts/factories.md) - Factory fixtures
 - [Events](events.md) - Complete event reference
 - [Plugins](plugins.md) - Plugin development guide
+- 

@@ -68,7 +68,6 @@ async def test_create_user(svc: Annotated[UserService, Use(user_service)]):
 ```
 
 The dependency chain is:
-
 ```
 test_create_user → user_service → user_repository → db (tagged "database")
 ```
@@ -78,7 +77,6 @@ So `test_create_user` inherits the "database" tag without any explicit declarati
 ### Why This Matters
 
 **Without tag inheritance:**
-
 ```python
 # You must manually tag EVERY test that touches the database
 @session.test(tags=["database"])  # Easy to forget!
@@ -92,7 +90,6 @@ async def test_update_user(): ...
 ```
 
 **With tag inheritance:**
-
 ```python
 # Tag the fixture ONCE
 @fixture(tags=["database"])
@@ -178,7 +175,6 @@ protest tags list tests:session
 ```
 
 Output:
-
 ```
 api
 database
@@ -193,7 +189,6 @@ protest tags list tests:session -r
 ```
 
 Output:
-
 ```
 test_create_user: api, database
 test_delete_user: api, database
@@ -219,7 +214,6 @@ def storage(): ...
 ```
 
 Run tests without external dependencies:
-
 ```bash
 protest run tests:session --no-tag database --no-tag redis --no-tag s3
 ```
@@ -235,7 +229,6 @@ async def test_full_migration():
 ```
 
 Quick feedback loop:
-
 ```bash
 protest run tests:session --no-tag slow
 ```
@@ -253,7 +246,6 @@ async def test_deployment(): ...
 ```
 
 Run locally (no Docker):
-
 ```bash
 protest run tests:session --no-tag requires-docker
 ```

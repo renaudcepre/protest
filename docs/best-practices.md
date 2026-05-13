@@ -91,8 +91,7 @@ import tests.test_users   # noqa: F401, E402
 import tests.test_orders   # noqa: F401, E402
 ```
 
-The imports are unused — they exist only to trigger `@suite.test()` registration at import time. This requires `# noqa` to silence linters and makes dependencies invisible. See
-the [Project Organization guide](guides/project-organization.md) for the correct pattern.
+The imports are unused — they exist only to trigger `@suite.test()` registration at import time. This requires `# noqa` to silence linters and makes dependencies invisible. See the [Project Organization guide](guides/project-organization.md) for the correct pattern.
 
 ## Suite Design
 
@@ -161,11 +160,11 @@ di_suite = ProTestSuite(
 
 ### Scope Determines Placement
 
-| Scope   | Where to Define               | Use Case                        |
-|---------|-------------------------------|---------------------------------|
-| Session | `session.py` or `fixtures.py` | Database, expensive resources   |
-| Suite   | Suite file                    | Suite-specific setup            |
-| Test    | Near test, `@fixture`         | Test isolation, cheap resources |
+| Scope | Where to Define | Use Case |
+|-------|-----------------|----------|
+| Session | `session.py` or `fixtures.py` | Database, expensive resources |
+| Suite | Suite file | Suite-specific setup |
+| Test | Near test, `@fixture` | Test isolation, cheap resources |
 
 ### Session Fixtures: Expensive Resources
 
@@ -232,7 +231,6 @@ suite.bind(user)
 ```
 
 Usage:
-
 ```python
 @suite.test()
 async def test_user_permissions(
@@ -511,3 +509,4 @@ async def test_draft_cannot_be_archived_directly(
 - [Factories](core-concepts/factories.md)
 - [Tags](core-concepts/tags.md) - Tag inheritance and filtering
 - [CLI Reference](cli.md)
+- 
