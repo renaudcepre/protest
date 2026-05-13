@@ -240,4 +240,3 @@ class FixtureDurationPlugin(PluginBase):
 - [Factories](../core-concepts/factories.md) - Factory fixtures
 - [Events](events.md) - Complete event reference
 - [Plugins](plugins.md) - Plugin development guide
-- 
