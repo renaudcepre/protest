@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from inspect import signature
 from itertools import groupby, product
-from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin, get_type_hints
+from typing import TYPE_CHECKING, Annotated, Any, get_args, get_origin
 
 from protest.di.decorators import get_fixture_marker, unwrap_fixture
+from protest.di.hints import get_type_hints_compat
 from protest.di.markers import Use
 from protest.di.validation import _extract_from_params
 from protest.entities import FixtureCallable, SuitePath, TestItem, TestRegistration
+from protest.evals.evaluator import EvalCase
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -18,10 +20,7 @@ if TYPE_CHECKING:
 
 def _extract_use_fixtures(func: Callable[..., Any]) -> list[FixtureCallable]:
     """Extract fixtures referenced via Use() markers in function parameters."""
-    try:
-        type_hints = get_type_hints(func, include_extras=True)
-    except Exception:
-        type_hints = {}
+    type_hints = get_type_hints_compat(func)
 
     fixtures: list[FixtureCallable] = []
     for param_name in signature(func).parameters:
@@ -164,6 +163,7 @@ class Collector:
                     xfail=test_reg.xfail,
                     timeout=test_reg.timeout,
                     retry=test_reg.retry,
+                    is_eval=test_reg.is_eval,
                 )
             ]
 
@@ -177,17 +177,23 @@ class Collector:
                 sources[index].get_id(value) for index, value in enumerate(combination)
             ]
 
+            item_tags = tags.copy()
+            for value in combination:
+                if isinstance(value, EvalCase) and value.tags:
+                    item_tags.update(value.tags)
+
             items.append(
                 TestItem(
                     func=test_reg.func,
                     suite=suite,
-                    tags=tags.copy(),
+                    tags=item_tags,
                     case_kwargs=case_kwargs,
                     case_ids=case_ids,
                     skip=test_reg.skip,
                     xfail=test_reg.xfail,
                     timeout=test_reg.timeout,
                     retry=test_reg.retry,
+                    is_eval=test_reg.is_eval,
                 )
             )
 

@@ -13,6 +13,7 @@ protest <command> [options] <target>
 | Command | Description |
 |---------|-------------|
 | `run` | Run tests |
+| `eval` | Run evaluations |
 | `live` | Start live reporter server |
 | `tags list` | List tags in a session |
 
@@ -273,6 +274,84 @@ protest run tests:session -k user -x
 # Check everything still works
 protest run tests:session
 ```
+
+---
+
+## protest eval
+
+Run evaluations from a session.
+
+`protest eval` is the eval-suite counterpart of `protest run`. It shares
+the same target format, filters, capture flags and reporting options as
+`run`; the differences are listed below.
+
+### Syntax
+
+```bash
+protest eval <target> [options]
+```
+
+### Options
+
+`protest eval` accepts every option from `protest run` (see above:
+`-n/--concurrency`, `--collect-only`, `-x/--exitfirst`, `-s/--no-capture`,
+`-q/--quiet`, `-v/--verbose`, `--show-logs`, `-t/--tag`, `--no-tag`,
+`-k/--keyword`, `--lf`, `--cache-clear`, `--no-color`, `--ctrf-output`,
+`--no-log-file`, `--app-dir`), plus one eval-only flag:
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--show-output` | Print `inputs` / `output` / `expected` for **every** case (failed cases always print these). | off |
+
+### Examples
+
+```bash
+# Run all evals in a session
+protest eval evals.session:session
+
+# One specific suite
+protest eval evals.session:session::helpdesk_struct
+
+# One ticket by name
+protest eval evals.session:session -k T001
+
+# All cases tagged "cat:hardware"
+protest eval evals.session:session --tag cat:hardware
+
+# Re-run only the cases that failed last time
+protest eval evals.session:session --lf
+
+# Show the input/output of every case (not just failures)
+protest eval evals.session:session --show-output
+```
+
+### Output
+
+Each case prints one line:
+
+```
+✓   classify_ticket_struct[T011] (2ms) category_is_allowed=✓ summary_keyword_recall=1.00 …
+```
+
+After every suite, an aggregate-stats table summarizes the `Metric`
+fields across cases (mean / p50 / p5 / p95). `Verdict` and `Reason`
+fields don't appear in this table — only numeric `Metric` fields do.
+
+Per-case markdown artifacts are written to
+`.protest/results/<suite>_<timestamp>/<case-id>.md`, with the full
+input, output, expected, and per-evaluator scores.
+
+---
+
+## Run history (recorded)
+
+Every `run` / `eval` appends one entry to `.protest/history.jsonl`
+(schema-versioned JSONL). History is **recorded from the first run** so the
+data accumulates over time; dedicated commands to browse and compare runs
+land in a future release.
+
+Per-case eval detail (input, output, expected, evaluator scores) is written
+to `.protest/results/<suite>_<timestamp>/<case-id>.md`.
 
 ---
 

@@ -1,8 +1,11 @@
+import logging
 import traceback
 from pathlib import Path
+from typing import Any
 
 from typing_extensions import Self
 
+from protest.console import strip_markup
 from protest.entities import (
     FixtureInfo,
     HandlerInfo,
@@ -18,7 +21,15 @@ from protest.entities import (
     TestStartInfo,
     TestTeardownInfo,
 )
+from protest.evals.types import EvalSuiteReport
+from protest.execution.capture import real_stdout
 from protest.plugin import PluginBase, PluginContext
+from protest.reporting.format import (
+    format_duration as _format_duration,
+)
+from protest.reporting.format import (
+    format_usage as _format_usage,
+)
 from protest.reporting.verbosity import Verbosity
 
 _MIN_NODE_ID_PARTS = 2
@@ -47,16 +58,29 @@ def _format_test_name(result: TestResult, include_suite: bool = False) -> str:
     return name
 
 
-MIN_DURATION_THRESHOLD = 0.001
+def _format_eval_scores_inline(result: TestResult, short: bool = False) -> str:
+    """Format eval scores for inline display — ASCII version (no glyphs).
 
-
-def _format_duration(seconds: float) -> str:
-    """Format duration: ms for fast, s for slow."""
-    if seconds < MIN_DURATION_THRESHOLD:
-        return "<1ms"
-    if seconds < 1:
-        return f"{seconds * 1000:.0f}ms"
-    return f"{seconds:.2f}s"
+    When `short=True`, only failing/skipped scores are shown — passing scores
+    are hidden to keep the output readable on large suites.
+    """
+    if not result.eval_payload:
+        return ""
+    parts: list[str] = []
+    for name, entry in result.eval_payload.scores.items():
+        if entry.skipped:
+            parts.append(f"{name}=skip")
+            continue
+        if short and entry.passed:
+            continue
+        val = entry.value
+        if isinstance(val, bool):
+            parts.append(f"{name}={'pass' if val else 'fail'}")
+        elif isinstance(val, float):
+            parts.append(f"{name}={val:.2f}")
+        else:
+            parts.append(f"{name}={val}")
+    return f" {' '.join(parts)}" if parts else ""
 
 
 class AsciiReporter(PluginBase):
@@ -65,17 +89,58 @@ class AsciiReporter(PluginBase):
     name = "ascii-reporter"
     description = "Plain ASCII reporter"
 
-    def __init__(self, verbosity: int = 0) -> None:
+    def __init__(
+        self,
+        verbosity: int = 0,
+        show_logs: str | None = None,
+        show_output: bool = False,
+        short: bool = False,
+    ) -> None:
         self._verbosity = verbosity
+        self._show_logs = show_logs
+        self._show_output = show_output
+        self._short = short
         self._is_parallel = False
         self._failed_results: list[TestResult] = []
         self._error_results: list[TestResult] = []
 
     @classmethod
     def activate(cls, ctx: PluginContext) -> Self | None:
-        if ctx.get("no_color", False):
-            return cls(verbosity=ctx.get("verbosity", 0))
+        # Activate when --no-color was passed, OR when `rich` is not
+        # installed (RichReporter would otherwise leave the run silent).
+        import importlib.util  # noqa: PLC0415 — std lib, kept local for clarity
+
+        if ctx.get("no_color", False) or importlib.util.find_spec("rich") is None:
+            return cls(
+                verbosity=ctx.get("verbosity", 0),
+                show_logs=ctx.get("show_logs"),
+                show_output=ctx.get("show_output", False),
+                short=ctx.get("short", False),
+            )
         return None
+
+    def _print_eval_detail(self, result: TestResult) -> None:
+        """Print eval inputs/output/expected (enabled by --show-output or on failure)."""
+        p = result.eval_payload
+        if not p:
+            return
+        if p.inputs is not None:
+            print(f"    | inputs: {str(p.inputs)[:200]}")
+        if p.output is not None:
+            print(f"    | output: {str(p.output)[:200]}")
+        if p.expected_output is not None:
+            print(f"    | expected: {str(p.expected_output)[:200]}")
+
+    def _maybe_show_logs(self, result: TestResult) -> None:
+        """Show captured log records if --show-logs is active."""
+        if not self._show_logs or not result.log_records:
+            return
+        min_level = getattr(logging, self._show_logs.upper(), logging.INFO)
+        for record in result.log_records:
+            if record.levelno >= min_level:
+                print(
+                    f"    LOG [{record.levelname}] {record.name}: {record.getMessage()}"
+                )
 
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
         self._is_parallel = len(items) > 1
@@ -123,7 +188,7 @@ class AsciiReporter(PluginBase):
             print(f"    -> fixture '{info.name}' setup... ({info.scope.value})")
 
     def on_fixture_setup_done(self, info: FixtureInfo) -> None:
-        if self._verbosity >= Verbosity.FIXTURES:
+        if self._verbosity >= Verbosity.NORMAL:
             print(
                 f"    -> fixture '{info.name}' ready ({_format_duration(info.duration)})"
             )
@@ -140,11 +205,17 @@ class AsciiReporter(PluginBase):
 
     def on_test_setup_done(self, info: TestStartInfo) -> None:
         if self._verbosity >= Verbosity.FIXTURES:
-            print(f"      > {info.name} setup done")
+            self._print_bypass(f"      > {info.name} setup done")
 
     def on_test_teardown_start(self, info: TestTeardownInfo) -> None:
         if self._verbosity >= Verbosity.FIXTURES:
-            print(f"      < {info.name} teardown...")
+            self._print_bypass(f"      < {info.name} teardown...")
+
+    @staticmethod
+    def _print_bypass(msg: str) -> None:
+        stream = real_stdout()
+        stream.write(msg + "\n")
+        stream.flush()
 
     def on_test_retry(self, info: TestRetryInfo) -> None:
         delay_msg = f", retrying in {info.delay}s" if info.delay > 0 else ""
@@ -161,7 +232,15 @@ class AsciiReporter(PluginBase):
             retry_suffix = ""
             if result.max_attempts > 1:
                 retry_suffix = f" [attempt {result.attempt}/{result.max_attempts}]"
-            print(f"  OK {name} ({duration}){retry_suffix}")
+            scores_str = (
+                _format_eval_scores_inline(result, short=self._short)
+                if result.is_eval
+                else ""
+            )
+            print(f"  OK {name} ({duration}){scores_str}{retry_suffix}")
+            if self._show_output and result.is_eval:
+                self._print_eval_detail(result)
+            self._maybe_show_logs(result)
 
     def on_test_fail(self, result: TestResult) -> None:
         name = _format_test_name(result, include_suite=self._is_parallel)
@@ -184,6 +263,9 @@ class AsciiReporter(PluginBase):
         if result.output:
             for line in result.output.rstrip().splitlines():
                 print(f"    | {line}")
+        if result.is_eval:
+            self._print_eval_detail(result)
+        self._maybe_show_logs(result)
 
     def on_test_skip(self, result: TestResult) -> None:
         if self._verbosity >= Verbosity.NORMAL:
@@ -225,14 +307,16 @@ class AsciiReporter(PluginBase):
         return "".join(lines)
 
     def _print_failure_summary(self) -> None:
-        if self._failed_results:
+        non_eval_failures = [r for r in self._failed_results if not r.is_eval]
+        if non_eval_failures:
             print("\n=== FAILURES ===")
-            for result in self._failed_results:
+            for result in non_eval_failures:
                 self._print_failure_detail(result, is_error=False)
 
-        if self._error_results:
+        non_eval_errors = [r for r in self._error_results if not r.is_eval]
+        if non_eval_errors:
             print("\n=== ERRORS ===")
-            for result in self._error_results:
+            for result in non_eval_errors:
                 self._print_failure_detail(result, is_error=True)
 
     def _print_failure_detail(self, result: TestResult, *, is_error: bool) -> None:
@@ -250,8 +334,52 @@ class AsciiReporter(PluginBase):
             for line in result.output.rstrip().splitlines():
                 print(f"  {line}")
 
+    def on_user_print(self, data: Any) -> None:
+        msg, raw, prefix = data
+        text = msg if raw else strip_markup(msg)
+        stream = real_stdout()
+        line = f"       | {text}\n" if prefix and not raw else f"{text}\n"
+        stream.write(line)
+        stream.flush()
+
+    def on_eval_suite_end(self, report: Any) -> None:
+        if not isinstance(report, EvalSuiteReport):
+            return
+        stats = report.all_score_stats()
+        print()
+        print(f"  Eval: {report.suite_name} ({report.total_count} cases)")
+        if stats:
+            max_name = max(len(s.name) for s in stats)
+            print("  " + "─" * 60)
+            for s in stats:
+                print(
+                    f"    {s.name:<{max_name}}  "
+                    f"mean={s.mean:.2f}  p50={s.median:.2f}  "
+                    f"p5={s.p5:.2f}  p95={s.p95:.2f}"
+                )
+            print("  " + "─" * 60)
+        rate_pct = report.pass_rate * 100
+        print(f"  Passed: {report.passed_count}/{report.total_count} ({rate_pct:.1f}%)")
+        if report.total_task_tokens > 0 or report.total_task_cost > 0:
+            print(
+                f"  Task: {_format_usage(report.total_task_input_tokens, report.total_task_output_tokens, report.total_task_cost)}"
+            )
+        if report.total_judge_calls > 0:
+            judge_parts = [f"{report.total_judge_calls} calls"]
+            usage = _format_usage(
+                report.total_judge_input_tokens,
+                report.total_judge_output_tokens,
+                report.total_judge_cost,
+            )
+            if usage:
+                judge_parts.append(usage)
+            print(f"  Judge: {', '.join(judge_parts)}")
+        print()
+
     def on_session_complete(self, result: SessionResult) -> None:
-        if self._failed_results or self._error_results:
+        has_non_eval_failures = any(not r.is_eval for r in self._failed_results)
+        has_non_eval_errors = any(not r.is_eval for r in self._error_results)
+        if has_non_eval_failures or has_non_eval_errors:
             self._print_failure_summary()
 
         total = (

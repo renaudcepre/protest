@@ -15,11 +15,13 @@ from protest.entities import (
     TestRetryInfo,
 )
 from protest.events.types import Event
-from protest.reporting.rich_reporter import (
+from protest.reporting.format import (
     MIN_DURATION_THRESHOLD,
-    RichReporter,
-    _format_duration,
 )
+from protest.reporting.format import (
+    format_duration as _format_duration,
+)
+from protest.reporting.rich_reporter import RichReporter
 
 
 class TestFormatDuration:

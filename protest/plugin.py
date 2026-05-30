@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser
     from collections.abc import Awaitable
 
+    from protest.compat import Self
     from protest.core.session import ProTestSession
     from protest.entities import (
         FixtureInfo,
@@ -141,6 +142,12 @@ class PluginBase:
 
     def on_suite_end(self, result: SuiteResult) -> None | Awaitable[None]:
         """Suite ends (after fixture teardown)."""
+
+    def on_eval_suite_end(self, report: Any) -> None | Awaitable[None]:
+        """Eval suite finished — aggregated report with scores/stats."""
+
+    def on_user_print(self, data: Any) -> None | Awaitable[None]:
+        """User-initiated print via protest.console.print()."""
 
     # ─────────────────────────────────────────────────────────────────────
     # Fixture lifecycle

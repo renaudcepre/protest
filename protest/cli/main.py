@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+from protest.api import collect_tests, list_tags, run_session
+from protest.core.session import ProTestSession
+from protest.loader import LoadError, load_session, parse_target
+from protest.plugin import PluginContext
+from protest.reporting.verbosity import Verbosity
 
 if TYPE_CHECKING:
-    from protest.core.session import ProTestSession
     from protest.entities import TestItem
-    from protest.plugin import PluginContext
 
 HELP_EPILOG = """
 Examples:
@@ -19,6 +24,9 @@ Examples:
   protest run demo:session --collect-only   List tests without running
   protest run demo:session --tag slow   Run tests with 'slow' tag
   protest run demo:session -s           Disable capture (show print output)
+  protest eval demo:session             Run all evaluations
+  protest eval demo:session --show-output  Show inputs/output/expected per case
+  protest live                          Start live reporter server
   protest tags list demo:session        List all available tags
 """
 
@@ -56,9 +64,6 @@ def _handle_tags_command() -> None:
 
 def _list_tags(target: str, app_dir: str, recursive: bool = False) -> None:
     """List all tags in a session."""
-    from protest.api import collect_tests, list_tags
-    from protest.loader import LoadError, load_session
-
     try:
         session = load_session(target, app_dir)
     except LoadError as exc:
@@ -103,19 +108,20 @@ def main() -> None:
         _print_help()
         return
 
-    if command == "tags":
-        _handle_tags_command()
+    commands: dict[str, Any] = {
+        "tags": _handle_tags_command,
+        "run": functools.partial(_handle_run_command, kind_filter="test"),
+        "eval": functools.partial(_handle_run_command, kind_filter="eval"),
+        "live": _handle_live_command,
+    }
+
+    handler = commands.get(command)
+    if handler:
+        handler()
         return
 
-    if command == "run":
-        _handle_run_command()
-        return
-
-    if command == "live":
-        _handle_live_command()
-        return
-
-    print(f"Error: Unknown command '{command}'. Use 'run', 'tags', or 'live'.")
+    valid = ", ".join(f"'{c}'" for c in commands)
+    print(f"Error: Unknown command '{command}'. Use {valid}.")
     sys.exit(1)
 
 
@@ -134,7 +140,7 @@ def _handle_live_command() -> None:
     )
     args = parser.parse_args(sys.argv[2:])
 
-    from protest.reporting.web import run_live_server
+    from protest.reporting.web import run_live_server  # noqa: PLC0415 — optional dep
 
     run_live_server(port=args.port)
 
@@ -143,9 +149,10 @@ def _print_help() -> None:
     """Print main help."""
     print("ProTest - Async-first Python test framework\n")
     print("Commands:")
-    print("  run    Run tests")
-    print("  live   Start live reporter server")
-    print("  tags   Tag inspection commands")
+    print("  run      Run tests")
+    print("  eval     Run evaluations")
+    print("  live     Start live reporter server")
+    print("  tags     Tag inspection commands")
     print(HELP_EPILOG)
 
 
@@ -169,11 +176,19 @@ def _create_base_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _create_run_parser() -> argparse.ArgumentParser:
-    """Base parser with core run options. Plugin options added dynamically."""
+def _create_run_parser(
+    *,
+    include_eval_options: bool = False,
+) -> argparse.ArgumentParser:
+    """Base parser with core run options. Plugin options added dynamically.
+
+    `include_eval_options=True` adds eval-only flags (e.g. ``--show-output``).
+    Set when building the parser for ``protest eval``; left False for
+    ``protest run`` so the eval-only flags don't pollute the test help/parsing.
+    """
     parser = argparse.ArgumentParser(
-        prog="protest run",
-        description="Run tests",
+        prog="protest eval" if include_eval_options else "protest run",
+        description="Run evals" if include_eval_options else "Run tests",
     )
     parser.add_argument(
         "target",
@@ -225,14 +240,35 @@ def _create_run_parser() -> argparse.ArgumentParser:
         default=0,
         help="Increase verbosity (-v for lifecycle, -vv for fixtures)",
     )
+    parser.add_argument(
+        "--show-logs",
+        dest="show_logs",
+        nargs="?",
+        const="INFO",
+        default=None,
+        metavar="LEVEL",
+        help="Show captured log records (default: INFO+)",
+    )
+    if include_eval_options:
+        parser.add_argument(
+            "--show-output",
+            dest="show_output",
+            action="store_true",
+            help="Show eval inputs/output/expected per case",
+        )
+        parser.add_argument(
+            "--short",
+            dest="short",
+            action="store_true",
+            help="Compact eval output: only print scores that failed per case",
+        )
     return parser
 
 
-def _handle_run_command() -> None:
-    """Handle 'protest run' subcommand with two-phase parsing."""
-    from protest.loader import LoadError, load_session, parse_target
-
+def _handle_run_command(kind_filter: str | None = None) -> None:
+    """Handle 'protest run' / 'protest eval' with two-phase parsing."""
     argv = sys.argv[2:]
+    include_eval_options = kind_filter == "eval"
 
     # Phase 1: Parse base args to get target
     base_parser = _create_base_parser()
@@ -240,16 +276,14 @@ def _handle_run_command() -> None:
 
     # If --help without target, show full help with all plugin options
     if ("--help" in remaining or "-h" in remaining) and not base_args.target:
-        from protest.core.session import ProTestSession
-
-        full_parser = _create_run_parser()
+        full_parser = _create_run_parser(include_eval_options=include_eval_options)
         for plugin_class in ProTestSession.default_plugin_classes():
             plugin_class.add_cli_options(full_parser)
         full_parser.parse_args(["--help"])
         return
 
     if not base_args.target:
-        _create_run_parser().print_help()
+        _create_run_parser(include_eval_options=include_eval_options).print_help()
         sys.exit(1)
 
     # Phase 2: Load session and register default plugins
@@ -263,7 +297,7 @@ def _handle_run_command() -> None:
     session.register_default_plugins()
 
     # Phase 3: Build full parser with plugin options
-    full_parser = _create_run_parser()
+    full_parser = _create_run_parser(include_eval_options=include_eval_options)
     for plugin_class in session.plugin_classes:
         plugin_class.add_cli_options(full_parser)
 
@@ -271,17 +305,15 @@ def _handle_run_command() -> None:
     args = full_parser.parse_args(argv)
 
     # Phase 5: Build context
-    from protest.plugin import PluginContext
-    from protest.reporting.verbosity import Verbosity
-
     effective_verbosity = Verbosity.QUIET if args.quiet else args.verbosity
-    ctx = PluginContext(
-        args={
-            **vars(args),
-            "target_suite": suite_filter,
-            "verbosity": effective_verbosity,
-        }
-    )
+    ctx_args: dict[str, Any] = {
+        **vars(args),
+        "target_suite": suite_filter,
+        "verbosity": effective_verbosity,
+    }
+    if kind_filter:
+        ctx_args["kind_filter"] = kind_filter
+    ctx = PluginContext(args=ctx_args)
 
     # Phase 6: Run tests (api.run_session handles plugin activation)
     run_tests(session, ctx, collect_only=args.collect_only)
@@ -292,8 +324,6 @@ def run_tests(
     ctx: PluginContext,
     collect_only: bool = False,
 ) -> None:
-    from protest.api import collect_tests, run_session
-
     if collect_only:
         items = collect_tests(session, ctx=ctx)
         print(f"Collected {len(items)} test(s):\n")

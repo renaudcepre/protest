@@ -13,11 +13,28 @@ from protest.entities import (
     TestItem,
     TestResult,
 )
+from protest.history import storage as history_storage
 from protest.plugin import PluginBase
 from tests.factories.test_items import make_test_item
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
+
+
+@pytest.fixture(autouse=True)
+def _isolate_protest_history(tmp_path: "Path", monkeypatch: pytest.MonkeyPatch) -> None:
+    """Redirect `DEFAULT_HISTORY_DIR` to a per-test temp dir.
+
+    Tests that forget to pass `history_dir=tmp_path` would otherwise write
+    into the repo's real `.protest/history.jsonl`. The monkeypatch targets
+    the single source of truth (`storage.DEFAULT_HISTORY_DIR`) — all
+    consumers access it via the module so the override is seen everywhere.
+
+    Tests that pass an explicit `history_dir` still use that value, because
+    the plugin does `history_dir or storage.DEFAULT_HISTORY_DIR`.
+    """
+    monkeypatch.setattr(history_storage, "DEFAULT_HISTORY_DIR", tmp_path / ".protest")
 
 
 @pytest.fixture

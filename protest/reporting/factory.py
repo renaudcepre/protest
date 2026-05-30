@@ -18,7 +18,7 @@ def get_reporter(force_no_color: bool = False) -> PluginBase:
         return AsciiReporter()
 
     try:
-        from rich.console import Console  # type: ignore[import-not-found]
+        from rich.console import Console
 
         Console()
     except ImportError:

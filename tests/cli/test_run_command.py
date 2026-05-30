@@ -244,3 +244,34 @@ class TestRunSuiteAndKeywordCombined:
         result.assert_success()
         expected_count = 1
         assert f"{expected_count}/{expected_count} passed" in result.stdout
+
+
+class TestRunRejectsEvalOnlyFlags:
+    """`--show-output` is eval-only and must not be accepted by `protest run`.
+
+    The CLI parser is split: `protest run` builds a parser without eval-only
+    flags, so passing `--show-output` should raise an argparse error rather
+    than silently no-op (the previous behavior was a UX papercut: the flag
+    appeared in `protest run --help` but did nothing for non-eval tests).
+    """
+
+    def test_run_rejects_show_output(
+        self, run_protest: Callable[..., CLIResult]
+    ) -> None:
+        result = run_protest("run", "simple_session:session", "--show-output")
+        assert result.exit_code != 0, (
+            f"Expected non-zero exit for `protest run --show-output`, "
+            f"got {result.exit_code}\nstdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        assert "show-output" in result.stderr, (
+            f"Expected argparse error mentioning 'show-output' in stderr, "
+            f"got: {result.stderr}"
+        )
+
+    def test_run_help_omits_show_output(
+        self, run_protest: Callable[..., CLIResult]
+    ) -> None:
+        result = run_protest("run", "--help")
+        assert "--show-output" not in result.stdout, (
+            f"Expected --show-output absent from `protest run --help`:\n{result.stdout}"
+        )

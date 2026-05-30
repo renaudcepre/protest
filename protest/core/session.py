@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    from pathlib import Path
     from types import TracebackType
 
     from protest.compat import Self
@@ -26,12 +27,15 @@ from protest.entities import (
     normalize_skip,
     normalize_xfail,
 )
+from protest.evals.results_writer import EvalResultsWriter
 from protest.events.bus import EventBus
 from protest.events.types import Event
 from protest.exceptions import InvalidMaxConcurrencyError
 from protest.execution.capture import set_session_teardown_capture
 from protest.filters.keyword import KeywordFilterPlugin
+from protest.filters.kind import KindFilterPlugin
 from protest.filters.suite import SuiteFilterPlugin
+from protest.history.plugin import HistoryPlugin
 from protest.reporting.ascii import AsciiReporter
 from protest.reporting.ctrf import CTRFReporter
 from protest.reporting.log_file import LogFilePlugin
@@ -54,7 +58,13 @@ class ProTestSession:
         concurrency: Number of parallel test workers (default: 1).
     """
 
-    def __init__(self, concurrency: int = 1) -> None:
+    def __init__(
+        self,
+        concurrency: int = 1,
+        history: bool = True,
+        history_dir: Path | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
         if concurrency < 1:
             raise InvalidMaxConcurrencyError(concurrency)
 
@@ -72,6 +82,9 @@ class ProTestSession:
         self._capture: bool = True
         self._setup_duration: float = 0
         self._teardown_duration: float = 0
+        self._history = history
+        self._history_dir = history_dir
+        self._metadata: dict[str, Any] = dict(metadata) if metadata else {}
 
     async def resolve_autouse(self) -> None:
         """Resolve all session autouse fixtures at session start."""
@@ -103,6 +116,18 @@ class ProTestSession:
     @capture.setter
     def capture(self, value: bool) -> None:
         self._capture = value
+
+    @property
+    def history(self) -> bool:
+        return self._history
+
+    @property
+    def history_dir(self) -> Path | None:
+        return self._history_dir
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        return self._metadata
 
     @property
     def setup_duration(self) -> float:
@@ -151,6 +176,7 @@ class ProTestSession:
         skip_reason: str = "Skipped",
         xfail: bool | str | Xfail | None = None,
         retry: int | Retry | None = None,
+        is_eval: bool = False,
     ) -> Callable[[FuncT], FuncT]:
         def decorator(func: FuncT) -> FuncT:
             if timeout is not None and timeout < 0:
@@ -168,6 +194,7 @@ class ProTestSession:
                     xfail=norm_xfail,
                     timeout=timeout,
                     retry=norm_retry,
+                    is_eval=is_eval,
                 )
             )
             return func
@@ -178,10 +205,6 @@ class ProTestSession:
         """Add a suite to this session."""
         suite._attach_to_session(self)
         self._suites.append(suite)
-
-    def include_suite(self, suite: ProTestSuite) -> None:
-        """Alias for add_suite (backward compatibility)."""
-        self.add_suite(suite)
 
     def bind(
         self,
@@ -246,6 +269,9 @@ class ProTestSession:
             TagFilterPlugin,
             SuiteFilterPlugin,
             KeywordFilterPlugin,
+            KindFilterPlugin,
+            HistoryPlugin,
+            EvalResultsWriter,
             RichReporter,
             AsciiReporter,
             CTRFReporter,
@@ -345,7 +371,7 @@ class ProTestSession:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:
-        import time
+        import time  # noqa: PLC0415 — only needed in __aexit__
 
         teardown_start = time.perf_counter()
         set_session_teardown_capture(True)

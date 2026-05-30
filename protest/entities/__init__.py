@@ -4,12 +4,15 @@ from protest.entities.core import (
     FixtureMarker,
     FixtureRegistration,
     FixtureScope,
+    SuiteKind,
     TestItem,
     TestOutcome,
     TestRegistration,
     format_fixture_scope,
 )
 from protest.entities.events import (
+    EvalPayload,
+    EvalScoreEntry,
     FixtureInfo,
     HandlerInfo,
     RunResult,
@@ -31,6 +34,8 @@ from protest.entities.suite_path import SuitePath
 from protest.entities.xfail import Xfail, normalize_xfail
 
 __all__ = [
+    "EvalPayload",
+    "EvalScoreEntry",
     "Fixture",
     "FixtureCallable",
     "FixtureInfo",
@@ -44,6 +49,7 @@ __all__ = [
     "SessionResult",
     "SessionSetupInfo",
     "Skip",
+    "SuiteKind",
     "SuitePath",
     "SuiteResult",
     "SuiteSetupInfo",
