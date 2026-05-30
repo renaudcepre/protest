@@ -14,7 +14,6 @@ protest <command> [options] <target>
 |---------|-------------|
 | `run` | Run tests |
 | `eval` | Run evaluations |
-| `history` | Browse run history (tests and evals) |
 | `live` | Start live reporter server |
 | `tags list` | List tags in a session |
 
@@ -344,106 +343,15 @@ input, output, expected, and per-evaluator scores.
 
 ---
 
-## protest history
+## Run history (recorded)
 
-Browse persisted run history (tests and evals).
+Every `run` / `eval` appends one entry to `.protest/history.jsonl`
+(schema-versioned JSONL). History is **recorded from the first run** so the
+data accumulates over time; dedicated commands to browse and compare runs
+land in a future release.
 
-Every run appends one entry to `.protest/history.jsonl`; `protest history`
-queries that file via sub-commands.
-
-### Syntax
-
-```bash
-protest history <subcommand> [filters]
-```
-
-If no sub-command is given, `list` runs by default — so
-`protest history --tail 5` is equivalent to
-`protest history list --tail 5`.
-
-### Sub-commands
-
-| Sub-command | Description |
-|-------------|-------------|
-| `list` | Per-suite trend table: pass-rate trend + score arrows. **Default** when no sub-command is given. |
-| `runs` | Run-by-run pass rates, most recent first. |
-| `show [N]` | Detailed panel for the Nth most recent run (`N=0` = latest, the default). |
-| `compare` | Compare the two most recent runs of the same model. |
-| `clean` | Remove entries from runs made on a dirty working tree. **Dry-run by default** — pass `--apply` to actually modify the file. |
-
-### Filters (shared by every sub-command)
-
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--tail N`, `-n N` | Limit to the N most recent entries | 10 |
-| `--evals` | Show eval runs only | _all kinds_ |
-| `--tests` | Show test runs only | _all kinds_ |
-| `--model NAME` | Keep only suites whose `ModelLabel.name` matches | _all_ |
-| `--suite NAME` | Keep only the suite with this name | _all_ |
-| `--path DIR` | Use a custom history directory | `.protest/` |
-
-`--model` and `--suite` filter at the **suite level**: a run that
-contains *several* suites with different models keeps the entry alive,
-with non-matching suites pruned out of the displayed view.
-
-### Reading `--compare`
-
-`--compare` reports four kinds of change between the two most recent
-runs of the same model:
-
-| Marker | Label | Meaning |
-|--------|-------|---------|
-| `+` | Fixed | Case was failing in the previous run, passes now |
-| `-` | Regressions | Case was passing in the previous run, fails now |
-| `⟳` | Modified | Case is recognizable (same name) but its content changed |
-| `*` | New | Case did not exist in the previous run |
-| `✗` | Deleted | Case existed in the previous run, gone now |
-
-The `Modified` line tells you **what** changed by suffixing the case
-name:
-
-- `T001 (case modified)` — `inputs` or `expected` changed (`case_hash`
-  diff)
-- `T001 (scoring modified)` — only the evaluator configuration changed
-  (`eval_hash` diff). Inputs and expected output are intact; you've
-  edited an evaluator or its parameters.
-
-### Examples
-
-```bash
-# Per-suite trend across last 10 eval runs (default sub-command: list)
-protest history --evals
-
-# Run-by-run breakdown of the last 5 eval runs
-protest history runs --evals --tail 5
-
-# Detailed panel for the most recent eval run
-protest history show --evals
-
-# Detailed panel for the run before that (1 = next-most-recent)
-protest history show 1 --evals
-
-# Compare the two most recent runs of the same model
-protest history compare --evals
-
-# Filter to one model — only suites with this model are shown
-protest history list --evals --model qwen-2.5
-
-# Preview which entries `clean` would remove (no file changes)
-protest history clean --evals
-
-# Actually remove dirty entries
-protest history clean --apply
-```
-
-### Notes
-
-- When the project is not a git repo, the per-run commit / dirty
-  columns display `?`. `clean` is a no-op in that case.
-- `--evals` and `--tests` are mutually exclusive; omit both to see
-  every kind.
-- Per-case detail (input, output, expected, evaluator scores) lives in
-  `.protest/results/`, not in the history file.
+Per-case eval detail (input, output, expected, evaluator scores) is written
+to `.protest/results/<suite>_<timestamp>/<case-id>.md`.
 
 ---
 

@@ -105,9 +105,6 @@ ignore = [
     "S603", # subprocess git calls are safe
     "PLR0913", # load_history has many filter params by design
 ]
-"protest/cli/history.py" = [
-    "T201", # print for CLI output
-]
 "protest/evals/**" = [
     "T201", # print for eval reporting
     "PLR0913", # adapter functions have many params by design

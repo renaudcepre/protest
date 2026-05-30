@@ -86,12 +86,10 @@ async def chatbot(case: Annotated[EvalCase, From(cases)]) -> str:
 ```
 
 ```bash
-protest eval evals.session:session
-protest history runs          # recent runs
-protest history compare       # current vs previous
+protest eval evals.session:session   # runs are recorded to .protest/history.jsonl
 ```
 
-See [Evals docs](https://renaudcepre.github.io/protest/evals/) for evaluators, judges, history tracking.
+See [Evals docs](https://renaudcepre.github.io/protest/evals/) for evaluators, judges, and scoring.
 
 ---
 
@@ -142,8 +140,6 @@ protest run module:session --ctrf-output r.json  # CTRF report for CI/CD
 protest eval module:session                   # Run LLM evals
 protest eval module:session --tag safety      # Filter by case tag
 protest eval module:session --last-failed     # Re-run failed cases only
-protest history runs --evals                  # Eval run-by-run history
-protest history compare --evals               # Diff last two eval runs
 ```
 
 ## Features
@@ -168,7 +164,7 @@ protest history compare --evals               # Diff last two eval runs
 | Async    | Plugin required                 | Native                               |
 | Parallel | Plugin required                 | Built-in                             |
 | Cycles   | Runtime error                   | Prevented at registration            |
-| Evals    | External (deepeval, pydantic-…) | Native (`protest eval`, history)     |
+| Evals    | External (deepeval, pydantic-…) | Native (`protest eval`, JSONL history) |
 
 pytest has a large ecosystem and extensive community. ProTest is an alternative if you
 prefer FastAPI-style explicit dependencies and native async in your tests.

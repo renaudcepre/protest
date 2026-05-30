@@ -26,10 +26,6 @@ Examples:
   protest run demo:session -s           Disable capture (show print output)
   protest eval demo:session             Run all evaluations
   protest eval demo:session --show-output  Show inputs/output/expected per case
-  protest history --evals               Show eval suite trends
-  protest history runs --evals          Run-by-run breakdown
-  protest history compare --evals       Compare 2 most recent runs
-  protest history clean                 Preview removable dirty entries
   protest live                          Start live reporter server
   protest tags list demo:session        List all available tags
 """
@@ -116,7 +112,6 @@ def main() -> None:
         "tags": _handle_tags_command,
         "run": functools.partial(_handle_run_command, kind_filter="test"),
         "eval": functools.partial(_handle_run_command, kind_filter="eval"),
-        "history": _handle_history_command,
         "live": _handle_live_command,
     }
 
@@ -156,7 +151,6 @@ def _print_help() -> None:
     print("Commands:")
     print("  run      Run tests")
     print("  eval     Run evaluations")
-    print("  history  Browse run history")
     print("  live     Start live reporter server")
     print("  tags     Tag inspection commands")
     print(HELP_EPILOG)
@@ -269,15 +263,6 @@ def _create_run_parser(
             help="Compact eval output: only print scores that failed per case",
         )
     return parser
-
-
-def _handle_history_command() -> None:
-    """Handle 'protest history' subcommand."""
-    from protest.cli.history import (  # noqa: PLC0415 — heavy module
-        handle_history_command,
-    )
-
-    handle_history_command(sys.argv[2:])
 
 
 def _handle_run_command(kind_filter: str | None = None) -> None:

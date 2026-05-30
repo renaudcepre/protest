@@ -35,12 +35,10 @@ ProTest evals use the same infrastructure as tests: fixtures, DI, parallelism, t
     the signal you're measuring. `protest eval` still exits 1 when any
     case fails a `Verdict` (so CI surfaces regressions), but the
     failures are not bugs, they're data points. The aggregate-stats
-    table and `protest history` are designed for this — you watch the
-    metrics drift over time, and use `--compare` to flag actual
-    regressions between runs. If you want a CI gate that only fails on
-    infrastructure errors (fixture / evaluator crashes) and not on
-    case-level scoring, run `protest eval || true` followed by
-    `protest history compare` to assert no regression.
+    table is designed for this — you watch the metrics drift over time.
+    Every run is recorded to `.protest/history.jsonl` so the trend
+    accumulates from day one (browsing and run-comparison tooling lands
+    in a future release).
 
 ## Quick Start
 
@@ -578,13 +576,9 @@ async def pipeline_eval(case, driver) -> str: ...
 async def chatbot_eval(case, deps) -> str: ...
 ```
 
-`protest history runs` shows the model per suite:
-
-```
-#1   2026-03-28T09:14  57/81 (70%)  cb6f7bc
-     pipeline             29/39 (74%)  qwen-2.5
-     chatbot              10/21 (48%)  mistral-7b
-```
+Each run records the model per suite in `.protest/history.jsonl`, so a
+mixed-model session (e.g. `pipeline` on `qwen-2.5`, `chatbot` on
+`mistral-7b`) keeps each suite's model alongside its scores.
 
 ## CLI
 
@@ -654,22 +648,12 @@ Each eval case writes a markdown file to `.protest/results/<suite>_<timestamp>/`
 
 ## History
 
-Eval results are persisted as JSONL in `.protest/history.jsonl`. Track trends across runs.
-
-```bash
-# Run list with per-suite breakdown
-protest history runs --evals
-
-# Detailed view of latest run
-protest history show --evals
-
-# Compare last two runs (fixed/regressed/new)
-# Requires --model NAME if your history mixes multiple model labels
-# (e.g. one suite per rules version) — comparing across labels is rejected
-# to avoid phantom regressions where a case "fails" only because the two
-# runs being diffed used different models.
-protest history compare --evals --model rules_v1
-```
+Every eval run is persisted as one JSONL entry in `.protest/history.jsonl`,
+recorded from the first run so trends accumulate over time. Each entry holds
+per-suite pass rates, per-case verdicts and scores, the model per suite, and
+git metadata. Tooling to browse, trend and compare runs lands in a future
+release; the file is a stable, schema-versioned format you can also read
+yourself in the meantime.
 
 ### Integrity Hashes
 
@@ -678,7 +662,10 @@ Each case in history carries two hashes:
 - **`case_hash`** — hash of inputs + expected output. Changes when the test data changes.
 - **`eval_hash`** — hash of evaluators. Changes when the scoring criteria change.
 
-`protest history compare` uses these hashes to detect modified cases vs regressions. If a case's `eval_hash` changed between runs, it's reported as "scoring modified" rather than a real regression.
+These hashes are what lets a later comparison distinguish a real regression
+from a definition change: when a case's `eval_hash` differs between two runs,
+the score moved because the scoring criteria changed ("scoring modified"), not
+because the system under test regressed.
 
 ## Progress Output
 

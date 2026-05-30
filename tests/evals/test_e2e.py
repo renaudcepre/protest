@@ -609,7 +609,7 @@ class TestHistory:
 
 
 class TestCleanDirty:
-    """protest history --clean-dirty behavior."""
+    """clean_dirty() storage behavior (removes dirty-tree entries at HEAD)."""
 
     def test_clean_dirty_removes_current_head_only(self, tmp_path: Path) -> None:
         # Entry with current HEAD + dirty
