@@ -74,7 +74,7 @@ class TestConditionalSkipDecorator:
     def test_suite_skip_with_callable(self) -> None:
         session = ProTestSession()
         suite = ProTestSuite("test")
-        session.include_suite(suite)
+        session.add_suite(suite)
 
         @suite.test(skip=lambda: True, skip_reason="Suite conditional skip")
         def test_skipped() -> None:

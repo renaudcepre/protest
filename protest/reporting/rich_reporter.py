@@ -1,8 +1,10 @@
+import importlib.util
+import logging
 import traceback
 from argparse import ArgumentParser
 from pathlib import Path
+from typing import Any
 
-from rich.console import Console  # type: ignore[import-not-found]
 from typing_extensions import Self
 
 from protest.entities import (
@@ -20,27 +22,68 @@ from protest.entities import (
     TestStartInfo,
     TestTeardownInfo,
 )
+from protest.evals.types import EvalSuiteReport
+from protest.execution.capture import real_stdout
 from protest.plugin import PluginBase, PluginContext
+from protest.reporting.format import (
+    format_duration as _format_duration,
+)
+from protest.reporting.format import (
+    format_usage as _format_usage,
+)
 from protest.reporting.verbosity import Verbosity
 
 
+# `rich` is an optional dependency. All `from rich...` imports below are
+# done lazily inside methods so that `import protest` works without it;
+# `RichReporter.activate()` returns None when rich is missing, and
+# `AsciiReporter` takes over via its own activate() check.
+def _rich_available() -> bool:
+    return importlib.util.find_spec("rich") is not None
+
+
+# Per-run pass-rate thresholds for the eval suite color cue.
+# Strict default — green only if every case passes; yellow above half.
+_PERFECT_PASS_RATE = 1.0
+_PARTIAL_PASS_RATE = 0.5
+
+
+def _short_label(name: str, node_id: str) -> str:
+    """name + [case_id] from node_id."""
+    if "[" in node_id:
+        suffix = node_id[node_id.index("[") :]
+        return f"{name}{suffix}"
+    return name
+
+
 def _format_test_name(result: TestResult) -> str:
-    if "[" in result.node_id:
-        suffix = result.node_id[result.node_id.index("[") :]
-        escaped_suffix = suffix.replace("[", "\\[")
-        return f"{result.name}{escaped_suffix}"
-    return result.name
+    label = _short_label(result.name, result.node_id)
+    return label.replace("[", "\\[")
 
 
-MIN_DURATION_THRESHOLD = 0.001
+def _format_eval_scores_inline(result: TestResult, short: bool = False) -> str:
+    """Format eval scores for inline display (e.g. ' bg_score=0.8 char_id=1.0').
 
-
-def _format_duration(seconds: float) -> str:
-    if seconds < MIN_DURATION_THRESHOLD:
-        return "<1ms"
-    if seconds < 1:
-        return f"{seconds * 1000:.0f}ms"
-    return f"{seconds:.2f}s"
+    When `short=True`, only failing/skipped scores are shown — passing scores
+    are hidden to keep the output readable on large suites.
+    """
+    if not result.eval_payload:
+        return ""
+    parts = []
+    for name, entry in result.eval_payload.scores.items():
+        if entry.skipped:
+            parts.append(f"{name}=⊘")
+            continue
+        if short and entry.passed:
+            continue
+        val = entry.value
+        if isinstance(val, bool):
+            parts.append(f"{name}={'✓' if val else '✗'}")
+        elif isinstance(val, float):
+            parts.append(f"{name}={val:.2f}")
+        else:
+            parts.append(f"{name}={val}")
+    return f" [dim]{' '.join(parts)}[/]" if parts else ""
 
 
 class RichReporter(PluginBase):
@@ -49,9 +92,20 @@ class RichReporter(PluginBase):
     name = "rich-reporter"
     description = "Rich console reporter with colors"
 
-    def __init__(self, verbosity: int = 0) -> None:
+    def __init__(
+        self,
+        verbosity: int = 0,
+        show_logs: str | None = None,
+        show_output: bool = False,
+        short: bool = False,
+    ) -> None:
+        from rich.console import Console  # noqa: PLC0415 — optional dep, lazy
+
         self.console = Console(highlight=False)
         self._verbosity = verbosity
+        self._show_logs = show_logs
+        self._show_output = show_output
+        self._short = short
         self._failed_results: list[TestResult] = []
         self._error_results: list[TestResult] = []
 
@@ -76,10 +130,59 @@ class RichReporter(PluginBase):
     def activate(cls, ctx: PluginContext) -> Self | None:
         if ctx.get("no_color", False):
             return None
-        return cls(verbosity=ctx.get("verbosity", 0))
+        if not _rich_available():
+            # `rich` is an optional dependency; AsciiReporter takes over.
+            return None
+        return cls(
+            verbosity=ctx.get("verbosity", 0),
+            show_logs=ctx.get("show_logs"),
+            show_output=ctx.get("show_output", False),
+            short=ctx.get("short", False),
+        )
 
     def _print(self, message: str) -> None:
         self.console.print(message)
+
+    def _print_eval_detail(self, result: TestResult) -> None:
+        """Print eval inputs/output/expected for -vv verbosity."""
+        p = result.eval_payload
+        if not p:
+            return
+        if p.inputs is not None:
+            inp = str(p.inputs)[:200]
+            self._print(f"[dim]       │ inputs: {inp}[/]")
+        if p.output is not None:
+            out = str(p.output)[:200]
+            self._print(f"[dim]       │ output: {out}[/]")
+        if p.expected_output is not None:
+            exp = str(p.expected_output)[:200]
+            self._print(f"[dim]       │ expected: {exp}[/]")
+
+    def _maybe_show_logs(self, result: TestResult) -> None:
+        """Show captured log records if --show-logs is active."""
+        if not self._show_logs or not result.log_records:
+            return
+        min_level = getattr(logging, self._show_logs.upper(), logging.INFO)
+        for record in result.log_records:
+            if record.levelno >= min_level:
+                level = record.levelname
+                color = (
+                    "red"
+                    if record.levelno >= logging.ERROR
+                    else "yellow"
+                    if record.levelno >= logging.WARNING
+                    else "dim"
+                )
+                self._print(
+                    f"[{color}]       LOG [{level}] {record.name}: {record.getMessage()}[/]"
+                )
+
+    def _print_bypass(self, message: str) -> None:
+        """Print bypassing capture (for lifecycle messages emitted during tests)."""
+        from rich.console import Console  # noqa: PLC0415 — optional dep, lazy
+
+        stream = real_stdout()
+        Console(file=stream, highlight=False).print(message)
 
     def on_collection_finish(self, items: list[TestItem]) -> list[TestItem]:
         return items
@@ -128,7 +231,7 @@ class RichReporter(PluginBase):
             self._print(f"[dim]    ↳ fixture '{info.name}' setup... {scope_str}[/]")
 
     def on_fixture_setup_done(self, info: FixtureInfo) -> None:
-        if self._verbosity >= Verbosity.FIXTURES:
+        if self._verbosity >= Verbosity.NORMAL:
             self._print(
                 f"[dim]    ↳ fixture '{info.name}' ready ({_format_duration(info.duration)})[/]"
             )
@@ -145,11 +248,13 @@ class RichReporter(PluginBase):
 
     def on_test_setup_done(self, info: TestStartInfo) -> None:
         if self._verbosity >= Verbosity.FIXTURES:
-            self._print(f"[dim]       → {info.name} setup done[/]")
+            label = _short_label(info.name, info.node_id).replace("[", "\\[")
+            self._print_bypass(f"[dim]       → {label} setup done[/]")
 
     def on_test_teardown_start(self, info: TestTeardownInfo) -> None:
         if self._verbosity >= Verbosity.FIXTURES:
-            self._print(f"[dim]       ← {info.name} teardown...[/]")
+            label = _short_label(info.name, info.node_id).replace("[", "\\[")
+            self._print_bypass(f"[dim]       ← {label} teardown...[/]")
 
     def on_test_retry(self, info: TestRetryInfo) -> None:
         delay_msg = f", retrying in {info.delay}s" if info.delay > 0 else ""
@@ -169,7 +274,17 @@ class RichReporter(PluginBase):
                 retry_suffix = (
                     f" [dim]\\[attempt {result.attempt}/{result.max_attempts}][/]"
                 )
-            self._print(f"   [green]✓[/]   {name} [dim]({duration})[/]{retry_suffix}")
+            scores_str = (
+                _format_eval_scores_inline(result, short=self._short)
+                if result.is_eval
+                else ""
+            )
+            self._print(
+                f"   [green]✓[/]   {name} [dim]({duration})[/]{scores_str}{retry_suffix}"
+            )
+            if self._show_output and result.is_eval:
+                self._print_eval_detail(result)
+            self._maybe_show_logs(result)
 
     def on_test_fail(self, result: TestResult) -> None:
         name = _format_test_name(result)
@@ -197,8 +312,17 @@ class RichReporter(PluginBase):
             self._print(f"   [red]✗[/]   {name}: {result.error}{retry_suffix}")
 
         if result.output:
-            for line in result.output.rstrip().splitlines():
+            lines = result.output.rstrip().splitlines()
+            max_lines = 20
+            for line in lines[:max_lines]:
                 self._print(f"[dim]       │ {line}[/]")
+            if len(lines) > max_lines:
+                self._print(
+                    f"[dim]       │ ... ({len(lines) - max_lines} more lines in .protest/last_run_stdout)[/]"
+                )
+        if result.is_eval:
+            self._print_eval_detail(result)  # always show on fail
+        self._maybe_show_logs(result)
 
     def on_test_skip(self, result: TestResult) -> None:
         self._skipped += 1
@@ -249,14 +373,16 @@ class RichReporter(PluginBase):
         return "".join(lines)
 
     def _print_failure_summary(self) -> None:
-        if self._failed_results:
+        non_eval_failures = [r for r in self._failed_results if not r.is_eval]
+        if non_eval_failures:
             self._print("\n[bold red]═══ FAILURES ═══[/]")
-            for result in self._failed_results:
+            for result in non_eval_failures:
                 self._print_failure_detail(result, is_error=False)
 
-        if self._error_results:
+        non_eval_errors = [r for r in self._error_results if not r.is_eval]
+        if non_eval_errors:
             self._print("\n[bold yellow]═══ ERRORS ═══[/]")
-            for result in self._error_results:
+            for result in non_eval_errors:
                 self._print_failure_detail(result, is_error=True)
 
     def _print_failure_detail(self, result: TestResult, *, is_error: bool) -> None:
@@ -281,8 +407,82 @@ class RichReporter(PluginBase):
                 escaped_line = line.replace("[", "\\[")
                 self._print(f"[dim]{escaped_line}[/]")
 
+    def on_user_print(self, data: Any) -> None:
+        from rich.console import Console  # noqa: PLC0415 — optional dep, lazy
+
+        msg, raw, prefix = data
+        # Write to the real stdout, bypassing capture
+        stream = real_stdout()
+        c = Console(file=stream, highlight=False)
+        if raw:
+            c.print(msg, markup=False)
+        elif prefix:
+            c.print(f"[dim]       │[/] {msg}")
+        else:
+            c.print(msg)
+
+    def on_eval_suite_end(self, report: Any) -> None:
+        if not isinstance(report, EvalSuiteReport):
+            return
+        from rich.table import Table  # noqa: PLC0415 — optional dep, lazy
+
+        stats = report.all_score_stats()
+        self._print("")
+        if stats:
+            table = Table(
+                title=f"Eval: {report.suite_name} ({report.total_count} cases)",
+                show_header=True,
+                header_style="bold cyan",
+                padding=(0, 1),
+            )
+            table.add_column("Score", style="cyan", no_wrap=True)
+            table.add_column("mean", justify="right")
+            table.add_column("p50", justify="right")
+            table.add_column("p5", justify="right", style="dim")
+            table.add_column("p95", justify="right", style="dim")
+            for s in stats:
+                table.add_row(
+                    s.name,
+                    f"{s.mean:.2f}",
+                    f"{s.median:.2f}",
+                    f"{s.p5:.2f}",
+                    f"{s.p95:.2f}",
+                )
+            self.console.print(table)
+        else:
+            self._print(
+                f"  [cyan]Eval: {report.suite_name} ({report.total_count} cases)[/]"
+            )
+        rate = report.pass_rate
+        color = (
+            "green"
+            if rate >= _PERFECT_PASS_RATE
+            else "yellow"
+            if rate >= _PARTIAL_PASS_RATE
+            else "red"
+        )
+        self._print(
+            f"  [{color}]Passed: {report.passed_count}/{report.total_count} ({rate * 100:.1f}%)[/]"
+        )
+        if report.total_task_tokens > 0 or report.total_task_cost > 0:
+            self._print(
+                f"  [dim]Task: {_format_usage(report.total_task_input_tokens, report.total_task_output_tokens, report.total_task_cost)}[/]"
+            )
+        if report.total_judge_calls > 0:
+            judge_parts = [f"{report.total_judge_calls} calls"]
+            usage = _format_usage(
+                report.total_judge_input_tokens,
+                report.total_judge_output_tokens,
+                report.total_judge_cost,
+            )
+            if usage:
+                judge_parts.append(usage)
+            self._print(f"  [dim]Judge: {', '.join(judge_parts)}[/]")
+
     def on_session_complete(self, result: SessionResult) -> None:
-        if self._failed_results or self._error_results:
+        has_non_eval_failures = any(not r.is_eval for r in self._failed_results)
+        has_non_eval_errors = any(not r.is_eval for r in self._error_results)
+        if has_non_eval_failures or has_non_eval_errors:
             self._print_failure_summary()
 
         total = (

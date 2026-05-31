@@ -58,6 +58,11 @@ class SuitePath:
         """Return lowercase string representation for case-insensitive comparison."""
         return self._path.lower()
 
+    @property
+    def root_name(self) -> str:
+        """Return the top-level suite name: 'A::B::C' -> 'A'."""
+        return self.parts[0] if self.parts else ""
+
     def __str__(self) -> str:
         return self._path
 

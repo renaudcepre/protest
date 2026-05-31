@@ -24,6 +24,24 @@ async def test_query(db: Annotated[Database, Use(database)]):
 
 The `Use` marker takes a **function reference**, not a string. This makes dependencies explicit and enables IDE navigation.
 
+### `Type` is a hint, not a runtime check
+
+In `Annotated[Type, Use(fixture)]`, `Type` is a **type hint for your IDE and static checkers** — ProTest does not validate at runtime that `fixture()` actually returns a `Type`. This matches FastAPI's behavior with `Annotated[Type, Depends(fn)]`: the type is taken on faith, not enforced.
+
+```python
+@fixture()
+def returns_str() -> str:
+    return "hello"
+
+@session.test()
+def test_mismatch(value: Annotated[int, Use(returns_str)]):
+    # `value` is actually a `str` at runtime — ProTest will not warn.
+    # The mismatch surfaces only when `value` is used as an `int`.
+    ...
+```
+
+In practice this is rarely a problem: keep your fixture return types and your call-site annotations aligned, and rely on `mypy`/`pyright` for the static check on the fixture itself.
+
 ## Why Function References?
 
 Using function references instead of string names has benefits:

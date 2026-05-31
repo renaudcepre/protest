@@ -62,6 +62,35 @@ CODES = ForEach([200, 201])
 def test_status(code: Annotated[int, From(CODES)]): ...
 ```
 
+### Native LLM Evals
+
+Score model outputs alongside your tests — same fixtures, same parallelism, same `protest` CLI. Cases get pass/fail + numeric metrics, persisted to JSONL for run-over-run comparison.
+
+```python
+from typing import Annotated
+from protest import ForEach, From, ProTestSession
+from protest.evals import EvalCase, EvalSuite
+from protest.evals.evaluators import contains_keywords
+
+session = ProTestSession()
+chatbot_suite = EvalSuite("chatbot")
+session.add_suite(chatbot_suite)
+
+cases = ForEach([
+    EvalCase(name="capital_fr", inputs="Capital of France?", expected="Paris"),
+])
+
+@chatbot_suite.eval(evaluators=[contains_keywords(keywords=["paris"])])
+async def chatbot(case: Annotated[EvalCase, From(cases)]) -> str:
+    return await my_agent(case.inputs)  # your LLM call
+```
+
+```bash
+protest eval evals.session:session   # runs are recorded to .protest/history.jsonl
+```
+
+See [Evals docs](https://renaudcepre.github.io/protest/evals/) for evaluators, judges, and scoring.
+
 ---
 
 ## Quick Start
@@ -107,6 +136,10 @@ protest run module:session --collect-only     # List tests without running
 protest run module:session --cache-clear      # Clear cache before run
 protest run module:session --app-dir src      # Look for module in src/
 protest run module:session --ctrf-output r.json  # CTRF report for CI/CD
+
+protest eval module:session                   # Run LLM evals
+protest eval module:session --tag safety      # Filter by case tag
+protest eval module:session --last-failed     # Re-run failed cases only
 ```
 
 ## Features
@@ -120,16 +153,18 @@ protest run module:session --ctrf-output r.json  # CTRF report for CI/CD
 - **Plugin system** - Custom reporters, filters
 - **Last-failed mode** - Re-run only failed tests with `--lf`
 - **CTRF reports** - Standardized JSON for CI/CD integration
+- **Native LLM evals** - Scored cases, JSONL history, `protest eval` (see [evals docs](https://renaudcepre.github.io/protest/evals/))
 
 ## Why Not pytest?
 
-|          | pytest             | ProTest                              |
-|----------|--------------------|--------------------------------------|
-| Fixtures | Implicit (by name) | Explicit (`Use(fixture)`)            |
-| Params   | Hidden in fixture  | Visible in test (`From()` + factory) |
-| Async    | Plugin required    | Native                               |
-| Parallel | Plugin required    | Built-in                             |
-| Cycles   | Runtime error      | Prevented at registration            |
+|          | pytest                          | ProTest                              |
+|----------|---------------------------------|--------------------------------------|
+| Fixtures | Implicit (by name)              | Explicit (`Use(fixture)`)            |
+| Params   | Hidden in fixture               | Visible in test (`From()` + factory) |
+| Async    | Plugin required                 | Native                               |
+| Parallel | Plugin required                 | Built-in                             |
+| Cycles   | Runtime error                   | Prevented at registration            |
+| Evals    | External (deepeval, pydantic-…) | Native (`protest eval`, JSONL history) |
 
 pytest has a large ecosystem and extensive community. ProTest is an alternative if you
 prefer FastAPI-style explicit dependencies and native async in your tests.

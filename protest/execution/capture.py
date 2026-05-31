@@ -1,14 +1,19 @@
+from __future__ import annotations
+
 import io
 import logging
 import sys
-from collections.abc import Callable
 from contextlib import suppress
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from logging import LogRecord
-from typing import TextIO
+from typing import TYPE_CHECKING, TextIO
 
-from protest.compat import Self
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from protest.compat import Self
+    from protest.events.bus import EventBus
 
 _capture_buffer: ContextVar[io.StringIO | None] = ContextVar(
     "capture_buffer", default=None
@@ -19,6 +24,7 @@ _log_records: ContextVar[list[LogRecord] | None] = ContextVar(
 )
 
 _current_node_id: ContextVar[str | None] = ContextVar("current_node_id", default=None)
+_event_bus_ref: ContextVar[EventBus | None] = ContextVar("event_bus_ref", default=None)
 
 
 @dataclass(slots=True)
@@ -100,6 +106,21 @@ def get_session_teardown_output() -> str:
     return _session_teardown.buffer.getvalue() if _session_teardown.buffer else ""
 
 
+def set_event_bus(bus: EventBus) -> Token[EventBus | None]:
+    """Set event bus reference for console.print() access."""
+    return _event_bus_ref.set(bus)
+
+
+def reset_event_bus(token: Token[EventBus | None]) -> None:
+    """Reset event bus reference."""
+    _event_bus_ref.reset(token)
+
+
+def get_event_bus() -> EventBus | None:
+    """Get current event bus (for console.print)."""
+    return _event_bus_ref.get()
+
+
 class TaskAwareStream:
     def __init__(self, original_stream: TextIO, show_output: bool = False) -> None:
         self._original = original_stream
@@ -130,6 +151,25 @@ class TaskAwareStream:
 
     def __getattr__(self, name: str) -> object:
         return getattr(self._original, name)
+
+
+def real_stdout() -> TextIO:
+    """Return the real process stdout, bypassing any active capture wrapper.
+
+    When a run is under capture, `sys.stdout` is a `TaskAwareStream` routing
+    writes into per-test buffers; reporters need to bypass that buffering to
+    write their own output (progress, summary) directly to the terminal.
+    """
+    if isinstance(sys.stdout, TaskAwareStream):
+        return sys.stdout._original
+    return sys.stdout
+
+
+def real_stderr() -> TextIO:
+    """Return the real process stderr, bypassing any active capture wrapper."""
+    if isinstance(sys.stderr, TaskAwareStream):
+        return sys.stderr._original
+    return sys.stderr
 
 
 class TaskAwareLogHandler(logging.Handler):

@@ -65,6 +65,8 @@ nav:
       - Tags: core-concepts/tags.md
       - Dependency Injection: core-concepts/dependency-injection.md
       - Reporters: core-concepts/reporters.md
+      - Console Output: core-concepts/console.md
+  - Evals: evals.md
   - Guides:
       - Best Practices: best-practices.md
       - Project Organization: guides/project-organization.md

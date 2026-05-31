@@ -190,7 +190,7 @@ class TestParameterizedCollection:
     def test_structured_data_for_reporters(self) -> None:
         session = ProTestSession()
         suite = ProTestSuite("API")
-        session.include_suite(suite)
+        session.add_suite(suite)
 
         users = ForEach(["alice"], ids=lambda u: u)
 

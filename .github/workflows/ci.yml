@@ -46,8 +46,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install dependencies
+        run: uv sync --all-extras --group dev
+
       - name: Type check
-        run: uvx mypy --strict protest
+        run: uv run mypy protest
 
   test:
     needs: lint
@@ -70,6 +73,11 @@ jobs:
           - os: windows-latest
             python-version: "3.12"
     runs-on: ${{ matrix.os }}
+    env:
+      # Force uv to honor the matrix Python version. Without this, uv picks
+      # the newest interpreter satisfying `requires-python` (often the system
+      # 3.12), making the matrix cosmetic.
+      UV_PYTHON: ${{ matrix.python-version }}
 
     steps:
       - uses: actions/checkout@v6
@@ -87,6 +95,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --dev
 
+      - name: Verify Python version
+        run: uv run python -c "import sys; v = '${{ matrix.python-version }}'; assert sys.version.startswith(v), f'expected {v}, got {sys.version}'"
+
       - name: Run tests
         if: matrix.os != 'ubuntu-latest' || matrix.python-version != '3.12'
         run: uv run pytest -vv
@@ -103,7 +114,7 @@ jobs:
           files: coverage.xml
           fail_ci_if_error: false
 
-c  docs:
+  docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

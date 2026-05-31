@@ -93,3 +93,49 @@ class InvalidMaxConcurrencyError(ProTestError):
             f"max_concurrency must be >= 1, got {value}. "
             f"Use None for unlimited concurrency."
         )
+
+
+class MultipleEvalCaseParamsError(ProTestError):
+    """Raised when an eval function declares more than one EvalCase parameter.
+
+    Only one EvalCase per eval is supported: it determines the case identity
+    (name, expected, inputs, metadata, per-case evaluators) used by the
+    runner, history, and reporters. Additional EvalCase parameters would be
+    silently ignored downstream.
+    """
+
+    def __init__(self, func_name: str, param_names: list[str]):
+        params = ", ".join(param_names)
+        super().__init__(
+            f"Eval '{func_name}' declares multiple EvalCase parameters: {params}. "
+            f"Only one EvalCase parameter is supported per eval — it is used "
+            f"for case identity (name), expected output, inputs, metadata, "
+            f"and per-case evaluators. Merge the cases into a single EvalCase, "
+            f"or split into separate evals."
+        )
+
+
+class ScoreNameCollisionError(ProTestError):
+    """Raised when two evaluators in the same eval emit scores with the same name.
+
+    Each `EvalScore.name` (from a dataclass `Verdict`/`Metric`/`Reason` field
+    or from the evaluator's name when it returns `bool`) becomes a key in
+    `EvalPayload.scores` (a dict). If two evaluators emit the same name,
+    one would silently overwrite the other in the per-case report and history,
+    which is a real source of misleading data.
+
+    Fix by renaming the colliding fields so each Verdict/Metric/Reason has a
+    unique name within the suite (e.g. prefix with the evaluator's concept:
+    `summary_detail` instead of just `detail`).
+    """
+
+    def __init__(self, case_name: str, duplicates: list[str]):
+        dup_str = ", ".join(repr(d) for d in sorted(duplicates))
+        super().__init__(
+            f"Score-name collision in eval '{case_name}': {dup_str}. "
+            f"Two or more evaluators emit a score under the same name. "
+            f"Rename the colliding dataclass Verdict/Metric/Reason field(s) "
+            f"so each name is unique within the suite — otherwise the "
+            f"duplicate scores would silently overwrite each other in the "
+            f"per-case report and the history file."
+        )
