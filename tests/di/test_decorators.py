@@ -4,6 +4,7 @@ from typing import Annotated
 
 from protest import FixtureFactory, ProTestSession, Use, factory, fixture
 from protest.core.runner import TestRunner
+from protest.di.decorators import FixtureWrapper, get_fixture_marker
 from protest.plugin import PluginBase
 from tests.conftest import CollectedEvents
 
@@ -303,3 +304,88 @@ class TestFactoryDecorator:
         tags = session.resolver.get_fixture_tags(user)
         assert "slow" in tags
         assert "integration" in tags
+
+
+class TestDecoratorWithoutParentheses:
+    """@fixture / @factory usable without parentheses when no args (issue #92)."""
+
+    def test_bare_fixture_equivalent_to_called(self) -> None:
+        """`@fixture` produces the same wrapper/marker as `@fixture()`."""
+
+        @fixture
+        def bare() -> int:
+            return 1
+
+        @fixture()
+        def called() -> int:
+            return 1
+
+        assert isinstance(bare, FixtureWrapper)
+        assert isinstance(called, FixtureWrapper)
+        bare_marker = get_fixture_marker(bare)
+        called_marker = get_fixture_marker(called)
+        assert bare_marker is not None
+        assert called_marker is not None
+        assert bare_marker.is_factory is called_marker.is_factory is False
+
+    def test_bare_factory_equivalent_to_called(self) -> None:
+        """`@factory` produces the same wrapper/marker as `@factory()` (defaults)."""
+
+        @factory
+        def bare(name: str) -> dict[str, str]:
+            return {"name": name}
+
+        @factory()
+        def called(name: str) -> dict[str, str]:
+            return {"name": name}
+
+        assert isinstance(bare, FixtureWrapper)
+        assert isinstance(called, FixtureWrapper)
+        bare_marker = get_fixture_marker(bare)
+        called_marker = get_fixture_marker(called)
+        assert bare_marker is not None
+        assert called_marker is not None
+        assert bare_marker.is_factory is True
+        assert bare_marker.cache is called_marker.cache is False
+        assert bare_marker.managed is called_marker.managed is True
+
+    def test_bare_fixture_resolves_in_test(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
+        """End-to-end: a bare `@fixture` resolves like a normal fixture."""
+        plugin, _collected = event_collector
+        session = ProTestSession()
+        session.register_plugin(plugin)
+
+        @fixture
+        def value() -> str:
+            return "ok"
+
+        @session.test()
+        def test_uses_value(v: Annotated[str, Use(value)]) -> None:
+            assert v == "ok"
+
+        result = TestRunner(session).run()
+        assert result.success is True
+
+    def test_bare_factory_resolves_in_test(
+        self, event_collector: tuple[PluginBase, CollectedEvents]
+    ) -> None:
+        """End-to-end: a bare `@factory` produces a usable factory."""
+        plugin, _collected = event_collector
+        session = ProTestSession()
+        session.register_plugin(plugin)
+
+        @factory
+        def user(name: str) -> dict[str, str]:
+            return {"name": name}
+
+        @session.test()
+        async def test_makes_user(
+            user_factory: Annotated[FixtureFactory[dict[str, str]], Use(user)],
+        ) -> None:
+            alice = await user_factory(name="alice")
+            assert alice["name"] == "alice"
+
+        result = TestRunner(session).run()
+        assert result.success is True

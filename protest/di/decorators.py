@@ -124,12 +124,29 @@ def fixture(
     return decorator
 
 
+@overload
+def factory(_func: FuncT, /) -> FixtureWrapper[FuncT]: ...
+
+
+@overload
 def factory(
+    *,
     cache: bool = False,
     managed: bool = True,
     tags: list[str] | None = None,
     max_concurrency: int | None = None,
-) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
+) -> Callable[[FuncT], FixtureWrapper[FuncT]]: ...
+
+
+def factory(
+    _func: FuncT | None = None,
+    /,
+    *,
+    cache: bool = False,
+    managed: bool = True,
+    tags: list[str] | None = None,
+    max_concurrency: int | None = None,
+) -> FixtureWrapper[FuncT] | Callable[[FuncT], FixtureWrapper[FuncT]]:
     """Decorator to mark a function as a factory fixture.
 
     Scope is determined at binding time:
@@ -187,6 +204,9 @@ def factory(
             max_concurrency=max_concurrency,
         )
         return FixtureWrapper(func, registration)
+
+    if _func is not None:
+        return decorator(_func)
 
     return decorator
 
