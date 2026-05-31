@@ -129,7 +129,7 @@ If a test creates `alice` then `bob`, teardown runs `bob` first, then `alice`.
 Factories can depend on other fixtures:
 
 ```python
-@fixture()
+@fixture
 def database():
     return Database()
 

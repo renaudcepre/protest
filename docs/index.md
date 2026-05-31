@@ -37,7 +37,7 @@ Tag a fixture once, and **every test using it inherits the tag automatically**â€
 def db(): ...
 session.bind(db)
 
-@fixture()
+@fixture
 def user_repo(db: Annotated[DB, Use(db)]): ...  # Inherits "database" tag
 session.bind(user_repo)
 
@@ -94,7 +94,7 @@ from protest import ProTestSession, Use, fixture
 
 session = ProTestSession()
 
-@fixture()
+@fixture
 def database():
     return {"connected": True}
 

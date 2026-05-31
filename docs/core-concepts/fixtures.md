@@ -4,12 +4,12 @@ Fixtures provide reusable setup and teardown logic for tests.
 
 ## What is a Fixture?
 
-A fixture is a function decorated with `@fixture()` that provides a value to tests.
+A fixture is a function decorated with `@fixture` that provides a value to tests.
 
 ```python
 from protest import fixture
 
-@fixture()
+@fixture
 def config():
     return {"debug": True}
 ```
@@ -18,7 +18,7 @@ def config():
 
 **Important:** Fixture scope is determined by WHERE you bind it, not by the decorator.
 
-The `@fixture()` decorator only marks a function as a fixture. The scope is set when you bind the fixture to a session or suite.
+The `@fixture` decorator only marks a function as a fixture. The scope is set when you bind the fixture to a session or suite.
 
 ### Session Scope
 
@@ -27,7 +27,7 @@ Bind to session with `session.bind()`. Lives for the entire test session.
 ```python
 from protest import fixture, ProTestSession
 
-@fixture()
+@fixture
 async def database():
     db = await connect()
     yield db
@@ -46,7 +46,7 @@ Bind to suite with `suite.bind()`. Lives for the duration of the suite.
 ```python
 from protest import fixture, ProTestSuite
 
-@fixture()
+@fixture
 def api_client(db: Annotated[Database, Use(database)]):
     return Client(db)
 
@@ -61,7 +61,7 @@ Use case: Resources shared within a group of related tests.
 Don't bind the fixture. Fresh instance for each test.
 
 ```python
-@fixture()
+@fixture
 def request_id():
     return str(uuid.uuid4())
 
@@ -83,7 +83,7 @@ Use case: Isolated state per test, unique IDs, temporary files.
 Use `yield` to separate setup from teardown:
 
 ```python
-@fixture()
+@fixture
 async def database():
     # Setup
     db = await connect()
@@ -111,11 +111,11 @@ A fixture can only depend on fixtures with equal or wider scope:
 Violating this raises `ScopeMismatchError`:
 
 ```python
-@fixture()
+@fixture
 def per_test_data():
     return "per-test"
 
-@fixture()
+@fixture
 def shared_resource(x: Annotated[str, Use(per_test_data)]):
     return x
 
@@ -210,7 +210,7 @@ async def rate_limited_api():
     """Only 2 concurrent requests allowed."""
     yield ApiClient()
 
-@fixture()
+@fixture
 async def user_service(api: Annotated[ApiClient, Use(rate_limited_api)]):
     """Service that uses the rate-limited API."""
     yield UserService(api)
@@ -242,7 +242,7 @@ Autouse fixtures are automatically resolved at their scope start, without being 
 ### Session Autouse
 
 ```python
-@fixture()
+@fixture
 def configure_logging():
     logging.basicConfig(level=logging.DEBUG)
     yield
@@ -256,7 +256,7 @@ Session autouse fixtures are resolved at `SESSION_SETUP_START`, before any test 
 ### Suite Autouse
 
 ```python
-@fixture()
+@fixture
 def clear_environment():
     old = os.environ.copy()
     os.environ.clear()
@@ -280,10 +280,10 @@ Don't use autouse when tests need the fixture's value - use explicit `Use()` ins
 
 ## Plain Functions
 
-All fixtures must be decorated with `@fixture()`. Plain functions raise `PlainFunctionError` when used with `Use()`:
+All fixtures must be decorated with `@fixture`. Plain functions raise `PlainFunctionError` when used with `Use()`:
 
 ```python
-def not_a_fixture():  # Missing @fixture()!
+def not_a_fixture():  # Missing @fixture!
     return "value"
 
 @session.test()

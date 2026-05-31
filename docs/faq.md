@@ -29,7 +29,7 @@ from typing import Annotated
 user_suite = ProTestSuite("User")
 
 
-@fixture()
+@fixture
 def user():
     return User("alice")
 
@@ -95,12 +95,12 @@ If fixtures could use `From()`, you'd get hidden cartesian products:
 ```python
 # Hypothetical - NOT SUPPORTED (decorator syntax doesn't exist either)
 # If this were possible:
-@fixture()
+@fixture
 def db(engine: Annotated[str, From(ENGINES)]):  # 3 engines
     ...
 session.bind(db)
 
-@fixture()
+@fixture
 def user(role: Annotated[str, From(ROLES)], db: ...):  # 2 roles
     ...
 session.bind(user)
@@ -165,4 +165,3 @@ async def test_pipeline() -> None:
 ```
 
 See `examples/subprocess_capture/session.py` for complete examples and [Built-ins](core-concepts/builtins.md#shell) for full API.
-

@@ -46,7 +46,7 @@ session.bind(db)
 
 
 # Fixture that depends on db - inherits "database" tag
-@fixture()
+@fixture
 def user_repository(db: Annotated[Database, Use(db)]):
     return UserRepository(db)
 
@@ -54,7 +54,7 @@ session.bind(user_repository)
 
 
 # Fixture that depends on user_repository - also inherits "database"
-@fixture()
+@fixture
 def user_service(repo: Annotated[UserRepository, Use(user_repository)]):
     return UserService(repo)
 

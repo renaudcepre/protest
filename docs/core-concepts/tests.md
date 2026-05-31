@@ -36,7 +36,7 @@ Tests declare their dependencies using type annotations:
 from typing import Annotated
 from protest import Use, fixture
 
-@fixture()
+@fixture
 def database():
     return Database()
 
@@ -175,7 +175,7 @@ ProTest evaluates skip conditions **after** fixture resolution, so your callable
 from typing import Annotated
 from protest import Use, fixture
 
-@fixture()
+@fixture
 def environment():
     return {"is_ci": os.getenv("CI") == "true"}
 

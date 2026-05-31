@@ -69,7 +69,7 @@ from protest import fixture
 from myapp.app import app
 
 
-@fixture()
+@fixture
 async def client() -> AsyncIterator[httpx.AsyncClient]:
     async with LifespanManager(app) as manager:
         transport = httpx.ASGITransport(app=manager.app)
@@ -144,7 +144,7 @@ from protest import fixture
 from myapp.app import app
 
 
-@fixture()
+@fixture
 async def client() -> AsyncIterator[httpx.AsyncClient]:
     async with LifespanManager(app) as manager:
         transport = httpx.ASGITransport(app=manager.app)
@@ -239,7 +239,7 @@ class _LifespanWrapper:
         await self.app(scope, receive, send)
 
 
-@fixture()
+@fixture
 async def client() -> AsyncIterator[httpx.AsyncClient]:
     async with lifespan(app) as state:
         wrapped = _LifespanWrapper(app, state)

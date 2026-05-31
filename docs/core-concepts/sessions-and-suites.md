@@ -39,7 +39,7 @@ Bind fixtures to the session with `bind()`:
 ```python
 from protest import fixture
 
-@fixture()
+@fixture
 def database():
     db = connect()
     yield db
@@ -79,7 +79,7 @@ api_suite = ProTestSuite(
 Bind fixtures to a suite with `bind()`:
 
 ```python
-@fixture()
+@fixture
 def api_client():
     return Client()
 
@@ -124,7 +124,7 @@ orders_suite.full_path # "API::Orders"
 Child suites can access fixtures from parent suites:
 
 ```python
-@fixture()
+@fixture
 def api_client():
     return Client()
 

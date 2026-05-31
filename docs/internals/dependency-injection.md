@@ -62,12 +62,12 @@ A fixture can only depend on fixtures with **equal or wider** scope:
 Violating this raises `ScopeMismatchError`:
 
 ```python
-@fixture()  # Test scope (not bound)
+@fixture  # Test scope (not bound)
 def per_test():
     return "fresh"
 
 
-@fixture()
+@fixture
 def shared(x: Annotated[str, Use(per_test)]):
     pass
 
@@ -113,7 +113,7 @@ wait for the first resolution to complete, then share the cached value.
 Generator fixtures use `yield` to separate setup from teardown:
 
 ```python
-@fixture()
+@fixture
 async def database():
     db = await connect()  # Setup
     yield db  # Value used by tests

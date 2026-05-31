@@ -7,7 +7,7 @@ session.bind() or suite.bind(). Unbound fixtures default to TEST scope.
 
 import functools
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, overload
 
 from protest.di.validation import validate_no_from_params
 from protest.entities import FixtureMarker, FixtureRegistration
@@ -43,10 +43,25 @@ def unwrap_fixture(func: Callable[..., Any]) -> Callable[..., Any]:
     return func
 
 
+@overload
+def fixture(_func: FuncT, /) -> FixtureWrapper[FuncT]: ...
+
+
+@overload
 def fixture(
+    *,
     tags: list[str] | None = None,
     max_concurrency: int | None = None,
-) -> Callable[[FuncT], FixtureWrapper[FuncT]]:
+) -> Callable[[FuncT], FixtureWrapper[FuncT]]: ...
+
+
+def fixture(
+    _func: FuncT | None = None,
+    /,
+    *,
+    tags: list[str] | None = None,
+    max_concurrency: int | None = None,
+) -> FixtureWrapper[FuncT] | Callable[[FuncT], FixtureWrapper[FuncT]]:
     """Decorator to mark a function as a fixture.
 
     Scope is determined at binding time:
@@ -102,6 +117,9 @@ def fixture(
             max_concurrency=max_concurrency,
         )
         return FixtureWrapper(func, registration)
+
+    if _func is not None:
+        return decorator(_func)
 
     return decorator
 

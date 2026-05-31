@@ -12,7 +12,7 @@ from protest import ProTestSession, Use, fixture
 
 session = ProTestSession()
 
-@fixture()
+@fixture
 def database():
     return Database()
 
@@ -65,11 +65,11 @@ def undefined_fixture():
 Fixtures can depend on other fixtures:
 
 ```python
-@fixture()
+@fixture
 def config():
     return {"db_url": "postgres://localhost"}
 
-@fixture()
+@fixture
 async def database(cfg: Annotated[dict, Use(config)]):
     return await connect(cfg["db_url"])
 
@@ -109,11 +109,11 @@ If two tests both use `database`, and `database` is session-scoped, they share t
 Raised when a fixture depends on a narrower scope:
 
 ```python
-@fixture()  # Test scope (not bound)
+@fixture  # Test scope (not bound)
 def per_test():
     return "fresh"
 
-@fixture()
+@fixture
 def shared(x: Annotated[str, Use(per_test)]):
     return x
 
