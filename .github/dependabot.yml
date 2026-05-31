@@ -5,9 +5,20 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      # Dev tooling (linters, type checkers, test/docs deps) → one batched PR,
+      # eligible for auto-merge on green CI.
+      dev-dependencies:
+        dependency-type: "development"
+    # Runtime deps (typing-extensions, rich, websockets) are intentionally
+    # left ungrouped: each gets its own PR so we can review floor raises that
+    # would narrow who can install protest.
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns: ["*"]
