@@ -4,9 +4,11 @@
 [![codecov](https://codecov.io/gh/renaudcepre/protest/graph/badge.svg?token=V0MLGEE5UZ)](https://codecov.io/gh/renaudcepre/protest)
 [![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://renaudcepre.github.io/protest/)
 
-Modern, async-first testing framework for Python 3.10+
+**Write your tests and your LLM evals in one async-first framework.**
 
-**Explicit dependencies. Native async. Built-in parallelism.**
+An eval is just a test that returns a value — scored, not asserted. Your evals get
+real fixtures, dependency injection and parallelism, and live right next to the
+tests they ship with. Python 3.10+, installs lean (Rich UI optional).
 
 ---
 
