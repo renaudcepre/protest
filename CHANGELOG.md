@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/renaudcepre/protest/compare/protest-v0.1.2...protest-v0.2.0) (2026-05-31)
+
+
+### Features
+
+* allow [@factory](https://github.com/factory) without parentheses when no arguments ([#111](https://github.com/renaudcepre/protest/issues/111)) ([6be96b5](https://github.com/renaudcepre/protest/commit/6be96b5808e98c1914966ff709a56dd44a7f440c))
+* allow [@fixture](https://github.com/fixture) without parentheses when no arguments ([#102](https://github.com/renaudcepre/protest/issues/102)) ([c24b75d](https://github.com/renaudcepre/protest/commit/c24b75d27970f126027f6dc26a37a727a28741c7))
+* **evals:** native eval system with judge, scoring, and short-circuit ([54d6037](https://github.com/renaudcepre/protest/commit/54d603747217b3a194aa07c8b839f5fdab7fe69f))
+
+
+### Documentation
+
+* lead README with the evals angle ([3bdeb71](https://github.com/renaudcepre/protest/commit/3bdeb71c8c5106a6efe2c74751be32245e43cd1e))
+
+
+### Miscellaneous Chores
+
+* release protest 0.2.0 ([56bafb8](https://github.com/renaudcepre/protest/commit/56bafb8eb82eba58e636e5ed67775f8efbac1b6d))
+
 ## [0.1.2](https://github.com/renaudcepre/protest/compare/protest-v0.1.1...protest-v0.1.2) (2026-03-24)
 
 
