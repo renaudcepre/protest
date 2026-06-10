@@ -86,10 +86,11 @@ def make_eval_wrapper(
             judge=judge,
         )
 
-        # Backstop for collisions the pre-execution name check can't see
-        # (e.g. two differently-named evaluators whose results emit the
-        # same score key). EvalPayload.scores is a dict keyed by name and
-        # would silently drop one of them.
+        # Defense-in-depth backstop. With per-evaluator namespacing and the
+        # pre-execution name check above, no known path reaches this —
+        # distinct evaluator names can't emit the same key. Kept because
+        # EvalPayload.scores is a dict: if a future extraction path ever
+        # produces duplicate keys, silent overwrite is the worst failure.
         seen: set[str] = set()
         duplicates: list[str] = []
         for s in scores:

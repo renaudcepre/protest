@@ -240,6 +240,39 @@ class Reason:
     """Annotate a str field as a reason displayed on failure."""
 
 
+def _validate_return_annotation(fn: Callable[..., Any]) -> None:
+    """Reject evaluator functions whose return annotation isn't bool or a dataclass.
+
+    The return annotation is the score contract: it determines the score
+    names recorded in history and the keys of skipped placeholders
+    (`Evaluator.score_names()`). An unannotated function — or one annotated
+    `-> X | None` / `-> Any` — would make the static derivation diverge
+    from what the run actually emits, silently reintroducing unstable
+    score keys. Failing at decoration time keeps the contract checkable.
+    """
+    try:
+        hints = get_type_hints(fn)
+    except NameError as exc:
+        raise TypeError(
+            f"@evaluator '{fn.__name__}': return annotation cannot be resolved "
+            f"at runtime ({exc}). Evaluator return types must resolve from "
+            f"module scope — import them at runtime (not only under "
+            f"TYPE_CHECKING) and define them at module level (a dataclass "
+            f"defined inside a function cannot be resolved). The annotation "
+            f"drives score names in history and skipped placeholders."
+        ) from exc
+    ret = hints.get("return")
+    base = get_origin(ret) or ret
+    if ret is bool or (isinstance(base, type) and dataclasses.is_dataclass(base)):
+        return
+    raise TypeError(
+        f"@evaluator '{fn.__name__}' must declare a return annotation of bool "
+        f"or a dataclass, got {ret!r}. The annotation is the score contract: "
+        f"it determines score names for history and skipped placeholders, so "
+        f"it cannot be missing, optional, or a union."
+    )
+
+
 def _annotated_score_field_names(cls: type) -> list[str]:
     """Names of the Metric/Verdict/Reason-annotated fields of a dataclass."""
     names = []
@@ -314,21 +347,16 @@ class Evaluator:
 
         Mirrors `extract_scores_from_result` without running the evaluator:
         a dataclass return annotation yields the namespaced
-        ``<name>.<field>`` names; anything else (bool, missing or
-        unresolvable annotation) yields the bare evaluator name. Used to
-        build skipped placeholders with the same keys as a real run, so
-        score keys stay stable whether or not a ShortCircuit fired.
+        ``<name>.<field>`` names; bool yields the bare evaluator name.
+        Used to build skipped placeholders with the same keys as a real
+        run, so score keys stay stable whether or not a ShortCircuit fired.
+        The annotation is guaranteed resolvable and bool-or-dataclass by
+        `_validate_return_annotation` at decoration time.
         """
-        try:
-            hints = get_type_hints(self._fn)
-        except NameError:
-            # Unresolvable annotation (e.g. TYPE_CHECKING-only import).
-            # Execution would still work — it reads type(result) — so the
-            # placeholder must not be stricter than the real run.
-            return [self._name]
-        ret = hints.get("return")
-        if isinstance(ret, type) and dataclasses.is_dataclass(ret):
-            return [f"{self._name}.{n}" for n in _annotated_score_field_names(ret)]
+        ret = get_type_hints(self._fn).get("return")
+        base = get_origin(ret) or ret
+        if isinstance(base, type) and dataclasses.is_dataclass(base):
+            return [f"{self._name}.{n}" for n in _annotated_score_field_names(base)]
         return [self._name]
 
     def __call__(self, **kwargs: Any) -> Evaluator:
@@ -360,5 +388,10 @@ def evaluator(fn: Callable[..., Any]) -> Evaluator:
     ``evaluators=[...]`` will accept. Plain callables are rejected at
     registration so the executor can rely on a uniform Union type instead
     of dispatching at runtime.
+
+    The function must declare a return annotation of ``bool`` or a
+    dataclass — the annotation is the score contract (see
+    `_validate_return_annotation`).
     """
+    _validate_return_annotation(fn)
     return Evaluator(fn)

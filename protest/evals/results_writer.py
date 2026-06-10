@@ -130,6 +130,8 @@ def _format_case_duration(seconds: float) -> str:
 
 
 def _format_score(score: EvalScore) -> str:
+    if score.skipped:
+        return f"- **{score.name}**: skipped"
     icon = "·" if score.is_metric else ("✓" if score.passed else "✗")
     return f"- **{score.name}**: {score.value} {icon}"
 

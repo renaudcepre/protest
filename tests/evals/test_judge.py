@@ -25,6 +25,14 @@ from protest.plugin import PluginBase
 # ---------------------------------------------------------------------------
 
 
+@dataclass
+class JudgeVerdict:
+    """Module-level: @evaluator return annotations must resolve from module
+    scope (function-local dataclasses can't be resolved by get_type_hints)."""
+
+    ok: Annotated[bool, Verdict]
+
+
 class FakeJudge:
     """Minimal Judge implementation for tests."""
 
@@ -319,10 +327,6 @@ class TestJudgeE2E:
 
     def test_judge_with_structured_output(self) -> None:
         """Judge returns structured dataclass via output_type."""
-
-        @dataclass
-        class JudgeVerdict:
-            ok: Annotated[bool, Verdict]
 
         class StructuredJudge:
             name: str = "structured"

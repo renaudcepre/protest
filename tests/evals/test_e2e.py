@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from pathlib import Path  # noqa: TC003 — used at runtime (pytest tmp_path)
 from typing import Annotated, Any
 
+import pytest
+
 from protest import ForEach, From, ProTestSession, Use, fixture
 from protest.api import run_session
 from protest.core.collector import Collector
@@ -919,40 +921,42 @@ class TestScoringV2:
         # word_overlap returns only float -> tracking-only, always passes
         assert result.success is True
 
-    def test_float_return_raises_type_error(self) -> None:
-        """Evaluator returning naked float -> TypeError (caught as fixture error)."""
-        results: list[Any] = []
+    def test_float_return_annotation_raises_at_decoration(self) -> None:
+        """`-> float` is rejected by @evaluator itself — the return annotation
+        is the score contract and must be bool or a dataclass."""
+        with pytest.raises(TypeError, match="bool or a dataclass"):
 
-        class Collector(PluginBase):
-            name = "collector"
+            @evaluator
+            def bad_evaluator(ctx: EvalContext) -> float:
+                return 0.5
 
-            def on_test_fail(self, result: Any) -> None:
-                results.append(result)
+    def test_missing_return_annotation_raises_at_decoration(self) -> None:
+        with pytest.raises(TypeError, match="bool or a dataclass"):
 
-        @evaluator
-        def bad_evaluator(ctx: EvalContext) -> float:
-            return 0.5
+            @evaluator
+            def unannotated(ctx: EvalContext):
+                return True
 
-        single_case = ForEach(
-            [EvalCase(inputs="hello", expected="hello", name="c1")],
-            ids=lambda c: c.name,
-        )
+    def test_optional_return_annotation_raises_at_decoration(self) -> None:
+        with pytest.raises(TypeError, match="bool or a dataclass"):
 
-        session = ProTestSession()
-        session.register_plugin(Collector())
+            @evaluator
+            def maybe(ctx: EvalContext) -> FakeAccuracyResult | None:
+                return None
 
-        eval_echo_suite = EvalSuite("eval_echo")
-        session.add_suite(eval_echo_suite)
+    def test_unresolvable_return_annotation_raises_at_decoration(self) -> None:
+        """A function-local dataclass can't be resolved by get_type_hints —
+        the placeholder keys would silently diverge from the real run."""
 
-        @eval_echo_suite.eval(evaluators=[bad_evaluator])
-        def eval_echo(case: Annotated[EvalCase, From(single_case)]) -> str:
-            return echo_task(case.inputs)
+        @dataclass
+        class LocalShape:
+            ok: Annotated[bool, Verdict]
 
-        runner = TestRunner(session)
-        runner.run()
+        with pytest.raises(TypeError, match="cannot be resolved"):
 
-        assert len(results) == 1
-        assert results[0].is_fixture_error is True
+            @evaluator
+            def local_shape(ctx: EvalContext) -> LocalShape:
+                return LocalShape(ok=True)
 
 
 class TestShortCircuit:

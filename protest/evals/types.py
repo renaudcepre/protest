@@ -194,7 +194,7 @@ class EvalCaseResult:
             case_name=payload.case_name or "",
             node_id=result.node_id,
             scores=tuple(
-                EvalScore(name=name, value=entry.value)
+                EvalScore(name=name, value=entry.value, skipped=entry.skipped)
                 for name, entry in payload.scores.items()
             ),
             duration=payload.task_duration,

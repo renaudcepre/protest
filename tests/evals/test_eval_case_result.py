@@ -77,6 +77,22 @@ class TestFromTestResultHappyPath:
         assert case.scores[0].name == "accuracy"
         assert case.scores[0].value == 0.9
 
+    def test_skipped_flag_preserved(self) -> None:
+        """Regression (#116): dropping `skipped` turned short-circuited
+        placeholders (value=False, skipped=True) into reported failures."""
+        payload = _make_payload(
+            scores={
+                "gate": EvalScoreEntry(value=False, passed=False),
+                "judge.ok": EvalScoreEntry(value=False, passed=True, skipped=True),
+            }
+        )
+        case = EvalCaseResult.from_test_result(_make_result(payload=payload))
+        by_name = {s.name: s for s in case.scores}
+        assert by_name["judge.ok"].skipped is True
+        assert by_name["judge.ok"].passed is True
+        assert by_name["judge.ok"] not in case.failed_scores
+        assert by_name["gate"] in case.failed_scores
+
     def test_task_usage_copied(self) -> None:
         """Regression: writer used to drop these fields silently."""
         case = EvalCaseResult.from_test_result(_make_result())

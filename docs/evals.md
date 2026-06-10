@@ -187,7 +187,13 @@ from protest.evals import Metric, Verdict, Reason
 
 Unannotated fields are ignored by the runner — free metadata.
 
-Returning `float`, `dict`, or any other non-dataclass/non-bool type raises `TypeError`.
+The return annotation is **required** and must be `bool` or a dataclass —
+`@evaluator` raises `TypeError` at decoration time otherwise (missing
+annotation, `-> float`, `-> X | None`, …). The annotation is the score
+contract: it determines the score names recorded in history and the keys
+of skipped placeholders, so it must also resolve at runtime — import the
+return type for real (not only under `TYPE_CHECKING`) and define it at
+module level.
 
 ### Tracking-Only Evaluators
 
@@ -641,7 +647,7 @@ Flags are independent and combinable: `-v --show-output --show-logs`.
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━┳━━━━━━┳━━━━━━┓
 ┃ Score                        ┃ mean ┃  p50 ┃   p5 ┃  p95 ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━╇━━━━━━╇━━━━━━┩
-│ keyword_check.recall │ 0.50 │ 0.50 │ 0.00 │ 1.00 │
+│ keyword_check.recall         │ 0.50 │ 0.50 │ 0.00 │ 1.00 │
 └──────────────────────────────┴──────┴──────┴──────┴──────┘
   Passed: 1/2 (50.0%)
   Results: .protest/results/chatbot_20260329_091422
