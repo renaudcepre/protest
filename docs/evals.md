@@ -16,7 +16,7 @@ Evaluate LLM outputs with scored metrics and historical tracking.
 - [TaskResult (SUT Usage Tracking)](#taskresult-sut-usage-tracking)
 - [Usage Display](#usage-display)
 - [Evaluator Errors](#evaluator-errors)
-- [Name Collisions](#name-collisions)
+- [Score Namespacing](#score-namespacing)
 - [Multi-Model Sessions](#multi-model-sessions)
 - [CLI](#cli)
 - [Output](#output)
@@ -206,8 +206,8 @@ def word_overlap(ctx: EvalContext) -> OverlapMetrics:
 In the terminal, tracking evaluators show with `·` instead of `✓`/`✗`:
 
 ```
-✓  chatbot[lookup] (1.2s) keyword_recall=0.95 all_present=✓
-·  chatbot[lookup]         overlap=0.80
+✓  chatbot[lookup] (1.2s) keyword_check.recall=0.95 keyword_check.all_present=✓
+·  chatbot[lookup]         word_overlap.overlap=0.80
 ```
 
 ### Simple Evaluator
@@ -227,7 +227,7 @@ from protest.evals import Metric, Verdict, Reason
 
 @dataclass
 class KeywordScores:
-    keyword_recall: Annotated[float, Metric]
+    recall: Annotated[float, Metric]
     all_present: Annotated[bool, Verdict]
     detail: Annotated[str, Reason] = ""
 
@@ -236,11 +236,15 @@ def keyword_check(ctx: EvalContext, keywords: list[str], min_recall: float = 0.5
     found = [k for k in keywords if k.lower() in ctx.output.lower()]
     recall = len(found) / len(keywords)
     return KeywordScores(
-        keyword_recall=recall,
+        recall=recall,
         all_present=recall >= min_recall,
         detail=f"found {len(found)}/{len(keywords)}",
     )
 ```
+
+Scores surface namespaced by the evaluator's name (`keyword_check.recall`,
+`keyword_check.all_present`), so field names only need to be unique within
+their own dataclass.
 
 The threshold (`min_recall`) is a parameter of the evaluator, not a framework concept. The evaluator decides the verdict.
 
@@ -342,15 +346,19 @@ EvalCase(name="factual_accuracy_case", inputs="...", evaluators=[llm_judge(rubri
 
 | Evaluator | Params | Returns |
 |-----------|--------|---------|
-| `contains_keywords` | `keywords, min_recall=1.0` | `keyword_recall: float`, `all_keywords_present: bool` |
+| `contains_keywords` | `keywords, min_recall=1.0` | `recall: float`, `all_present: bool` |
 | `contains_expected` | `case_sensitive=False` | `bool` |
-| `does_not_contain` | `forbidden` | `no_forbidden_words: bool` |
+| `does_not_contain` | `forbidden` | `ok: bool` |
 | `not_empty` | — | `bool` |
 | `max_length` | `max_chars=500` | `conciseness: float`, `within_limit: bool` |
 | `min_length` | `min_chars=1` | `bool` |
 | `matches_regex` | `pattern` | `bool` |
-| `json_valid` | `required_keys=[]` | `valid_json: bool`, `has_required_keys: bool` |
+| `json_valid` | `required_keys=[]` | `valid: bool`, `has_required_keys: bool` |
 | `word_overlap` | — | `overlap: float` (tracking-only) |
+
+Dataclass fields surface as `<evaluator>.<field>` in scores — e.g.
+`contains_keywords.recall`, `json_valid.valid` (see
+[Score Namespacing](#score-namespacing)).
 
 ## Fixtures
 
@@ -525,36 +533,40 @@ If an evaluator raises an exception (e.g. LLM judge timeout), the case is marked
 
 > **Tip:** For non-deterministic evaluators (LLM judges), catch exceptions in the evaluator and return a verdict indicating failure rather than letting them propagate.
 
-## Name Collisions
+## Score Namespacing
 
-Each `Verdict` / `Metric` / `Reason` field name from a dataclass evaluator
-becomes a key in the per-case score dict (and in the history file). **Names
-must be unique across all evaluators that run on the same case.**
+Each `Verdict` / `Metric` / `Reason` field from a dataclass evaluator becomes
+a score named `<evaluator>.<field>` — e.g. `keyword_check.recall`.
+A bool evaluator's single verdict keeps the evaluator's bare name
+(`not_empty`). These names are the keys in the per-case score dict, the
+history file, and the markdown artifacts.
 
-If two evaluators emit a score under the same name (e.g. both have a
-`detail` field), ProTest raises `ScoreNameCollisionError` at runtime so the
-collision is loud instead of silently overwriting the duplicate. Rename the
-colliding field — typically by prefixing with the evaluator's concept:
+Because names are namespaced per evaluator, two evaluators on the same case
+can both declare plain `ok` / `detail` fields without clashing:
 
 ```python
 @dataclass
 class SummaryShape:
-    summary_well_formed: Annotated[bool, Verdict]
-    summary_detail: Annotated[str, Reason] = ""        # not just "detail"
+    well_formed: Annotated[bool, Verdict]
+    detail: Annotated[str, Reason] = ""    # → summary_shape.detail
 
 @dataclass
 class CategoryMatch:
-    category_matches: Annotated[bool, Verdict]
-    category_match_detail: Annotated[str, Reason] = ""  # not just "detail"
+    matches: Annotated[bool, Verdict]
+    detail: Annotated[str, Reason] = ""    # → category_match.detail
 ```
 
-Why no auto-prefix? An evaluator's score name is what users grep for in
-history, scripts, and the markdown artifacts. Auto-prefixing would mean the
-same evaluator's `accuracy` field changes name (`fact_check.accuracy` vs
-plain `accuracy`) depending on which other evaluators are wired in alongside
-it — silently breaking downstream consumers when a new evaluator is added.
-Failing loud and asking you to pick a stable, unique name keeps the score
-identifiers stable across configurations.
+Namespacing is unconditional: a score's full name depends only on its own
+evaluator, never on which other evaluators are wired in alongside it — so
+the identifiers you grep for in history and scripts stay stable when
+evaluators are added or removed.
+
+A collision is still possible in one case: the same evaluator name attached
+twice to one case (the same `@evaluator` function rebound with different
+kwargs, or two functions sharing a name). ProTest raises
+`ScoreNameCollisionError` at runtime so the duplicate is loud instead of
+silently overwriting the other's scores. Wrap each binding in its own named
+`@evaluator` function to give them distinct names.
 
 ## Multi-Model Sessions
 
@@ -618,19 +630,19 @@ Flags are independent and combinable: `-v --show-output --show-logs`.
 ### Default
 
 ```
-   ✓   chatbot[lookup] (1.2s) keyword_recall=1.00 all_keywords_present=✓
-   ✗   chatbot[math]: all_keywords_present=False
+   ✓   chatbot[lookup] (1.2s) keyword_check.recall=1.00 keyword_check.all_present=✓
+   ✗   chatbot[math]: keyword_check.all_present=False
        │ inputs: What is 2+2?
        │ output: The answer is 4.
        │ expected: 4
-       │ detail: found 0/1
+       │ keyword_check.detail: found 0/1
 
            Eval: chatbot (2 cases)
-┏━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━┳━━━━━━┳━━━━━━┓
-┃ Score           ┃ mean ┃  p50 ┃   p5 ┃  p95 ┃
-┡━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━╇━━━━━━╇━━━━━━┩
-│ keyword_recall  │ 0.50 │ 0.50 │ 0.00 │ 1.00 │
-└─────────────────┴──────┴──────┴──────┴──────┘
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━┳━━━━━━┳━━━━━━┳━━━━━━┓
+┃ Score                        ┃ mean ┃  p50 ┃   p5 ┃  p95 ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━╇━━━━━━╇━━━━━━╇━━━━━━┩
+│ keyword_check.recall │ 0.50 │ 0.50 │ 0.00 │ 1.00 │
+└──────────────────────────────┴──────┴──────┴──────┴──────┘
   Passed: 1/2 (50.0%)
   Results: .protest/results/chatbot_20260329_091422
 ```

@@ -82,9 +82,10 @@ def make_eval_wrapper(
             judge=judge,
         )
 
-        # Detect score-name collisions across evaluators. EvalPayload.scores
-        # is a dict keyed by name; duplicates would silently overwrite each
-        # other downstream. Fail loud so the user can rename the field.
+        # Detect score-name collisions across evaluators. Names are
+        # namespaced per evaluator, so a duplicate means the same evaluator
+        # name appears twice on this case; EvalPayload.scores is a dict
+        # keyed by name and would silently drop one of them.
         seen: set[str] = set()
         duplicates: list[str] = []
         for s in scores:

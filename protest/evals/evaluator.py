@@ -13,7 +13,7 @@ Plain callables are not accepted in ``evaluators=[...]``; use ``@evaluator``::
     @evaluator
     def contains_keywords(ctx: EvalContext, keywords: list[str]) -> ContainsKeywordsResult:
         found = sum(1 for k in keywords if k.lower() in ctx.output.lower())
-        return ContainsKeywordsResult(keyword_recall=found / len(keywords), ...)
+        return ContainsKeywordsResult(recall=found / len(keywords), ...)
 
     # Bind params → returns a fresh Evaluator with kwargs frozen in.
     evaluators=[contains_keywords(keywords=["paris", "france"])]
@@ -245,7 +245,11 @@ def extract_scores_from_result(result: Any, evaluator_name: str) -> list[Any]:
 
     For bool returns: a single verdict named after the evaluator.
     For dataclass returns: only fields annotated with Metric/Verdict/Reason
-    are extracted. Unannotated fields are ignored (free metadata).
+    are extracted, each namespaced as ``<evaluator_name>.<field>`` so two
+    evaluators on the same case can both declare plain ``ok`` / ``detail``
+    fields. Namespacing is unconditional: a score's full name depends only
+    on its own evaluator, never on which other evaluators are wired in.
+    Unannotated fields are ignored (free metadata).
 
     Raises:
         TypeError: If result is not bool or dataclass.
@@ -264,7 +268,12 @@ def extract_scores_from_result(result: Any, evaluator_name: str) -> list[Any]:
                 if isinstance(meta, type) and issubclass(
                     meta, (Metric, Verdict, Reason)
                 ):
-                    scores.append(EvalScore(name=f.name, value=getattr(result, f.name)))
+                    scores.append(
+                        EvalScore(
+                            name=f"{evaluator_name}.{f.name}",
+                            value=getattr(result, f.name),
+                        )
+                    )
                     break
         return scores
 

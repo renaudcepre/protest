@@ -18,13 +18,13 @@ from protest.evals.evaluator import EvalContext, Metric, Verdict, evaluator
 
 @dataclass(frozen=True, slots=True)
 class ContainsKeywordsResult:
-    keyword_recall: Annotated[float, Metric]
-    all_keywords_present: Annotated[bool, Verdict]
+    recall: Annotated[float, Metric]
+    all_present: Annotated[bool, Verdict]
 
 
 @dataclass(frozen=True, slots=True)
 class DoesNotContainResult:
-    no_forbidden_words: Annotated[bool, Verdict]
+    ok: Annotated[bool, Verdict]
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +35,7 @@ class MaxLengthResult:
 
 @dataclass(frozen=True, slots=True)
 class JsonValidResult:
-    valid_json: Annotated[bool, Verdict]
+    valid: Annotated[bool, Verdict]
     has_required_keys: Annotated[bool, Verdict]
 
 
@@ -60,8 +60,8 @@ def contains_keywords(
     total = len(keywords)
     recall = found / total if total else 1.0
     return ContainsKeywordsResult(
-        keyword_recall=recall,
-        all_keywords_present=recall >= min_recall,
+        recall=recall,
+        all_present=recall >= min_recall,
     )
 
 
@@ -82,7 +82,7 @@ def does_not_contain(
     """Check that the output does not contain forbidden words."""
     output = ctx.output if case_sensitive else ctx.output.lower()
     found = [w for w in forbidden if (w if case_sensitive else w.lower()) in output]
-    return DoesNotContainResult(no_forbidden_words=len(found) == 0)
+    return DoesNotContainResult(ok=len(found) == 0)
 
 
 @evaluator
@@ -135,14 +135,14 @@ def json_valid(
     try:
         parsed = json_module.loads(ctx.output)
     except (json_module.JSONDecodeError, TypeError):
-        return JsonValidResult(valid_json=False, has_required_keys=False)
+        return JsonValidResult(valid=False, has_required_keys=False)
 
     has_keys = (
         all(k in parsed for k in required_keys)
         if required_keys and isinstance(parsed, dict)
         else True
     )
-    return JsonValidResult(valid_json=True, has_required_keys=has_keys)
+    return JsonValidResult(valid=True, has_required_keys=has_keys)
 
 
 @evaluator

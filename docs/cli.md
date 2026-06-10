@@ -330,7 +330,7 @@ protest eval evals.session:session --show-output
 Each case prints one line:
 
 ```
-✓   classify_ticket_struct[T011] (2ms) category_is_allowed=✓ summary_keyword_recall=1.00 …
+✓   classify_ticket_struct[T011] (2ms) category_check.allowed=✓ summary_check.recall=1.00 …
 ```
 
 After every suite, an aggregate-stats table summarizes the `Metric`

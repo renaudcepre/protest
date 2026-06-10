@@ -118,24 +118,23 @@ class MultipleEvalCaseParamsError(ProTestError):
 class ScoreNameCollisionError(ProTestError):
     """Raised when two evaluators in the same eval emit scores with the same name.
 
-    Each `EvalScore.name` (from a dataclass `Verdict`/`Metric`/`Reason` field
-    or from the evaluator's name when it returns `bool`) becomes a key in
-    `EvalPayload.scores` (a dict). If two evaluators emit the same name,
-    one would silently overwrite the other in the per-case report and history,
-    which is a real source of misleading data.
-
-    Fix by renaming the colliding fields so each Verdict/Metric/Reason has a
-    unique name within the suite (e.g. prefix with the evaluator's concept:
-    `summary_detail` instead of just `detail`).
+    Score names are namespaced by evaluator (`<evaluator>.<field>` for
+    dataclass results, the evaluator's name for bool results), so distinct
+    evaluators can freely share field names like `ok` or `detail`. A
+    collision therefore means the same evaluator name appears twice on one
+    case — e.g. the same `@evaluator` function attached twice (possibly with
+    different bound kwargs), or two functions sharing a `__name__`. The
+    duplicate scores would silently overwrite each other in the per-case
+    report and history, so we fail loud instead.
     """
 
     def __init__(self, case_name: str, duplicates: list[str]):
         dup_str = ", ".join(repr(d) for d in sorted(duplicates))
         super().__init__(
             f"Score-name collision in eval '{case_name}': {dup_str}. "
-            f"Two or more evaluators emit a score under the same name. "
-            f"Rename the colliding dataclass Verdict/Metric/Reason field(s) "
-            f"so each name is unique within the suite — otherwise the "
-            f"duplicate scores would silently overwrite each other in the "
-            f"per-case report and the history file."
+            f"Scores are namespaced per evaluator, so this means the same "
+            f"evaluator name appears more than once on this case — the same "
+            f"@evaluator attached twice (e.g. with different bound kwargs) "
+            f"or two functions sharing a name. Wrap each binding in its own "
+            f"named @evaluator function so every score name is unique."
         )

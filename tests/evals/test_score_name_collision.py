@@ -1,10 +1,10 @@
-"""Tests for `ScoreNameCollisionError` — fail-loud on duplicate score names.
+"""Tests for score namespacing and `ScoreNameCollisionError`.
 
-Two evaluators emitting a score under the same name (e.g. both have a
-``detail`` field on their dataclass return) would silently overwrite each
-other in ``EvalPayload.scores`` (a dict). The wrapper detects the
-collision at runtime and raises a clear error pointing at the duplicate
-name(s) so the user can rename the colliding field.
+Dataclass scores are namespaced per evaluator (``<evaluator>.<field>``),
+so two evaluators on the same case can both declare plain ``ok`` /
+``detail`` fields. A collision is still possible — and raises — when the
+same evaluator name appears twice on one case (the same ``@evaluator``
+attached twice, e.g. rebound with different kwargs).
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ class _ShapeA:
 @dataclass
 class _ShapeB:
     other_check: Annotated[bool, Verdict]
-    detail: Annotated[str, Reason] = ""  # collides with _ShapeA.detail
+    detail: Annotated[str, Reason] = ""  # same field name as _ShapeA — fine
 
 
 @evaluator
@@ -59,81 +59,94 @@ def _bool_one(ctx: EvalContext) -> bool:
 
 @dataclass
 class _ShapeWithBoolOneField:
-    _bool_one: Annotated[bool, Verdict]  # collides with _bool_one evaluator's name
+    _bool_one: Annotated[bool, Verdict]  # namespaced — no clash with _bool_one
 
 
 @evaluator
-def _shape_collides_with_bool(ctx: EvalContext) -> _ShapeWithBoolOneField:
+def _shape_with_bool_one_field(ctx: EvalContext) -> _ShapeWithBoolOneField:
     return _ShapeWithBoolOneField(_bool_one=True)
 
 
-@dataclass
-class _ShapeUniqueA:
-    matches_a: Annotated[bool, Verdict]
-    detail_a: Annotated[str, Reason] = ""
-
-
-@dataclass
-class _ShapeUniqueB:
-    matches_b: Annotated[bool, Verdict]
-    detail_b: Annotated[str, Reason] = ""
-
-
 @evaluator
-def _shape_unique_a(ctx: EvalContext) -> _ShapeUniqueA:
-    return _ShapeUniqueA(matches_a=True, detail_a="A")
+def _threshold(ctx: EvalContext, limit: int = 0) -> bool:
+    return len(str(ctx.output)) >= limit
 
 
-@evaluator
-def _shape_unique_b(ctx: EvalContext) -> _ShapeUniqueB:
-    return _ShapeUniqueB(matches_b=True, detail_b="B")
-
-
-def _invoke(evaluators: list, case: EvalCase) -> None:
+async def _invoke(evaluators: list, case: EvalCase):
     """Invoke the eval wrapper directly so collision exceptions propagate."""
 
     def task(case: EvalCase) -> str:
         return str(case.inputs)
 
     wrapped = make_eval_wrapper(task, evaluators)
-    asyncio.run(wrapped(case=case))
+    return await wrapped(case=case)
+
+
+class TestNamespacing:
+    def test_shared_field_names_do_not_collide(self) -> None:
+        payload = asyncio.run(
+            _invoke([_shape_a, _shape_b], EvalCase(inputs="x", name="c1"))
+        )
+        assert "_shape_a.detail" in payload.scores
+        assert "_shape_b.detail" in payload.scores
+        assert "_shape_a.matches" in payload.scores
+        assert "_shape_b.other_check" in payload.scores
+
+    def test_bool_evaluator_keeps_bare_name(self) -> None:
+        payload = asyncio.run(_invoke([_bool_one], EvalCase(inputs="x", name="c1")))
+        assert "_bool_one" in payload.scores
+
+    def test_bool_name_does_not_clash_with_namespaced_field(self) -> None:
+        payload = asyncio.run(
+            _invoke(
+                [_bool_one, _shape_with_bool_one_field],
+                EvalCase(inputs="x", name="c2"),
+            )
+        )
+        assert "_bool_one" in payload.scores
+        assert "_shape_with_bool_one_field._bool_one" in payload.scores
 
 
 class TestCollisionRaises:
-    def test_two_dataclasses_share_field_name(self) -> None:
+    def test_same_bool_evaluator_twice(self) -> None:
         with pytest.raises(ScoreNameCollisionError) as excinfo:
-            _invoke([_shape_a, _shape_b], EvalCase(inputs="x", name="c1"))
-        msg = str(excinfo.value)
-        assert "'detail'" in msg
-        assert "c1" in msg
-
-    def test_bool_evaluator_name_collides_with_dataclass_field(self) -> None:
-        with pytest.raises(ScoreNameCollisionError) as excinfo:
-            _invoke(
-                [_bool_one, _shape_collides_with_bool],
-                EvalCase(inputs="x", name="c2"),
+            asyncio.run(
+                _invoke([_bool_one, _bool_one], EvalCase(inputs="x", name="c1"))
             )
         msg = str(excinfo.value)
         assert "_bool_one" in msg
+        assert "c1" in msg
+
+    def test_same_evaluator_rebound_with_different_kwargs(self) -> None:
+        # Rebinding keeps the function's name, so both emit '_threshold'.
+        with pytest.raises(ScoreNameCollisionError) as excinfo:
+            asyncio.run(
+                _invoke(
+                    [_threshold(limit=1), _threshold(limit=100)],
+                    EvalCase(inputs="x", name="c2"),
+                )
+            )
+        msg = str(excinfo.value)
+        assert "_threshold" in msg
         assert "c2" in msg
 
+    def test_same_dataclass_evaluator_twice(self) -> None:
+        with pytest.raises(ScoreNameCollisionError) as excinfo:
+            asyncio.run(_invoke([_shape_a, _shape_a], EvalCase(inputs="x", name="c3")))
+        msg = str(excinfo.value)
+        assert "_shape_a.matches" in msg
+        assert "c3" in msg
 
-class TestNoCollisionPasses:
-    def test_unique_names_pass(self) -> None:
-        # Should not raise.
-        _invoke(
-            [_shape_unique_a, _shape_unique_b],
-            EvalCase(inputs="x", name="c1"),
-        )
 
-    def test_session_with_unique_names_runs_clean(self) -> None:
-        """Smoke check: running through the full session path also succeeds."""
+class TestSessionPath:
+    def test_session_with_shared_field_names_runs_clean(self) -> None:
+        """Smoke check: shared `detail` fields pass through the full session."""
         from protest.api import run_session  # noqa: PLC0415 — heavy import
 
         session = ProTestSession()
         suite = EvalSuite("evals")
 
-        @suite.eval(evaluators=[_shape_unique_a, _shape_unique_b])
+        @suite.eval(evaluators=[_shape_a, _shape_b])
         def ok(case: Annotated[EvalCase, From(_cases)]) -> str:
             return str(case.inputs)
 
