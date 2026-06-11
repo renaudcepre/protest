@@ -59,9 +59,9 @@ def _format_test_name(result: TestResult, include_suite: bool = False) -> str:
 
 
 def _format_eval_scores_inline(result: TestResult, short: bool = False) -> str:
-    """Format eval scores for inline display — ASCII version (no glyphs).
+    """Format eval scores for inline display - ASCII version (no glyphs).
 
-    When `short=True`, only failing/skipped scores are shown — passing scores
+    When `short=True`, only failing/skipped scores are shown - passing scores
     are hidden to keep the output readable on large suites.
     """
     if not result.eval_payload:
@@ -108,7 +108,7 @@ class AsciiReporter(PluginBase):
     def activate(cls, ctx: PluginContext) -> Self | None:
         # Activate when --no-color was passed, OR when `rich` is not
         # installed (RichReporter would otherwise leave the run silent).
-        import importlib.util  # noqa: PLC0415 — std lib, kept local for clarity
+        import importlib.util  # noqa: PLC0415 - std lib, kept local for clarity
 
         if ctx.get("no_color", False) or importlib.util.find_spec("rich") is None:
             return cls(

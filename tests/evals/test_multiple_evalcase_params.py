@@ -1,4 +1,4 @@
-"""Tests for `_validate_single_evalcase_param` — D1 registration-time check.
+"""Tests for `_validate_single_evalcase_param` - D1 registration-time check.
 
 The runtime contract (`_find_case`) picks the first `EvalCase` in kwargs and
 silently drops any others. The wrapper detects > 1 EvalCase param at

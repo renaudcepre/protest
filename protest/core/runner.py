@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from protest.core.collector import Collector
 from protest.core.execution import ParallelExecutor, SuiteManager, TestExecutor
 from protest.core.outcome import OutcomeBuilder
-from protest.core.session import ProTestSession  # noqa: TC001 — used at runtime
+from protest.core.session import ProTestSession  # noqa: TC001 - used at runtime
 from protest.core.tracker import SuiteTracker
 from protest.entities import (
     RunResult,

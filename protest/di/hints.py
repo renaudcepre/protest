@@ -5,7 +5,7 @@ fails in two scenarios commonly encountered in ProTest user code; this
 module wraps it with a cascade of fallbacks.
 
 ------------------------------------------------------------------------
-Failure mode 1 — names defined in a local scope (PEP 563 stringification)
+Failure mode 1 - names defined in a local scope (PEP 563 stringification)
 ------------------------------------------------------------------------
 
 With ``from __future__ import annotations``, all annotations are stored
@@ -40,7 +40,7 @@ because annotations only reference DI markers (``Use``/``From``) plus
 small, distinctively-named locals.
 
 -------------------------------------------------
-Failure mode 2 — TYPE_CHECKING-only imported types
+Failure mode 2 - TYPE_CHECKING-only imported types
 -------------------------------------------------
 
 Types imported under ``if TYPE_CHECKING:`` are absent at runtime, so
@@ -53,7 +53,7 @@ Types imported under ``if TYPE_CHECKING:`` are absent at runtime, so
     def make() -> HeavyType: ...
 
 Fix: substitute ``Any`` for each unresolvable name and retry. The exact
-type is irrelevant for DI dispatch — only the ``Use(...)``/``From(...)``
+type is irrelevant for DI dispatch - only the ``Use(...)``/``From(...)``
 marker inside ``Annotated[...]`` is consulted at injection time.
 """
 

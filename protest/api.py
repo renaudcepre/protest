@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING
 from protest.core.collector import Collector
 from protest.core.runner import TestRunner
 from protest.core.suite import (
-    ProTestSuite,  # noqa: TC001 — used at runtime in list_tags
+    ProTestSuite,  # noqa: TC001 - used at runtime in list_tags
 )
 from protest.events.types import Event
 from protest.filters.keyword import KeywordFilterPlugin

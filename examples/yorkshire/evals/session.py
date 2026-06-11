@@ -1,4 +1,4 @@
-"""Yorkshire Chatbot Evals — evaluate the fake Yorkshire expert chatbot.
+"""Yorkshire Chatbot Evals - evaluate the fake Yorkshire expert chatbot.
 
 Run with:
     protest eval examples.yorkshire.evals.session:session

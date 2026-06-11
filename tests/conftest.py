@@ -28,7 +28,7 @@ def _isolate_protest_history(tmp_path: "Path", monkeypatch: pytest.MonkeyPatch) 
 
     Tests that forget to pass `history_dir=tmp_path` would otherwise write
     into the repo's real `.protest/history.jsonl`. The monkeypatch targets
-    the single source of truth (`storage.DEFAULT_HISTORY_DIR`) — all
+    the single source of truth (`storage.DEFAULT_HISTORY_DIR`) - all
     consumers access it via the module so the override is seen everywhere.
 
     Tests that pass an explicit `history_dir` still use that value, because

@@ -2,14 +2,14 @@
 
 Goal: catch divergences between the two reporters before they ship as silent
 asymmetries. A user who swaps `--no-color` should get the same *semantic*
-output (same fields, same filters) — only the visual style differs.
+output (same fields, same filters) - only the visual style differs.
 
 Three axes are enforced:
 
-1. Structural  — both reporters expose the same public hooks (`on_*` handlers).
-2. CLI         — both reporters react to the same shared flags (`--show-output`,
+1. Structural  - both reporters expose the same public hooks (`on_*` handlers).
+2. CLI         - both reporters react to the same shared flags (`--show-output`,
                  `--show-logs`). Reporter-specific flags (`--no-color`) are allowed.
-3. Behavioral  — parametrized scenarios drive the same input through both
+3. Behavioral  - parametrized scenarios drive the same input through both
                  reporters and assert the same *semantic* markers appear
                  (score names for eval pass, eval detail on fail, summary omits
                  eval failures, etc.).
@@ -161,7 +161,7 @@ class TestStructuralSymmetry:
         """Both reporters override the same set of on_* methods.
 
         If one reporter starts overriding a hook that the other ignores, an
-        event will be invisible in the "other" reporter — that's the bug we
+        event will be invisible in the "other" reporter - that's the bug we
         want to catch at test time, not in production.
         """
         rich_handlers = _public_handlers(RichReporter)
@@ -186,7 +186,7 @@ class TestCliSymmetry:
     """Ensure the two reporters consume the same shared flags.
 
     Reporter-specific flags are allowed (e.g. `--no-color` makes sense only on
-    the Ascii side) — they're expected to appear in either one but not both.
+    the Ascii side) - they're expected to appear in either one but not both.
     The rule is: anything in `_SHARED_CLI_FLAGS` must be *activatable* on both
     reporters (read from PluginContext via activate()).
     """
@@ -220,7 +220,7 @@ class TestCliSymmetry:
             redeclared = dests & _SHARED_CLI_FLAGS
             assert not redeclared, (
                 f"{cls.__name__}.add_cli_options redeclares shared flags: "
-                f"{sorted(redeclared)} — move them to cli._create_run_parser"
+                f"{sorted(redeclared)} - move them to cli._create_run_parser"
             )
 
 
@@ -262,7 +262,7 @@ class TestBehavioralSymmetry:
     ) -> None:
         """Given a failing eval, both reporters dump inputs/output/expected.
 
-        This must happen regardless of --show-output — the user can't debug
+        This must happen regardless of --show-output - the user can't debug
         a failed assertion without seeing what the task actually produced.
         """
         reporter = _make_reporter(reporter_cls)
@@ -314,7 +314,7 @@ class TestBehavioralSymmetry:
         """End-of-session summary must not re-list eval failures.
 
         Eval cases are already displayed inline via on_test_fail. Re-listing
-        them in the summary duplicates noise — the pattern agreed on is
+        them in the summary duplicates noise - the pattern agreed on is
         "non_eval_failures only".
         """
         reporter = _make_reporter(reporter_cls)

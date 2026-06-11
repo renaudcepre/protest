@@ -1,4 +1,4 @@
-"""Content hashing for eval cases — detect when cases or scoring change.
+"""Content hashing for eval cases - detect when cases or scoring change.
 
 Hashes capture identity + configuration, not implementation. A renamed
 parameter changes the hash; a rewritten function body does not. This is
@@ -52,9 +52,9 @@ def _canonical(obj: Any) -> Any:  # noqa: PLR0911
     """Convert an object to a canonical JSON-serializable form.
 
     Resolution order:
-    1. Primitives, list, tuple, dict — native support
-    2. ``evaluator_identity()`` — explicit, user-controlled
-    3. Dataclass / functools.partial / callable — introspection fallback
+    1. Primitives, list, tuple, dict - native support
+    2. ``evaluator_identity()`` - explicit, user-controlled
+    3. Dataclass / functools.partial / callable - introspection fallback
     4. Anything else → CanonicalError
     """
     # --- primitives & containers ---
@@ -74,7 +74,7 @@ def _canonical(obj: Any) -> Any:  # noqa: PLR0911
 
     # --- introspection fallback ---
 
-    # Dataclasses — public fields only (skip _ prefixed runtime internals)
+    # Dataclasses - public fields only (skip _ prefixed runtime internals)
     if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
         return {
             "__type__": type(obj).__qualname__,
@@ -84,14 +84,14 @@ def _canonical(obj: Any) -> Any:  # noqa: PLR0911
                 if not f.name.startswith("_")
             },
         }
-    # functools.partial — qualname + bound kwargs
+    # functools.partial - qualname + bound kwargs
     if isinstance(obj, functools.partial):
         return {
             "fn": _fn_qualname(obj.func),
             "args": _canonical(list(obj.args)) if obj.args else [],
             "kwargs": _canonical(dict(obj.keywords)) if obj.keywords else {},
         }
-    # Plain callable — qualname only
+    # Plain callable - qualname only
     if callable(obj):
         qualname = _fn_qualname(obj)
         if qualname is not None:

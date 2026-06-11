@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path  # noqa: TC003 — used at runtime (pytest tmp_path)
+from pathlib import Path  # noqa: TC003 - used at runtime (pytest tmp_path)
 from typing import Annotated, Any
 
 import pytest
@@ -49,7 +49,7 @@ from protest.evals.evaluators import (
 from protest.evals.hashing import compute_case_hash, compute_eval_hash
 from protest.evals.results_writer import EvalResultsWriter
 from protest.evals.suite import EvalSuite
-from protest.evals.types import EvalSuiteReport  # noqa: TC001 — used at runtime
+from protest.evals.types import EvalSuiteReport  # noqa: TC001 - used at runtime
 from protest.filters.kind import KindFilterPlugin
 from protest.history.storage import append_entry, clean_dirty
 from protest.plugin import PluginBase, PluginContext
@@ -76,7 +76,7 @@ def fake_accuracy(ctx: EvalContext) -> FakeAccuracyResult:
 
 @evaluator
 async def async_fake_accuracy(ctx: EvalContext) -> FakeAccuracyResult:
-    """Async evaluator — simulates LLMJudge which calls an async LLM API."""
+    """Async evaluator - simulates LLMJudge which calls an async LLM API."""
     # Simulate async I/O (e.g. LLM call) without actually blocking
     if ctx.expected_output and ctx.expected_output.lower() in ctx.output.lower():
         return FakeAccuracyResult(accuracy=1.0, matches_expected=True)
@@ -734,7 +734,7 @@ class TestBuiltinEvaluators:
         """Regression: `min_recall=0.0` must always pass (no discontinuity at 0).
 
         Earlier behavior: `min_recall=0.0` flipped to strict mode (all required),
-        while `min_recall=0.0001` was permissive — surprising at the boundary.
+        while `min_recall=0.0001` was permissive - surprising at the boundary.
         Now `recall >= min_recall` applies uniformly.
         """
         e = contains_keywords(keywords=["alpha", "beta"], min_recall=0.0)
@@ -775,7 +775,7 @@ class TestBuiltinEvaluators:
         """Sized containers: empty -> False, non-empty -> True.
 
         Earlier behavior fell through to `return True` for any non-string,
-        so `not_empty([])` reported True — misleading for tasks that return
+        so `not_empty([])` reported True - misleading for tasks that return
         lists/dicts (e.g. tool calls, retrieved chunks).
         """
         # Helper accepts Any at runtime; type hint is just a default.
@@ -806,7 +806,7 @@ class TestBuiltinEvaluators:
         assert not_empty.run(ctx_int) is True
 
         ctx_zero: Any = self._make_ctx("")
-        ctx_zero.output = 0  # 0 is not None, not Sized — still passes.
+        ctx_zero.output = 0  # 0 is not None, not Sized - still passes.
         assert not_empty.run(ctx_zero) is True
 
     def test_max_length(self) -> None:
@@ -922,7 +922,7 @@ class TestScoringV2:
         assert result.success is True
 
     def test_float_return_annotation_raises_at_decoration(self) -> None:
-        """`-> float` is rejected by @evaluator itself — the return annotation
+        """`-> float` is rejected by @evaluator itself - the return annotation
         is the score contract and must be bool or a dataclass."""
         with pytest.raises(TypeError, match="bool or a dataclass"):
 
@@ -945,7 +945,7 @@ class TestScoringV2:
                 return None
 
     def test_unresolvable_return_annotation_raises_at_decoration(self) -> None:
-        """A function-local dataclass can't be resolved by get_type_hints —
+        """A function-local dataclass can't be resolved by get_type_hints -
         the placeholder keys would silently diverge from the real run."""
 
         @dataclass

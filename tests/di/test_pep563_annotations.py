@@ -31,7 +31,7 @@ def module_level_fixture_that_raises() -> str:
     raise RuntimeError("Fixture error")
 
 
-# Module-level ForEach — mirrors real usage where ForEach is defined at module scope
+# Module-level ForEach - mirrors real usage where ForEach is defined at module scope
 module_numbers = ForEach([10, 20, 30])
 module_numbers_short = ForEach([1, 2])
 

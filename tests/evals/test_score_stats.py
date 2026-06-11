@@ -1,4 +1,4 @@
-"""Tests for `ScoreStats.from_values` — percentile correctness.
+"""Tests for `ScoreStats.from_values` - percentile correctness.
 
 Pre-M11, p5/p95 used `int(n * 0.05)` index lookup, which collapses to
 min/max for small samples (the typical eval case). Post-M11 uses

@@ -4,7 +4,7 @@ The plugin stamps every new entry with `schema_version`. Readers skip
 entries with a future version (written by a newer protest) and warn once
 per version.
 
-Legacy entries (no `schema_version` key at all — written before this was
+Legacy entries (no `schema_version` key at all - written before this was
 introduced) are treated as version 0 and read without warning.
 """
 
@@ -91,7 +91,7 @@ class TestFutureVersionSkipped:
 
 
 class TestLegacyEntriesStillReadable:
-    """Pre-schema_version entries have no key — treat as legacy (version 0)."""
+    """Pre-schema_version entries have no key - treat as legacy (version 0)."""
 
     def test_entry_without_schema_version_is_read(self, tmp_path: Path) -> None:
         path = tmp_path / ".protest" / storage.HISTORY_FILE

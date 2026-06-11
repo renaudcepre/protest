@@ -17,7 +17,7 @@ class TaskResult(Generic[T]):
     """Optional wrapper for eval task return values with usage stats.
 
     Return this instead of a plain value to report LLM usage for the
-    system under test. ProTest unwraps it transparently — evaluators
+    system under test. ProTest unwraps it transparently - evaluators
     see the plain output.
 
     Usage::
@@ -33,7 +33,7 @@ class TaskResult(Generic[T]):
                 cost=0.003,
             )
 
-        # Or just return str directly — TaskResult is opt-in.
+        # Or just return str directly - TaskResult is opt-in.
     """
 
     output: T
@@ -44,7 +44,7 @@ class TaskResult(Generic[T]):
 
 @dataclass(frozen=True, slots=True)
 class JudgeResponse(Generic[T]):
-    """Return type for Judge.judge() — wraps the output with optional usage stats.
+    """Return type for Judge.judge() - wraps the output with optional usage stats.
 
     Evaluators never see this: ``ctx.judge()`` unwraps and returns ``output``.
     ProTest accumulates tokens/cost for history and display.
@@ -58,7 +58,7 @@ class JudgeResponse(Generic[T]):
             cost=0.003,
         )
 
-        # Or minimal — tokens/cost are optional:
+        # Or minimal - tokens/cost are optional:
         return JudgeResponse(output=result.output)
     """
 
@@ -249,7 +249,7 @@ class ScoreStats:
             # `quantiles(n=20, method='inclusive')` returns 19 cutpoints that
             # split the data into 20 equal groups. Index 0 = 5%, index 18 = 95%.
             # Inclusive method interpolates linearly between adjacent values
-            # and clamps to [min, max] — appropriate for bounded scores.
+            # and clamps to [min, max] - appropriate for bounded scores.
             cuts = statistics.quantiles(sv, n=20, method="inclusive")
             p5_value = cuts[0]
             p95_value = cuts[18]

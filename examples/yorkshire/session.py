@@ -1,4 +1,4 @@
-"""Yorkshire Terrier Unified Session — tests + evals in one session.
+"""Yorkshire Terrier Unified Session - tests + evals in one session.
 
 Run all (tests + evals):
     protest run examples.yorkshire.session:session

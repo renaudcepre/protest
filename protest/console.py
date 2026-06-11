@@ -1,4 +1,4 @@
-"""protest.console — progress output that bypasses test capture.
+"""protest.console - progress output that bypasses test capture.
 
 Usage::
 
@@ -10,10 +10,10 @@ Usage::
             console.print(f"[bold]pipeline:[/] importing {scene.name} ({i+1}/{len(scenes)})")
             await import_scene(scene)
 
-    # Raw mode — no markup processing
+    # Raw mode - no markup processing
     console.print("debug: raw bytes here", raw=True)
 
-    # Section mode — no per-test prefix (use for suite/session-level lines)
+    # Section mode - no per-test prefix (use for suite/session-level lines)
     console.print(f"  Results: {run_dir}", prefix=False)
 
 Messages go through the event bus → reporters display them inline.
@@ -37,7 +37,7 @@ def print(msg: str, *, raw: bool = False, prefix: bool = True) -> None:
 
     Args:
         msg: The message to print. Supports Rich markup unless raw=True.
-        raw: If True, no markup processing — message passed as-is.
+        raw: If True, no markup processing - message passed as-is.
         prefix: If False, omit the per-test indent/bar prefix. Use for
             suite-level or session-level lines (e.g. "Results: <dir>") that
             visually belong outside any single case's output block.
@@ -51,7 +51,7 @@ def print(msg: str, *, raw: bool = False, prefix: bool = True) -> None:
     # so messages appear immediately (not after the test). An earlier public
     # `EventBus.emit_sync` was removed (commit e14ffd5) because its signal-
     # handler use case was async-signal-unsafe, and we don't want to offer
-    # that API to users. Kept private here — the framework itself is the
+    # that API to users. Kept private here - the framework itself is the
     # only caller, and console.print is never invoked from a signal handler.
     for handler_entry in bus._handlers.get(Event.USER_PRINT, []):
         try:
@@ -68,7 +68,7 @@ def print(msg: str, *, raw: bool = False, prefix: bool = True) -> None:
 
 
 def _fallback_print(msg: str, raw: bool) -> None:
-    """Fallback when no event bus — write to real stderr (bypassing capture)."""
+    """Fallback when no event bus - write to real stderr (bypassing capture)."""
     text = msg if raw else strip_markup(msg)
     stream = real_stderr()
     stream.write(text + "\n")

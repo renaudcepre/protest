@@ -1,4 +1,4 @@
-"""ProTest evals — native eval support."""
+"""ProTest evals - native eval support."""
 
 from protest.evals.evaluator import (
     EvalCase,

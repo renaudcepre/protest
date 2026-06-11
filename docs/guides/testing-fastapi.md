@@ -4,7 +4,7 @@ How to write async integration tests for a FastAPI application using ProTest, ht
 
 ## Async Client with Lifespan
 
-FastAPI's `TestClient` is synchronous. For ProTest's async-first approach, `httpx.AsyncClient` with `ASGITransport` is the natural fit — but **httpx does not trigger ASGI lifespan events**.
+FastAPI's `TestClient` is synchronous. For ProTest's async-first approach, `httpx.AsyncClient` with `ASGITransport` is the natural fit - but **httpx does not trigger ASGI lifespan events**.
 
 This means if your app uses `@asynccontextmanager` lifespan (the modern FastAPI pattern for startup/shutdown), your app state won't be initialized during tests:
 
@@ -23,7 +23,7 @@ app = FastAPI(lifespan=lifespan)
 ```
 
 ```python
-# This will NOT work — lifespan never runs, app.state.db is missing
+# This will NOT work - lifespan never runs, app.state.db is missing
 transport = httpx.ASGITransport(app=app)
 async with httpx.AsyncClient(transport=transport) as client:
     resp = await client.get("/users")  # 500: 'State' has no attribute 'db'
@@ -85,13 +85,13 @@ Bind it at the appropriate scope:
 # tests/session.py
 from tests.fixtures import client
 
-# SESSION scope — one client for all tests (fast, shared state)
+# SESSION scope - one client for all tests (fast, shared state)
 session.bind(client)
 
-# Or SUITE scope — fresh client per suite (isolated)
+# Or SUITE scope - fresh client per suite (isolated)
 api_suite.bind(client)
 
-# Or TEST scope (no binding) — fresh client per test (slowest, most isolated)
+# Or TEST scope (no binding) - fresh client per test (slowest, most isolated)
 ```
 
 ## Complete Example
@@ -250,20 +250,20 @@ async def client() -> AsyncIterator[httpx.AsyncClient]:
             yield c
 ```
 
-This works but is non-standard. Prefer `asgi-lifespan` — it handles edge cases (multiple lifespans, error propagation) that a manual wrapper misses.
+This works but is non-standard. Prefer `asgi-lifespan` - it handles edge cases (multiple lifespans, error propagation) that a manual wrapper misses.
 
 ## Why Not `TestClient`?
 
 FastAPI's `TestClient` (from Starlette) is synchronous and uses `requests` under the hood. It handles lifespan automatically, but:
 
-- **Sync-only** — doesn't work with ProTest's async tests
-- **Thread-based** — spawns a background thread for the event loop
-- **No concurrency** — can't benefit from ProTest's parallel execution
+- **Sync-only** - doesn't work with ProTest's async tests
+- **Thread-based** - spawns a background thread for the event loop
+- **No concurrency** - can't benefit from ProTest's parallel execution
 
 `httpx.AsyncClient` + `asgi-lifespan` gives you native async testing that composes naturally with ProTest.
 
 ## See Also
 
-- [Project Organization](project-organization.md) — how to structure test files
-- [Fixtures](../core-concepts/fixtures.md) — scope at binding, `yield` teardown
-- [Best Practices](../best-practices.md) — naming, tags, anti-patterns
+- [Project Organization](project-organization.md) - how to structure test files
+- [Fixtures](../core-concepts/fixtures.md) - scope at binding, `yield` teardown
+- [Best Practices](../best-practices.md) - naming, tags, anti-patterns

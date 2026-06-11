@@ -1,4 +1,4 @@
-"""Tests for `protest.console.print` — payload shape and reporter formatting.
+"""Tests for `protest.console.print` - payload shape and reporter formatting.
 
 `console.print(msg, raw=False, prefix=True)` builds a 3-tuple payload
 `(msg, raw, prefix)` dispatched on USER_PRINT. Each reporter unpacks the
@@ -51,7 +51,7 @@ class TestAsciiReporterUserPrint:
     def test_prefix_false_no_bar(self, stdout_buffer: io.StringIO) -> None:
         reporter = AsciiReporter()
         reporter.on_user_print(("Results: /tmp/foo", False, False))
-        # No bar — visually a section line, not attached to a case.
+        # No bar - visually a section line, not attached to a case.
         assert stdout_buffer.getvalue() == "Results: /tmp/foo\n"
 
 
@@ -111,7 +111,7 @@ class TestConsolePrintHandlerErrors:
 
     Earlier behavior: `contextlib.suppress(Exception)` swallowed any handler
     raise. A reporter bug (e.g. malformed Rich markup) made `console.print`
-    silently no-op — users assumed the call did nothing.
+    silently no-op - users assumed the call did nothing.
     """
 
     def _bus_with_failing_handler(
@@ -152,7 +152,7 @@ class TestConsolePrintHandlerErrors:
         monkeypatch.setattr("protest.console.real_stderr", raising_stderr)
         self._bus_with_failing_handler(monkeypatch, RuntimeError("boom"))
 
-        # Must not raise — the outer suppress() is the last line of defense.
+        # Must not raise - the outer suppress() is the last line of defense.
         console.print("anything")
 
     def test_successful_handler_does_not_touch_stderr(

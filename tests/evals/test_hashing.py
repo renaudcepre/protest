@@ -1,4 +1,4 @@
-"""Tests for protest.evals.hashing — fail-hard canonicalization."""
+"""Tests for protest.evals.hashing - fail-hard canonicalization."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from protest.evals.hashing import (
 )
 
 # ---------------------------------------------------------------------------
-# Fixtures — representative evaluator types
+# Fixtures - representative evaluator types
 # ---------------------------------------------------------------------------
 
 
@@ -49,7 +49,7 @@ def parameterized_function(ctx: object, keywords: list[str]) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# _canonical — primitives & containers
+# _canonical - primitives & containers
 # ---------------------------------------------------------------------------
 
 
@@ -69,7 +69,7 @@ class TestCanonicalPrimitives:
 
 
 # ---------------------------------------------------------------------------
-# _canonical — dataclass handling
+# _canonical - dataclass handling
 # ---------------------------------------------------------------------------
 
 
@@ -99,7 +99,7 @@ class TestCanonicalDataclass:
     def test_dataclass_with_lock_skips_private_fields(self) -> None:
         """Regression: dataclasses.asdict() deepcopy fails on threading.Lock.
 
-        Private fields (_prefixed) are runtime internals, not config — excluded from hash.
+        Private fields (_prefixed) are runtime internals, not config - excluded from hash.
         """
         ev = LockHoldingEvaluator(name="llm_judge")
         result = _canonical(ev)
@@ -108,7 +108,7 @@ class TestCanonicalDataclass:
 
 
 # ---------------------------------------------------------------------------
-# _canonical — callables (the real-world evaluator path)
+# _canonical - callables (the real-world evaluator path)
 # ---------------------------------------------------------------------------
 
 
@@ -138,7 +138,7 @@ class TestCanonicalCallable:
 
 
 # ---------------------------------------------------------------------------
-# _canonical — evaluator_identity (explicit, user-controlled)
+# _canonical - evaluator_identity (explicit, user-controlled)
 # ---------------------------------------------------------------------------
 
 
@@ -198,7 +198,7 @@ class TestCanonicalEvaluatorIdentity:
 
 
 # ---------------------------------------------------------------------------
-# _canonical — fail-hard on unknown types
+# _canonical - fail-hard on unknown types
 # ---------------------------------------------------------------------------
 
 

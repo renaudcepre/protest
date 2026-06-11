@@ -62,7 +62,7 @@ def test_user_display_name() -> None:
     assert u.display_name == "Alice (member)"
 ```
 
-The `@suite.test()` decorators register tests at import time. The key is that `users_suite` is exported — another module will import and consume it.
+The `@suite.test()` decorators register tests at import time. The key is that `users_suite` is exported - another module will import and consume it.
 
 ### Step 2: Intermediate Suites Assemble Children
 
@@ -80,11 +80,11 @@ api_suite.add_suite(users_api_suite)
 api_suite.add_suite(orders_api_suite)
 ```
 
-Every import is immediately consumed by `.add_suite()` — no dead imports.
+Every import is immediately consumed by `.add_suite()` - no dead imports.
 
 ### Step 3: Session Assembles Everything
 
-The session file is thin — just imports and registration:
+The session file is thin - just imports and registration:
 
 ```python
 # tests/session.py
@@ -131,20 +131,20 @@ protest run tests.session:session -k "change_role"
 
 ## Why This Pattern Works
 
-1. **Every import is consumed** — `suite.add_suite()`, `session.bind()`, or `session.add_suite()` uses the imported object. No linter warnings, no `# noqa`.
+1. **Every import is consumed** - `suite.add_suite()`, `session.bind()`, or `session.add_suite()` uses the imported object. No linter warnings, no `# noqa`.
 
-2. **Clear ownership** — each test file owns its suite. You can read one file and understand what it tests.
+2. **Clear ownership** - each test file owns its suite. You can read one file and understand what it tests.
 
-3. **Composable** — suites nest naturally. `API::Users::Permissions` is just three files, each adding its suite to the parent.
+3. **Composable** - suites nest naturally. `API::Users::Permissions` is just three files, each adding its suite to the parent.
 
-4. **IDE-friendly** — "Go to Definition" on any suite import takes you to the file that defines it. Rename refactoring works.
+4. **IDE-friendly** - "Go to Definition" on any suite import takes you to the file that defines it. Rename refactoring works.
 
 ## Anti-Pattern: Side-Effect Imports
 
 When a test module doesn't export its suite but instead reaches into the session file to get it, you end up with side-effect imports:
 
 ```python
-# DON'T DO THIS — tests/session.py
+# DON'T DO THIS - tests/session.py
 from protest import ProTestSession, ProTestSuite
 
 session = ProTestSession()
@@ -157,7 +157,7 @@ import tests.domain.test_orders  # noqa: F401, E402
 ```
 
 ```python
-# tests/domain/test_users.py — reaches back into session
+# tests/domain/test_users.py - reaches back into session
 from tests.session import domain_suite  # circular risk!
 
 @domain_suite.test()
@@ -165,10 +165,10 @@ def test_something(): ...
 ```
 
 Problems:
-- **`# noqa` everywhere** — linters correctly warn about unused imports
-- **Circular import risk** — test modules import from session, session imports test modules
-- **Invisible dependencies** — removing an import silently drops tests with no error
-- **Import order matters** — suites must be defined before test modules are imported
+- **`# noqa` everywhere** - linters correctly warn about unused imports
+- **Circular import risk** - test modules import from session, session imports test modules
+- **Invisible dependencies** - removing an import silently drops tests with no error
+- **Import order matters** - suites must be defined before test modules are imported
 
 ## Anti-Pattern: One Session Per Test File
 
@@ -210,7 +210,7 @@ yorkshire/tests/
     └── ...
 ```
 
-The session file imports each suite and registers it — every import consumed, zero `# noqa`.
+The session file imports each suite and registers it - every import consumed, zero `# noqa`.
 
 ## Tips
 
@@ -224,6 +224,6 @@ The session file imports each suite and registers it — every import consumed, 
 
 ## See Also
 
-- [Best Practices](../best-practices.md) — fixture placement, naming conventions, tags
-- [Fixtures](../core-concepts/fixtures.md) — scope at binding, teardown
-- [Running Tests](../getting-started/running-tests.md) — CLI filters, tags, `--lf`
+- [Best Practices](../best-practices.md) - fixture placement, naming conventions, tags
+- [Fixtures](../core-concepts/fixtures.md) - scope at binding, teardown
+- [Running Tests](../getting-started/running-tests.md) - CLI filters, tags, `--lf`

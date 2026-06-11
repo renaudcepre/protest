@@ -55,5 +55,5 @@ your type checker at the right interpreter:
 - **mypy**: run via `uv run mypy ...` so it inherits the same
   interpreter, or set `python_executable` in `mypy.ini`.
 
-Once configured, no extra stub package or plugin is needed — protest
+Once configured, no extra stub package or plugin is needed - protest
 exposes its own types directly.

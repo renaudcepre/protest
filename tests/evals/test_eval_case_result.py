@@ -110,7 +110,7 @@ class TestFromTestResultHappyPath:
 
 
 class TestFromTestResultPassedDerivation:
-    """`passed` is derived, not passed in — the writer no longer gets it wrong."""
+    """`passed` is derived, not passed in - the writer no longer gets it wrong."""
 
     def test_passed_when_no_error_and_payload_passed(self) -> None:
         result = _make_result(payload=_make_payload(passed=True))

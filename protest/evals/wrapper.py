@@ -1,4 +1,4 @@
-"""Eval wrapper — turns a function into a scored eval test.
+"""Eval wrapper - turns a function into a scored eval test.
 
 The wrapper intercepts the return value, runs evaluators, and returns
 an EvalPayload. The rest of the pipeline (executor, outcome builder,
@@ -71,7 +71,7 @@ def make_eval_wrapper(
         per_case = _extract_per_case_evaluators(kwargs)
         all_evaluators.extend(per_case)
 
-        # Duplicate evaluator names are knowable before running anything —
+        # Duplicate evaluator names are knowable before running anything -
         # fail here rather than after burning judge tokens on a doomed case.
         _check_duplicate_evaluator_names(all_evaluators, case_name)
 
@@ -87,7 +87,7 @@ def make_eval_wrapper(
         )
 
         # Defense-in-depth backstop. With per-evaluator namespacing and the
-        # pre-execution name check above, no known path reaches this —
+        # pre-execution name check above, no known path reaches this -
         # distinct evaluator names can't emit the same key. Kept because
         # EvalPayload.scores is a dict: if a future extraction path ever
         # produces duplicate keys, silent overwrite is the worst failure.
@@ -162,7 +162,7 @@ def _validate_single_evalcase_param(func: Any) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Extract helpers — pull EvalCase from kwargs
+# Extract helpers - pull EvalCase from kwargs
 # ---------------------------------------------------------------------------
 
 
@@ -173,8 +173,8 @@ def _check_duplicate_evaluator_names(
 
     Score names are namespaced per evaluator, so a duplicate evaluator name
     (the same @evaluator attached twice, possibly rebound with different
-    kwargs) guarantees colliding score keys. Runs before any evaluator —
-    including judge calls — executes.
+    kwargs) guarantees colliding score keys. Runs before any evaluator -
+    including judge calls - executes.
     """
     seen: set[str] = set()
     duplicates: list[str] = []
@@ -260,7 +260,7 @@ async def run_evaluators(
 
     Callers must have validated the list (Evaluator | ShortCircuit only) at the
     boundary; the loop below trusts the Union and uses isinstance solely to
-    narrow it — the only legitimate isinstance kept in this module.
+    narrow it - the only legitimate isinstance kept in this module.
     """
     ctx = EvalContext(
         name=case_name,

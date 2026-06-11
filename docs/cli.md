@@ -335,7 +335,7 @@ Each case prints one line:
 
 After every suite, an aggregate-stats table summarizes the `Metric`
 fields across cases (mean / p50 / p5 / p95). `Verdict` and `Reason`
-fields don't appear in this table — only numeric `Metric` fields do.
+fields don't appear in this table - only numeric `Metric` fields do.
 
 Per-case markdown artifacts are written to
 `.protest/results/<suite>_<timestamp>/<case-id>.md`, with the full

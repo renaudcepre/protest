@@ -1,4 +1,4 @@
-"""EvalResultsWriter — writes per-case eval results as markdown files.
+"""EvalResultsWriter - writes per-case eval results as markdown files.
 
 Listens to TEST_PASS/FAIL events, filters for eval cases, and writes
 a markdown file for each case to .protest/results/<suite>_<timestamp>/.
@@ -92,7 +92,7 @@ def _render_case(case: EvalCaseResult) -> str:
     status = "PASS ✓" if case.passed else "FAIL ✗"
     duration = _format_case_duration(case.duration)
     lines: list[str] = [
-        f"# {case.case_name} — {status} ({duration})",
+        f"# {case.case_name} - {status} ({duration})",
         "",
     ]
 
