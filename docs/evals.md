@@ -147,6 +147,11 @@ protest eval evals.session:session --no-tag slow
 
 An evaluator is a function decorated with `@evaluator` that receives an `EvalContext` and returns a verdict. The decorator is mandatory: passing a plain function in `evaluators=[...]` raises `TypeError` at registration. The wrapping is what gives the evaluator its identity (used for hashing, history, reporting) and a typed `run(ctx)` method - there's no implicit conversion.
 
+Every eval case must have **at least one evaluator** at runtime - suite-level
+(`@suite.eval(evaluators=[...])`) or per-case (`EvalCase(evaluators=[...])`).
+Zero evaluators raises `NoEvaluatorsError`: `passed` is `all(verdicts)` and
+`all([])` is `True`, so a mis-wired eval would otherwise pass silently forever.
+
 !!! info "If your eval task returns a non-string output"
 
     The built-in evaluators (`contains_keywords`, `not_empty`, `max_length`,

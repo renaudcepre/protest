@@ -115,6 +115,26 @@ class MultipleEvalCaseParamsError(ProTestError):
         )
 
 
+class NoEvaluatorsError(ProTestError):
+    """Raised when an eval case ends up with zero evaluators at runtime.
+
+    `passed` is computed as `all(s.passed for s in scores)` and `all([])`
+    is `True` - an eval with no evaluators would silently pass no matter
+    what the task returned, making a wiring mistake (forgotten
+    `evaluators=`, per-case evaluators not attached) indistinguishable
+    from a healthy eval. The guard runs at execution time because
+    per-case evaluators are only known then.
+    """
+
+    def __init__(self, case_name: str):
+        super().__init__(
+            f"Eval '{case_name}' has no evaluators. An eval with zero "
+            f"evaluators would always pass (all([]) is True), hiding wiring "
+            f"mistakes. Pass evaluators= to @suite.eval(...) or attach "
+            f"per-case evaluators via EvalCase(evaluators=[...])."
+        )
+
+
 class ScoreNameCollisionError(ProTestError):
     """Raised when two evaluators in the same eval emit scores with the same name.
 
