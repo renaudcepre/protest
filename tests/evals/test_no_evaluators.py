@@ -1,4 +1,4 @@
-"""Tests for `NoEvaluatorsError` — fail loud on the zero-evaluators trap.
+"""Tests for `NoEvaluatorsError` - fail loud on the zero-evaluators trap.
 
 `passed` is `all(s.passed for s in scores)` and `all([])` is `True`: an
 eval that ends up with no evaluators at runtime would always pass,
@@ -44,28 +44,48 @@ class TestNoEvaluatorsRaises:
             asyncio.run(_invoke([], EvalCase(inputs="x", name="c1")))
         assert "c1" in str(excinfo.value)
 
-    def test_empty_short_circuit_raises(self) -> None:
-        """ShortCircuit([]) contributes zero evaluators — still the trap."""
-        with pytest.raises(NoEvaluatorsError):
-            asyncio.run(_invoke([ShortCircuit([])], EvalCase(inputs="x", name="c1")))
+    def test_empty_short_circuit_rejected_at_construction(self) -> None:
+        """ShortCircuit([]) would contribute zero evaluators - rejected
+        even earlier, when the group is built."""
+        with pytest.raises(ValueError, match="at least one evaluator"):
+            ShortCircuit([])
 
-    def test_session_path_marks_case_as_error(self) -> None:
-        """Through the runner, the guard surfaces as a failed session, not
-        a silently green one."""
-        from protest.api import run_session  # noqa: PLC0415 — heavy import
+    def test_session_path_fails_with_no_evaluators_error(self) -> None:
+        """Through the runner, the guard surfaces as a NoEvaluatorsError on
+        the case, not a silently green session."""
+        from protest.api import run_session  # noqa: PLC0415 - heavy import
+        from protest.plugin import PluginBase  # noqa: PLC0415 - heavy import
+
+        captured = []
+
+        class Capture(PluginBase):
+            name = "capture"
+
+            def on_test_fail(self, result) -> None:
+                captured.append(result)
 
         cases = ForEach([EvalCase(inputs="x", name="c1")])
         session = ProTestSession()
+        session.register_plugin(Capture())
         suite = EvalSuite("evals")
 
         @suite.eval()
         def forgot_evaluators(case: Annotated[EvalCase, From(cases)]) -> str:
             return str(case.inputs)
 
-        _ = forgot_evaluators
+        # Twin eval with an evaluator: must stay green, proving the
+        # failure below is the guard and not collateral wiring breakage.
+        @suite.eval(evaluators=[_ok])
+        def wired_correctly(case: Annotated[EvalCase, From(cases)]) -> str:
+            return str(case.inputs)
+
+        _ = forgot_evaluators, wired_correctly
         session.add_suite(suite)
         result = run_session(session)
         assert result.success is False
+        assert len(captured) == 1
+        assert isinstance(captured[0].error, NoEvaluatorsError)
+        assert "no evaluators" in str(captured[0].error)
 
 
 class TestEvaluatorsPresentPasses:

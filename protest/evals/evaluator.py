@@ -186,6 +186,12 @@ class ShortCircuit:
     """
 
     def __init__(self, evaluators: list[Evaluator]) -> None:
+        if not evaluators:
+            raise ValueError(
+                "ShortCircuit requires at least one evaluator. An empty "
+                "group contributes zero scores, feeding the always-green "
+                "trap (all([]) is True)."
+            )
         validate_evaluators(evaluators, _inside_short_circuit=True)
         self.evaluators = evaluators
 
