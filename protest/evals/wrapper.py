@@ -27,6 +27,7 @@ from protest.evals.types import EvalScore, TaskResult
 from protest.exceptions import (
     FixtureError,
     MultipleEvalCaseParamsError,
+    NoEvaluatorsError,
     ScoreNameCollisionError,
 )
 
@@ -48,6 +49,19 @@ def make_eval_wrapper(
         inputs = _extract_inputs(kwargs)
         metadata = _extract_metadata(kwargs)
 
+        all_evaluators = list(evaluators)
+        all_evaluators.extend(_extract_per_case_evaluators(kwargs))
+
+        # Both guards run before the task itself: the evaluator list is
+        # fully known from the kwargs alone, and the task is typically the
+        # expensive LLM call. Zero evaluators would silently pass
+        # (all([]) is True), and duplicate names guarantee colliding score
+        # keys - fail before spending any tokens on a doomed case.
+        flat_evaluators = _flatten_evaluators(all_evaluators)
+        if not flat_evaluators:
+            raise NoEvaluatorsError(case_name)
+        _check_duplicate_evaluator_names(flat_evaluators, case_name)
+
         start = time.perf_counter()
         if asyncio.iscoroutinefunction(func):
             raw_output = await func(**kwargs)
@@ -66,14 +80,6 @@ def make_eval_wrapper(
             task_cost = raw_output.cost or 0.0
         else:
             output = raw_output
-
-        all_evaluators = list(evaluators)
-        per_case = _extract_per_case_evaluators(kwargs)
-        all_evaluators.extend(per_case)
-
-        # Duplicate evaluator names are knowable before running anything -
-        # fail here rather than after burning judge tokens on a doomed case.
-        _check_duplicate_evaluator_names(all_evaluators, case_name)
 
         scores, eval_ctx = await run_evaluators(
             all_evaluators,
@@ -167,18 +173,18 @@ def _validate_single_evalcase_param(func: Any) -> None:
 
 
 def _check_duplicate_evaluator_names(
-    evaluators: list[Evaluator | ShortCircuit], case_name: str
+    evaluators: list[Evaluator], case_name: str
 ) -> None:
     """Raise ScoreNameCollisionError if an evaluator name appears twice.
 
     Score names are namespaced per evaluator, so a duplicate evaluator name
     (the same @evaluator attached twice, possibly rebound with different
-    kwargs) guarantees colliding score keys. Runs before any evaluator -
-    including judge calls - executes.
+    kwargs) guarantees colliding score keys. Takes the flattened list;
+    runs before the task and any evaluator executes.
     """
     seen: set[str] = set()
     duplicates: list[str] = []
-    for ev in _flatten_evaluators(evaluators):
+    for ev in evaluators:
         if ev.name in seen and ev.name not in duplicates:
             duplicates.append(ev.name)
         seen.add(ev.name)
