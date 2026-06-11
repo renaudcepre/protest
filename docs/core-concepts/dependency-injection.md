@@ -26,7 +26,7 @@ The `Use` marker takes a **function reference**, not a string. This makes depend
 
 ### `Type` is a hint, not a runtime check
 
-In `Annotated[Type, Use(fixture)]`, `Type` is a **type hint for your IDE and static checkers** — ProTest does not validate at runtime that `fixture()` actually returns a `Type`. This matches FastAPI's behavior with `Annotated[Type, Depends(fn)]`: the type is taken on faith, not enforced.
+In `Annotated[Type, Use(fixture)]`, `Type` is a **type hint for your IDE and static checkers** - ProTest does not validate at runtime that `fixture()` actually returns a `Type`. This matches FastAPI's behavior with `Annotated[Type, Depends(fn)]`: the type is taken on faith, not enforced.
 
 ```python
 @fixture()
@@ -35,7 +35,7 @@ def returns_str() -> str:
 
 @session.test()
 def test_mismatch(value: Annotated[int, Use(returns_str)]):
-    # `value` is actually a `str` at runtime — ProTest will not warn.
+    # `value` is actually a `str` at runtime - ProTest will not warn.
     # The mismatch surfaces only when `value` is used as an `int`.
     ...
 ```

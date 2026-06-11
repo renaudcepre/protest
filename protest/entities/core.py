@@ -21,7 +21,7 @@ FixtureCallable: TypeAlias = "Callable[..., Any]"
 
 
 class SuiteKind(str, Enum):
-    """Kind of suite — determines behavior (eval wiring, history, reporting).
+    """Kind of suite - determines behavior (eval wiring, history, reporting).
 
     Inherits from `str` (not `StrEnum`) for Python 3.10 compatibility.
     """

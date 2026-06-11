@@ -1,4 +1,4 @@
-"""Tests for `append_entry` — concurrent writer safety.
+"""Tests for `append_entry` - concurrent writer safety.
 
 Covers the basic invariant (one entry = one parseable line) and the
 multiprocess-concurrency case: N workers append concurrently to the same
@@ -33,7 +33,7 @@ def _worker_append(args: tuple[str, int, int]) -> None:
 
 
 def _worker_append_innocent(args: tuple[str, int, int]) -> None:
-    """Append entries on an unrelated commit — `clean_dirty` must not touch them."""
+    """Append entries on an unrelated commit - `clean_dirty` must not touch them."""
     path_str, worker_id, count = args
     path = Path(path_str)
     for i in range(count):
@@ -105,7 +105,7 @@ class TestAppendEntryConcurrency:
 
         lines = path.read_text().splitlines()
         assert len(lines) == total, (
-            f"expected {total} lines, got {len(lines)} — some writes were lost"
+            f"expected {total} lines, got {len(lines)} - some writes were lost"
         )
 
         counts_per_worker: dict[int, int] = {}
@@ -123,13 +123,13 @@ class TestCleanDirtyConcurrency:
 
     The dangerous race: clean_dirty does (read → compute kept → truncate →
     rewrite). Without a lock, an `append_entry` landing between the read
-    and the truncate is silently overwritten — the new entry disappears.
+    and the truncate is silently overwritten - the new entry disappears.
     Here we run both in parallel and check the conserved quantity: every
     appended "innocent" entry (different commit) must survive.
     """
 
     def test_concurrent_append_not_dropped_by_clean_dirty(self, tmp_path: Path) -> None:
-        # Skip outside a git repo — clean_dirty depends on `git rev-parse HEAD`.
+        # Skip outside a git repo - clean_dirty depends on `git rev-parse HEAD`.
         try:
             subprocess.run(
                 ["git", "rev-parse", "HEAD"],  # noqa: S607
@@ -170,10 +170,10 @@ class TestCleanDirtyConcurrency:
             entry = json.loads(raw)
             if entry.get("git", {}).get("commit") == "innocent_commit":
                 innocent_count += 1
-        # All `per_worker` innocent appends survived — none silently
+        # All `per_worker` innocent appends survived - none silently
         # discarded by an interleaved clean_dirty truncate.
         assert innocent_count == per_worker, (
-            f"expected {per_worker} innocent entries, got {innocent_count} — "
+            f"expected {per_worker} innocent entries, got {innocent_count} - "
             "concurrent clean_dirty dropped some appends"
         )
 

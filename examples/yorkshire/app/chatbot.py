@@ -1,4 +1,4 @@
-"""Yorkshire Terrier Expert Chatbot — fake LLM for eval demos.
+"""Yorkshire Terrier Expert Chatbot - fake LLM for eval demos.
 
 Simulates a RAG chatbot with realistic imperfections:
 - Sometimes misses keywords (simulates retrieval failures)
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import random
 
-# Knowledge base — what a real RAG system would retrieve
+# Knowledge base - what a real RAG system would retrieve
 YORKSHIRE_FACTS = {
     "size": "Yorkshire Terriers typically weigh between 2-3 kg. They come in teacup, mini, and standard sizes.",
     "grooming": "Yorkies with long coats need daily brushing. Seniors over 6 years need extra grooming care. Regular baths every 2-3 weeks.",
@@ -29,7 +29,7 @@ def yorkshire_chatbot(question: str) -> str:  # noqa: PLR0912
     """Fake chatbot that answers questions about Yorkshire Terriers.
 
     Simulates a RAG pipeline: keyword matching → fact retrieval → response generation.
-    No LLM calls — pure string matching for deterministic eval testing.
+    No LLM calls - pure string matching for deterministic eval testing.
     """
     question_lower = question.lower()
 

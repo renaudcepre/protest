@@ -50,7 +50,7 @@ class FakeJudge:
         if output_type is str:
             return JudgeResponse(output=f"judged: {prompt[:20]}")
         # Dataclass fallback: caller must use a dataclass whose fields all
-        # have defaults — no real LLM call to derive values from.
+        # have defaults - no real LLM call to derive values from.
         return JudgeResponse(output=output_type())
 
 
@@ -359,7 +359,7 @@ class TestJudgeE2E:
 
 class TestTaskResult:
     def test_task_result_unwrapped_for_evaluators(self) -> None:
-        """TaskResult is unwrapped — evaluators see the plain output."""
+        """TaskResult is unwrapped - evaluators see the plain output."""
 
         @evaluator
         def check_output(ctx: EvalContext) -> bool:

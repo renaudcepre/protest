@@ -61,7 +61,7 @@ HISTORY_FILE = "history.jsonl"
 # JSONL entry schema version. Bump when the on-disk shape changes in a way
 # that older readers can't transparently handle (new required fields,
 # restructured nesting). Entries written before this was introduced have no
-# `schema_version` key and are treated as version 0 (legacy — best-effort).
+# `schema_version` key and are treated as version 0 (legacy - best-effort).
 SCHEMA_VERSION = 1
 
 _warned_future_versions: set[int] = set()

@@ -5,8 +5,8 @@ An evaluator is a function decorated with ``@evaluator`` that receives an
 ``Evaluator`` instance that carries identity (for hashing/history) and exposes
 two distinct entry points:
 
-- ``ev(keyword=value, ...)`` — bind params, return a new ``Evaluator``
-- ``ev.run(ctx)`` — execute against an ``EvalContext`` (called by the framework)
+- ``ev(keyword=value, ...)`` - bind params, return a new ``Evaluator``
+- ``ev.run(ctx)`` - execute against an ``EvalContext`` (called by the framework)
 
 Plain callables are not accepted in ``evaluators=[...]``; use ``@evaluator``::
 
@@ -245,8 +245,8 @@ def _validate_return_annotation(fn: Callable[..., Any]) -> None:
 
     The return annotation is the score contract: it determines the score
     names recorded in history and the keys of skipped placeholders
-    (`Evaluator.score_names()`). An unannotated function — or one annotated
-    `-> X | None` / `-> Any` — would make the static derivation diverge
+    (`Evaluator.score_names()`). An unannotated function - or one annotated
+    `-> X | None` / `-> Any` - would make the static derivation diverge
     from what the run actually emits, silently reintroducing unstable
     score keys. Failing at decoration time keeps the contract checkable.
     """
@@ -256,7 +256,7 @@ def _validate_return_annotation(fn: Callable[..., Any]) -> None:
         raise TypeError(
             f"@evaluator '{fn.__name__}': return annotation cannot be resolved "
             f"at runtime ({exc}). Evaluator return types must resolve from "
-            f"module scope — import them at runtime (not only under "
+            f"module scope - import them at runtime (not only under "
             f"TYPE_CHECKING) and define them at module level (a dataclass "
             f"defined inside a function cannot be resolved). The annotation "
             f"drives score names in history and skipped placeholders."
@@ -316,12 +316,12 @@ def extract_scores_from_result(result: Any, evaluator_name: str) -> list[Any]:
 
 
 class Evaluator:
-    """A configured evaluator — callable with identity for hashing.
+    """A configured evaluator - callable with identity for hashing.
 
     Created by the ``@evaluator`` decorator. Two distinct entry points:
 
-    - ``ev(keyword=value, ...)`` — bind params, return a new Evaluator
-    - ``ev.run(ctx)`` — execute against an EvalContext
+    - ``ev(keyword=value, ...)`` - bind params, return a new Evaluator
+    - ``ev.run(ctx)`` - execute against an EvalContext
 
     Splitting these avoids the "callable that does two things based on the
     type of arg[0]" anti-pattern: each method has a single, monomorphic
@@ -390,7 +390,7 @@ def evaluator(fn: Callable[..., Any]) -> Evaluator:
     of dispatching at runtime.
 
     The function must declare a return annotation of ``bool`` or a
-    dataclass — the annotation is the score contract (see
+    dataclass - the annotation is the score contract (see
     `_validate_return_annotation`).
     """
     _validate_return_annotation(fn)

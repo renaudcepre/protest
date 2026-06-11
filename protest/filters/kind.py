@@ -1,4 +1,4 @@
-"""KindFilterPlugin — filters tests by suite kind (test/eval)."""
+"""KindFilterPlugin - filters tests by suite kind (test/eval)."""
 
 from __future__ import annotations
 

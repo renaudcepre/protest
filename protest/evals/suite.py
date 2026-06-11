@@ -1,4 +1,4 @@
-"""EvalSuite — eval-dedicated suite with judge and model support."""
+"""EvalSuite - eval-dedicated suite with judge and model support."""
 
 from __future__ import annotations
 

@@ -371,7 +371,7 @@ class ProTestSession:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool:
-        import time  # noqa: PLC0415 — only needed in __aexit__
+        import time  # noqa: PLC0415 - only needed in __aexit__
 
         teardown_start = time.perf_counter()
         set_session_teardown_capture(True)

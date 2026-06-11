@@ -43,7 +43,7 @@ def _rich_available() -> bool:
 
 
 # Per-run pass-rate thresholds for the eval suite color cue.
-# Strict default — green only if every case passes; yellow above half.
+# Strict default - green only if every case passes; yellow above half.
 _PERFECT_PASS_RATE = 1.0
 _PARTIAL_PASS_RATE = 0.5
 
@@ -64,7 +64,7 @@ def _format_test_name(result: TestResult) -> str:
 def _format_eval_scores_inline(result: TestResult, short: bool = False) -> str:
     """Format eval scores for inline display (e.g. ' bg_score=0.8 char_id=1.0').
 
-    When `short=True`, only failing/skipped scores are shown — passing scores
+    When `short=True`, only failing/skipped scores are shown - passing scores
     are hidden to keep the output readable on large suites.
     """
     if not result.eval_payload:
@@ -99,7 +99,7 @@ class RichReporter(PluginBase):
         show_output: bool = False,
         short: bool = False,
     ) -> None:
-        from rich.console import Console  # noqa: PLC0415 — optional dep, lazy
+        from rich.console import Console  # noqa: PLC0415 - optional dep, lazy
 
         self.console = Console(highlight=False)
         self._verbosity = verbosity
@@ -179,7 +179,7 @@ class RichReporter(PluginBase):
 
     def _print_bypass(self, message: str) -> None:
         """Print bypassing capture (for lifecycle messages emitted during tests)."""
-        from rich.console import Console  # noqa: PLC0415 — optional dep, lazy
+        from rich.console import Console  # noqa: PLC0415 - optional dep, lazy
 
         stream = real_stdout()
         Console(file=stream, highlight=False).print(message)
@@ -408,7 +408,7 @@ class RichReporter(PluginBase):
                 self._print(f"[dim]{escaped_line}[/]")
 
     def on_user_print(self, data: Any) -> None:
-        from rich.console import Console  # noqa: PLC0415 — optional dep, lazy
+        from rich.console import Console  # noqa: PLC0415 - optional dep, lazy
 
         msg, raw, prefix = data
         # Write to the real stdout, bypassing capture
@@ -424,7 +424,7 @@ class RichReporter(PluginBase):
     def on_eval_suite_end(self, report: Any) -> None:
         if not isinstance(report, EvalSuiteReport):
             return
-        from rich.table import Table  # noqa: PLC0415 — optional dep, lazy
+        from rich.table import Table  # noqa: PLC0415 - optional dep, lazy
 
         stats = report.all_score_stats()
         self._print("")

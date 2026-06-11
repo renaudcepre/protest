@@ -21,7 +21,7 @@ protest run tests:session -n 10
 **Ctrl+Click works.** Your IDE knows every type. No guessing where fixtures come from.
 
 ```python
-# pytest: "db" is resolved by name — requires searching through fixtures
+# pytest: "db" is resolved by name - requires searching through fixtures
 def test_user(db): ...
 
 # ProTest: Ctrl+Click → Go to definition. Full type inference.
@@ -30,7 +30,7 @@ def test_user(db: Annotated[Database, Use(database)]): ...
 
 ### Smart Tagging (Tag Propagation)
 
-Tag a fixture once, and **every test using it inherits the tag automatically**—even through deep dependency chains.
+Tag a fixture once, and **every test using it inherits the tag automatically** - even through deep dependency chains.
 
 ```python
 @fixture(tags=["database"])

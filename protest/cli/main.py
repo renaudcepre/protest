@@ -140,7 +140,7 @@ def _handle_live_command() -> None:
     )
     args = parser.parse_args(sys.argv[2:])
 
-    from protest.reporting.web import run_live_server  # noqa: PLC0415 — optional dep
+    from protest.reporting.web import run_live_server  # noqa: PLC0415 - optional dep
 
     run_live_server(port=args.port)
 

@@ -25,17 +25,17 @@ Evaluate LLM outputs with scored metrics and historical tracking.
 
 ## What is an Eval?
 
-A test produces **pass/fail**. An eval produces **scores** — numeric values (0.0–1.0) that measure output quality. Scores are aggregated across cases, tracked over time, and compared between runs.
+A test produces **pass/fail**. An eval produces **scores** - numeric values (0.0–1.0) that measure output quality. Scores are aggregated across cases, tracked over time, and compared between runs.
 
 ProTest evals use the same infrastructure as tests: fixtures, DI, parallelism, tags. An eval is a test that returns a value, scored by evaluators.
 
 !!! tip "First-run expectations: don't expect 100% green"
 
-    Unlike tests, evals are **expected to have failing cases** — that's
+    Unlike tests, evals are **expected to have failing cases** - that's
     the signal you're measuring. `protest eval` still exits 1 when any
     case fails a `Verdict` (so CI surfaces regressions), but the
     failures are not bugs, they're data points. The aggregate-stats
-    table is designed for this — you watch the metrics drift over time.
+    table is designed for this - you watch the metrics drift over time.
     Every run is recorded to `.protest/history.jsonl` so the trend
     accumulates from day one (browsing and run-comparison tooling lands
     in a future release).
@@ -80,11 +80,11 @@ protest eval evals.session:session
 4. Bool verdicts determine pass/fail
 5. Aggregated stats appear in the terminal
 
-The rest of the pipeline — fixtures, DI, parallelism, reporters — works identically to tests.
+The rest of the pipeline - fixtures, DI, parallelism, reporters - works identically to tests.
 
 ## EvalSuite
 
-`EvalSuite` groups eval cases. It's the eval equivalent of `ProTestSuite` — it forces `kind=EVAL` and carries model/judge configuration. Model and judge are suite-level config: each suite declares which model produced its results and which judge scores them.
+`EvalSuite` groups eval cases. It's the eval equivalent of `ProTestSuite` - it forces `kind=EVAL` and carries model/judge configuration. Model and judge are suite-level config: each suite declares which model produced its results and which judge scores them.
 
 ```python
 from protest.evals import EvalSuite
@@ -100,7 +100,7 @@ async def chatbot(case: Annotated[EvalCase, From(cases)]) -> str:
 
 ## EvalCase
 
-Typed dataclass for eval case data. All eval cases **must** use `EvalCase` — plain dicts are not supported.
+Typed dataclass for eval case data. All eval cases **must** use `EvalCase` - plain dicts are not supported.
 
 ```python
 from protest.evals import EvalCase
@@ -117,12 +117,12 @@ cases = ForEach([
 | `expected` | `Any` | Expected output (passed to evaluators as `ctx.expected_output`) |
 | `name` | `str` | Case identifier (used in test IDs and history) |
 | `evaluators` | `list` | Per-case evaluators (added to suite-level ones) |
-| `tags` | `list[str]` | First-class tags — flow to `protest eval --tag …` (see below) |
+| `tags` | `list[str]` | First-class tags - flow to `protest eval --tag …` (see below) |
 | `metadata` | `dict` | Arbitrary metadata, opaque to the framework |
 
 ### Why `EvalCase` and not a dict?
 
-The runtime reads case data via attribute access (`case.expected`, `case.metadata`, `case.evaluators`), not by string key. A plain dict would compile fine but blow up at runtime, and you'd lose the IDE refactor/Ctrl+Click affordances. Making `EvalCase` a typed dataclass surfaces typos at import time and keeps the contract one obvious place — same trade-off as `Annotated[T, Use(fn)]` over pytest's name-based fixture lookup.
+The runtime reads case data via attribute access (`case.expected`, `case.metadata`, `case.evaluators`), not by string key. A plain dict would compile fine but blow up at runtime, and you'd lose the IDE refactor/Ctrl+Click affordances. Making `EvalCase` a typed dataclass surfaces typos at import time and keeps the contract one obvious place - same trade-off as `Annotated[T, Use(fn)]` over pytest's name-based fixture lookup.
 
 ### Per-case `tags`
 
@@ -145,7 +145,7 @@ protest eval evals.session:session --no-tag slow
 
 ## Evaluators
 
-An evaluator is a function decorated with `@evaluator` that receives an `EvalContext` and returns a verdict. The decorator is mandatory: passing a plain function in `evaluators=[...]` raises `TypeError` at registration. The wrapping is what gives the evaluator its identity (used for hashing, history, reporting) and a typed `run(ctx)` method — there's no implicit conversion.
+An evaluator is a function decorated with `@evaluator` that receives an `EvalContext` and returns a verdict. The decorator is mandatory: passing a plain function in `evaluators=[...]` raises `TypeError` at registration. The wrapping is what gives the evaluator its identity (used for hashing, history, reporting) and a typed `run(ctx)` method - there's no implicit conversion.
 
 !!! info "If your eval task returns a non-string output"
 
@@ -180,24 +180,24 @@ from protest.evals import Metric, Verdict, Reason
 
 | Annotation | Role |
 |------------|------|
-| `Annotated[bool, Verdict]` | Verdict — pass/fail (`all(verdicts)`) |
-| `Annotated[float, Metric]` | Metric — aggregated in stats (mean/p50/p95) |
-| `Annotated[int, Metric]` | Metric — converted to float |
-| `Annotated[str, Reason]` | Reason — displayed on failure, stored in history |
+| `Annotated[bool, Verdict]` | Verdict - pass/fail (`all(verdicts)`) |
+| `Annotated[float, Metric]` | Metric - aggregated in stats (mean/p50/p95) |
+| `Annotated[int, Metric]` | Metric - converted to float |
+| `Annotated[str, Reason]` | Reason - displayed on failure, stored in history |
 
-Unannotated fields are ignored by the runner — free metadata.
+Unannotated fields are ignored by the runner - free metadata.
 
-The return annotation is **required** and must be `bool` or a dataclass —
+The return annotation is **required** and must be `bool` or a dataclass -
 `@evaluator` raises `TypeError` at decoration time otherwise (missing
 annotation, `-> float`, `-> X | None`, …). The annotation is the score
 contract: it determines the score names recorded in history and the keys
-of skipped placeholders, so it must also resolve at runtime — import the
+of skipped placeholders, so it must also resolve at runtime - import the
 return type for real (not only under `TYPE_CHECKING`) and define it at
 module level.
 
 ### Tracking-Only Evaluators
 
-A dataclass with `Metric` fields but no `Verdict` is tracking-only. The case always passes for this evaluator — it measures without gating.
+A dataclass with `Metric` fields but no `Verdict` is tracking-only. The case always passes for this evaluator - it measures without gating.
 
 ```python
 @dataclass
@@ -274,7 +274,7 @@ async def llm_judge(ctx: EvalContext, rubric: str = "", min_score: float = 0.7) 
     )
 ```
 
-The judge handles structured output — no text parsing needed. See [Judge](#judge) for setup.
+The judge handles structured output - no text parsing needed. See [Judge](#judge) for setup.
 
 ### Per-Case Thresholds
 
@@ -295,15 +295,15 @@ from protest.evals import ShortCircuit
 evaluators=[
     not_empty,                                                  # always runs
     ShortCircuit([
-        contains_keywords(keywords=["paris"], min_recall=0.5),  # 0ms — if fail → stop
-        llm_judge(rubric="factual accuracy"),                   # 3s — skipped if above fails
+        contains_keywords(keywords=["paris"], min_recall=0.5),  # 0ms - if fail → stop
+        llm_judge(rubric="factual accuracy"),                   # 3s - skipped if above fails
     ]),
 ]
 ```
 
 `ShortCircuit` is a group of ordered evaluators. The first `Verdict=False` stops the group. Evaluators outside the `ShortCircuit` always run.
 
-Execution order — `evaluators=[a, ShortCircuit([b, c]), d]`:
+Execution order - `evaluators=[a, ShortCircuit([b, c]), d]`:
 
 ```
 a            ← always runs
@@ -355,14 +355,14 @@ EvalCase(name="factual_accuracy_case", inputs="...", evaluators=[llm_judge(rubri
 | `contains_keywords` | `keywords, min_recall=1.0` | `recall: float`, `all_present: bool` |
 | `contains_expected` | `case_sensitive=False` | `bool` |
 | `does_not_contain` | `forbidden` | `ok: bool` |
-| `not_empty` | — | `bool` |
+| `not_empty` | - | `bool` |
 | `max_length` | `max_chars=500` | `conciseness: float`, `within_limit: bool` |
 | `min_length` | `min_chars=1` | `bool` |
 | `matches_regex` | `pattern` | `bool` |
 | `json_valid` | `required_keys=[]` | `valid: bool`, `has_required_keys: bool` |
-| `word_overlap` | — | `overlap: float` (tracking-only) |
+| `word_overlap` | - | `overlap: float` (tracking-only) |
 
-Dataclass fields surface as `<evaluator>.<field>` in scores — e.g.
+Dataclass fields surface as `<evaluator>.<field>` in scores - e.g.
 `contains_keywords.recall`, `json_valid.valid` (see
 [Score Namespacing](#score-namespacing)).
 
@@ -392,7 +392,7 @@ async def pipeline_eval(
 
 ## ModelLabel
 
-`ModelLabel` is a **passive label** that ProTest stores in the history alongside each run, so you can attribute results to a specific model and compare runs side-by-side. It does not route requests, set a temperature, pick a provider, or otherwise touch any LLM — the actual model wiring happens inside *your* task function (or the agent / SDK it calls).
+`ModelLabel` is a **passive label** that ProTest stores in the history alongside each run, so you can attribute results to a specific model and compare runs side-by-side. It does not route requests, set a temperature, pick a provider, or otherwise touch any LLM - the actual model wiring happens inside *your* task function (or the agent / SDK it calls).
 
 ```python
 suite = EvalSuite("pipeline", model=ModelLabel(name="qwen-2.5"))
@@ -400,7 +400,7 @@ suite = EvalSuite("pipeline", model=ModelLabel(name="qwen-2.5"))
 
 ## Judge
 
-A `Judge` is a protocol for LLM-as-judge evaluators. ProTest owns the interface — you plug in your LLM library.
+A `Judge` is a protocol for LLM-as-judge evaluators. ProTest owns the interface - you plug in your LLM library.
 
 ### The Protocol
 
@@ -439,7 +439,7 @@ class PydanticAIJudge:
         )
 ```
 
-Tokens and cost are optional — omit them if your provider doesn't expose usage data:
+Tokens and cost are optional - omit them if your provider doesn't expose usage data:
 
 ```python
 return JudgeResponse(output=result.output)  # tokens/cost = None, that's fine
@@ -471,7 +471,7 @@ class JudgeResult:
 async def llm_rubric(ctx: EvalContext, rubric: str = "") -> JudgeResult:
     return await ctx.judge(
         f"Evaluate this response.\n\nResponse: {ctx.output}\nCriteria: {rubric}",
-        JudgeResult,  # structured output — no text parsing
+        JudgeResult,  # structured output - no text parsing
     )
 ```
 
@@ -519,7 +519,7 @@ async def chatbot(case: Annotated[EvalCase, From(cases)]) -> TaskResult[str]:
     )
 ```
 
-This is **opt-in** — returning a plain `str` still works. ProTest unwraps `TaskResult` transparently: evaluators see the plain output, usage stats flow to the reporter and history.
+This is **opt-in** - returning a plain `str` still works. ProTest unwraps `TaskResult` transparently: evaluators see the plain output, usage stats flow to the reporter and history.
 
 ## Usage Display
 
@@ -542,7 +542,7 @@ If an evaluator raises an exception (e.g. LLM judge timeout), the case is marked
 ## Score Namespacing
 
 Each `Verdict` / `Metric` / `Reason` field from a dataclass evaluator becomes
-a score named `<evaluator>.<field>` — e.g. `keyword_check.recall`.
+a score named `<evaluator>.<field>` - e.g. `keyword_check.recall`.
 A bool evaluator's single verdict keeps the evaluator's bare name
 (`not_empty`). These names are the keys in the per-case score dict, the
 history file, and the markdown artifacts.
@@ -563,7 +563,7 @@ class CategoryMatch:
 ```
 
 Namespacing is unconditional: a score's full name depends only on its own
-evaluator, never on which other evaluators are wired in alongside it — so
+evaluator, never on which other evaluators are wired in alongside it - so
 the identifiers you grep for in history and scripts stay stable when
 evaluators are added or removed.
 
@@ -629,7 +629,7 @@ protest eval evals.session:session --show-logs=DEBUG
 
 Flags are independent and combinable: `-v --show-output --show-logs`.
 
-> **Note:** Failed eval cases always show inputs/output/expected — no flag needed.
+> **Note:** Failed eval cases always show inputs/output/expected - no flag needed.
 
 ## Output
 
@@ -677,8 +677,8 @@ yourself in the meantime.
 
 Each case in history carries two hashes:
 
-- **`case_hash`** — hash of inputs + expected output. Changes when the test data changes.
-- **`eval_hash`** — hash of evaluators. Changes when the scoring criteria change.
+- **`case_hash`** - hash of inputs + expected output. Changes when the test data changes.
+- **`eval_hash`** - hash of evaluators. Changes when the scoring criteria change.
 
 These hashes are what lets a later comparison distinguish a real regression
 from a definition change: when a case's `eval_hash` differs between two runs,

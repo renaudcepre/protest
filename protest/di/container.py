@@ -741,7 +741,7 @@ class FixtureContainer:
         """Run exit stack teardown, interruptible by cancellation event.
 
         Returns True if cancelled (should abort), False if completed normally.
-        Teardown runs on the SAME event loop as fixture setup — creating a
+        Teardown runs on the SAME event loop as fixture setup - creating a
         new loop would break async resources (drivers, connections) that hold
         references to the original loop.
         """

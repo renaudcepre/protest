@@ -108,7 +108,7 @@ class MultipleEvalCaseParamsError(ProTestError):
         params = ", ".join(param_names)
         super().__init__(
             f"Eval '{func_name}' declares multiple EvalCase parameters: {params}. "
-            f"Only one EvalCase parameter is supported per eval — it is used "
+            f"Only one EvalCase parameter is supported per eval - it is used "
             f"for case identity (name), expected output, inputs, metadata, "
             f"and per-case evaluators. Merge the cases into a single EvalCase, "
             f"or split into separate evals."
@@ -122,7 +122,7 @@ class ScoreNameCollisionError(ProTestError):
     dataclass results, the evaluator's name for bool results), so distinct
     evaluators can freely share field names like `ok` or `detail`. A
     collision therefore means the same evaluator name appears twice on one
-    case — e.g. the same `@evaluator` function attached twice (possibly with
+    case - e.g. the same `@evaluator` function attached twice (possibly with
     different bound kwargs), or two functions sharing a `__name__`. The
     duplicate scores would silently overwrite each other in the per-case
     report and history, so we fail loud instead.
@@ -133,7 +133,7 @@ class ScoreNameCollisionError(ProTestError):
         super().__init__(
             f"Score-name collision in eval '{case_name}': {dup_str}. "
             f"Scores are namespaced per evaluator, so this means the same "
-            f"evaluator name appears more than once on this case — the same "
+            f"evaluator name appears more than once on this case - the same "
             f"@evaluator attached twice (e.g. with different bound kwargs) "
             f"or two functions sharing a name. Wrap each binding in its own "
             f"named @evaluator function so every score name is unique."

@@ -3,7 +3,7 @@
 The autouse `_isolate_protest_history` fixture in `tests/conftest.py`
 monkeypatches `storage.DEFAULT_HISTORY_DIR` to a per-test temp directory.
 These tests assert that both the storage functions and the HistoryPlugin
-pick up the override — any regression in the plumbing would let runs leak
+pick up the override - any regression in the plumbing would let runs leak
 into `.protest/history.jsonl` in the real project cwd.
 """
 

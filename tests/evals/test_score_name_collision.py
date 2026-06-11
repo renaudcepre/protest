@@ -2,7 +2,7 @@
 
 Dataclass scores are namespaced per evaluator (``<evaluator>.<field>``),
 so two evaluators on the same case can both declare plain ``ok`` /
-``detail`` fields. A collision is still possible — and raises — when the
+``detail`` fields. A collision is still possible - and raises - when the
 same evaluator name appears twice on one case (the same ``@evaluator``
 attached twice, e.g. rebound with different kwargs).
 """
@@ -39,7 +39,7 @@ class _ShapeA:
 @dataclass
 class _ShapeB:
     other_check: Annotated[bool, Verdict]
-    detail: Annotated[str, Reason] = ""  # same field name as _ShapeA — fine
+    detail: Annotated[str, Reason] = ""  # same field name as _ShapeA - fine
 
 
 @evaluator
@@ -59,7 +59,7 @@ def _bool_one(ctx: EvalContext) -> bool:
 
 @dataclass
 class _ShapeWithBoolOneField:
-    _bool_one: Annotated[bool, Verdict]  # namespaced — no clash with _bool_one
+    _bool_one: Annotated[bool, Verdict]  # namespaced - no clash with _bool_one
 
 
 @evaluator
@@ -138,7 +138,7 @@ class TestCollisionRaises:
         assert "c3" in msg
 
     def test_collision_detected_before_any_evaluator_runs(self) -> None:
-        """The name check fires pre-execution — no evaluator (judge) call is made."""
+        """The name check fires pre-execution - no evaluator (judge) call is made."""
         calls: list[str] = []
 
         @evaluator
@@ -184,7 +184,7 @@ class TestSkippedPlaceholderNamespacing:
         assert "_shape_a.matches" in payload.scores
         assert "_shape_a.detail" in payload.scores
         assert payload.scores["_shape_a.matches"].skipped is True
-        # Bare evaluator name must NOT appear — that was the pre-namespacing key.
+        # Bare evaluator name must NOT appear - that was the pre-namespacing key.
         assert "_shape_a" not in payload.scores
 
     def test_skipped_bool_evaluator_keeps_bare_name(self) -> None:
@@ -207,7 +207,7 @@ class TestSkippedPlaceholderNamespacing:
 class TestSessionPath:
     def test_session_with_shared_field_names_runs_clean(self) -> None:
         """Smoke check: shared `detail` fields pass through the full session."""
-        from protest.api import run_session  # noqa: PLC0415 — heavy import
+        from protest.api import run_session  # noqa: PLC0415 - heavy import
 
         session = ProTestSession()
         suite = EvalSuite("evals")

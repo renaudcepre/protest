@@ -1,10 +1,10 @@
-"""Tests for C3 — sub-millisecond duration handling.
+"""Tests for C3 - sub-millisecond duration handling.
 
 The eval pipeline persists `EvalPayload.task_duration` (SUT-only timing).
 For deterministic stubs / fast classifiers, that value is sub-millisecond
 and the previous serializer (`round(_, 3)`) collapsed everything to `0.0`,
 making run-over-run comparisons useless. The markdown renderer had the
-matching bug — it printed `0ms` for any sub-ms task.
+matching bug - it printed `0ms` for any sub-ms task.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ class TestSerializerPrecision:
         case = _make_case(2.07e-05)  # 20.7 µs
         entry = _serialize_eval_case(case)
         # Previously: 0.0 (round to 3 decimals)
-        # Now: 2e-05 (round to 5 decimals — 10 µs precision)
+        # Now: 2e-05 (round to 5 decimals - 10 µs precision)
         assert entry["duration"] > 0
         assert entry["duration"] == 2e-05
 
@@ -59,7 +59,7 @@ class TestMarkdownDurationFormat:
         assert _format_case_duration(2.07e-05) == "21µs"
 
     def test_two_decimals_in_low_milliseconds(self) -> None:
-        # 2.5 ms — keep one fractional digit so 1ms vs 2ms is visible.
+        # 2.5 ms - keep one fractional digit so 1ms vs 2ms is visible.
         assert _format_case_duration(0.0025) == "2.50ms"
 
     def test_integer_milliseconds_in_mid_range(self) -> None:

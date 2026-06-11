@@ -32,7 +32,7 @@ tests/
 3. **Fixtures live near their tests** - in the same file or a sibling `fixtures.py`
 4. **Nesting is meaningful** - `API::Users::Permissions` not arbitrary hierarchies
 
-> **Full guide:** [Project Organization](guides/project-organization.md) — multi-file patterns, anti-patterns, and a real-world walkthrough.
+> **Full guide:** [Project Organization](guides/project-organization.md) - multi-file patterns, anti-patterns, and a real-world walkthrough.
 
 ## Session Organization
 
@@ -91,7 +91,7 @@ import tests.test_users   # noqa: F401, E402
 import tests.test_orders   # noqa: F401, E402
 ```
 
-The imports are unused — they exist only to trigger `@suite.test()` registration at import time. This requires `# noqa` to silence linters and makes dependencies invisible. See the [Project Organization guide](guides/project-organization.md) for the correct pattern.
+The imports are unused - they exist only to trigger `@suite.test()` registration at import time. This requires `# noqa` to silence linters and makes dependencies invisible. See the [Project Organization guide](guides/project-organization.md) for the correct pattern.
 
 ## Suite Design
 

@@ -1,4 +1,4 @@
-"""HistoryPlugin — persists test and eval run results as JSONL."""
+"""HistoryPlugin - persists test and eval run results as JSONL."""
 
 from __future__ import annotations
 
@@ -214,7 +214,7 @@ def _serialize_eval_case(case: EvalCaseResult) -> dict[str, Any]:
     """Serialize an eval case result for JSONL storage.
 
     Skipped scores are excluded: a ShortCircuit skip produces
-    `EvalScore(value=False, skipped=True)` — serializing it as an assertion
+    `EvalScore(value=False, skipped=True)` - serializing it as an assertion
     would look like a real failure in `history --compare` diffs.
 
     `case.duration` here is `EvalPayload.task_duration` (SUT-only timing,

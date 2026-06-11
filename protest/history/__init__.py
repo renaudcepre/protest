@@ -1,4 +1,4 @@
-"""History module — run tracking for tests and evals."""
+"""History module - run tracking for tests and evals."""
 
 from protest.history.storage import (
     HISTORY_FILE,

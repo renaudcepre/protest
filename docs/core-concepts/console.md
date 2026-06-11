@@ -45,5 +45,5 @@ The message is passed as-is to both reporters.
 `console.print` sends a `USER_PRINT` event through the event bus. The reporter receives it and writes to the real stdout (bypassing test capture). This means:
 
 - Messages appear immediately, not buffered until test end
-- Works with `-n 4` (concurrent tests) — the event bus serializes per plugin
+- Works with `-n 4` (concurrent tests) - the event bus serializes per plugin
 - No interference with test capture or `result.output`
